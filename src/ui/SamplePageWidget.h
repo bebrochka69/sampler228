@@ -1,29 +1,39 @@
 #pragma once
 
-#include <QString>
+#include <QRectF>
 #include <QStringList>
 #include <QVector>
 #include <QWidget>
 
+#include "SampleBrowserModel.h"
+
+class QMouseEvent;
 class QPaintEvent;
+class QWheelEvent;
+class SampleSession;
 
 class SamplePageWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit SamplePageWidget(QWidget *parent = nullptr);
+    explicit SamplePageWidget(SampleSession *session, QWidget *parent = nullptr);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
 private:
-    struct NavItem {
-        QString label;
-        int indent = 0;
-        bool isFolder = false;
-        bool selected = false;
-    };
+    void refreshBrowser();
+    void rebuildProjects();
+    void clampScroll();
 
-    QVector<NavItem> m_navItems;
+    SampleSession *m_session = nullptr;
+    SampleBrowserModel m_browser;
+    QVector<SampleBrowserModel::Entry> m_entries;
     QStringList m_projects;
-    QVector<float> m_wave;
+    int m_scrollOffset = 0;
+
+    QRectF m_playRect;
+    QRectF m_stopRect;
+    QRectF m_rescanRect;
 };

@@ -1,0 +1,58 @@
+#pragma once
+
+#include <QAudioDecoder>
+#include <QMediaPlayer>
+#include <QObject>
+#include <QString>
+#include <QVector>
+
+class QAudioOutput;
+
+class SampleSession : public QObject {
+    Q_OBJECT
+public:
+    explicit SampleSession(QObject *parent = nullptr);
+
+    void setSource(const QString &path);
+    QString sourcePath() const { return m_sourcePath; }
+
+    void play();
+    void stop();
+    bool isPlaying() const;
+
+    const QVector<float> &waveform() const { return m_waveform; }
+    bool hasWaveform() const { return !m_waveform.isEmpty(); }
+    QString infoText() const { return m_infoText; }
+    QString errorText() const { return m_errorText; }
+
+signals:
+    void waveformChanged();
+    void infoChanged();
+    void playbackChanged(bool playing);
+    void errorChanged(const QString &message);
+
+private slots:
+    void handleBufferReady();
+    void handleDecodeFinished();
+    void handleDecodeError(QAudioDecoder::Error error);
+    void handlePlayerState(QMediaPlayer::PlaybackState state);
+
+private:
+    void startDecode();
+    void resetDecodeState();
+    void rebuildWaveform();
+
+    QString m_sourcePath;
+    QAudioDecoder m_decoder;
+    QMediaPlayer *m_player = nullptr;
+    QAudioOutput *m_audioOutput = nullptr;
+
+    QVector<float> m_pcm;
+    QVector<float> m_waveform;
+    int m_sampleRate = 0;
+    int m_channels = 0;
+    qint64 m_frames = 0;
+    QString m_infoText;
+    QString m_errorText;
+    bool m_decoding = false;
+};

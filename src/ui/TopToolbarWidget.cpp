@@ -241,7 +241,8 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(9, QFont::DemiBold));
     p.drawText(QRectF(barLeft - 2, meterRect.top() + 2, barWidth + 4, 12), Qt::AlignCenter, "L");
-    p.drawText(QRectF(barLeft + barWidth + barGap - 2, meterRect.top() + 2, barWidth + 4, 12),\n               Qt::AlignCenter, "R");
+    p.drawText(QRectF(barLeft + barWidth + barGap - 2, meterRect.top() + 2, barWidth + 4, 12),
+               Qt::AlignCenter, "R");
 
     const float zeroDbY = barTop + barHeight * 0.2f;
     p.setPen(QPen(Theme::textMuted(), 1.0));

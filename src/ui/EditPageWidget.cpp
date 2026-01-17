@@ -2,10 +2,12 @@
 
 #include <QPainter>
 
+#include "SampleSession.h"
 #include "Theme.h"
 #include "WaveformRenderer.h"
 
-EditPageWidget::EditPageWidget(QWidget *parent) : QWidget(parent) {
+EditPageWidget::EditPageWidget(SampleSession *session, QWidget *parent)
+    : QWidget(parent), m_session(session) {
     setAutoFillBackground(false);
 
     m_params = {
@@ -20,6 +22,10 @@ EditPageWidget::EditPageWidget(QWidget *parent) : QWidget(parent) {
     };
 
     m_wave = WaveformRenderer::makeDemoWave(220, 21);
+
+    if (m_session) {
+        connect(m_session, &SampleSession::waveformChanged, this, [this]() { update(); });
+    }
 }
 
 void EditPageWidget::paintEvent(QPaintEvent *event) {
@@ -41,7 +47,11 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.drawRoundedRect(waveRect, 10, 10);
 
     const QRectF waveInner = waveRect.adjusted(12, 12, -12, -12);
-    WaveformRenderer::drawWaveform(p, waveInner, m_wave, Theme::accentAlt(),
+    QVector<float> wave = m_wave;
+    if (m_session && m_session->hasWaveform()) {
+        wave = m_session->waveform();
+    }
+    WaveformRenderer::drawWaveform(p, waveInner, wave, Theme::accentAlt(),
                                    Theme::withAlpha(Theme::textMuted(), 120));
 
     // Vertical grid lines with stronger center divisions.

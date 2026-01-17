@@ -6,10 +6,12 @@
 
 class QPaintEvent;
 
+class SampleSession;
+
 class EditPageWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit EditPageWidget(QWidget *parent = nullptr);
+    explicit EditPageWidget(SampleSession *session, QWidget *parent = nullptr);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -22,4 +24,5 @@ private:
 
     QVector<Param> m_params;
     QVector<float> m_wave;
+    SampleSession *m_session = nullptr;
 };

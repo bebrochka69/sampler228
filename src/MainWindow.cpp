@@ -9,6 +9,7 @@
 #include "ui/SeqPageWidget.h"
 #include "ui/SimplePageWidget.h"
 #include "ui/TopToolbarWidget.h"
+#include "SampleSession.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("GrooveBox UI");
@@ -22,8 +23,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     m_toolbar = new TopToolbarWidget(central);
 
     m_stack = new QStackedWidget(central);
-    m_stack->addWidget(new SamplePageWidget(m_stack));
-    m_stack->addWidget(new EditPageWidget(m_stack));
+    m_sampleSession = new SampleSession(this);
+    m_stack->addWidget(new SamplePageWidget(m_sampleSession, m_stack));
+    m_stack->addWidget(new EditPageWidget(m_sampleSession, m_stack));
     m_stack->addWidget(new SeqPageWidget(m_stack));
     m_stack->addWidget(new SimplePageWidget("FX", m_stack));
     m_stack->addWidget(new SimplePageWidget("ARRANG", m_stack));

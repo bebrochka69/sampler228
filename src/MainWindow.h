@@ -6,6 +6,7 @@ class BpmArcWidget;
 class QStackedWidget;
 class TopToolbarWidget;
 class QResizeEvent;
+class SampleSession;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -19,4 +20,5 @@ private:
     TopToolbarWidget *m_toolbar = nullptr;
     QStackedWidget *m_stack = nullptr;
     BpmArcWidget *m_bpmArc = nullptr;
+    SampleSession *m_sampleSession = nullptr;
 };

@@ -1,5 +1,7 @@
 #include <QApplication>
+#include <QCoreApplication>
 
+#include "FramebufferCleaner.h"
 #include "MainWindow.h"
 
 int main(int argc, char *argv[]) {
@@ -9,6 +11,10 @@ int main(int argc, char *argv[]) {
 
     MainWindow window;
     window.show();
+
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, []() {
+        FramebufferCleaner::clearIfNeeded();
+    });
 
     return app.exec();
 }

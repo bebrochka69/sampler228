@@ -17,7 +17,7 @@ inline QColor textMuted() { return QColor(165, 170, 182); }
 inline QColor warn() { return QColor(255, 120, 30); }
 inline QColor danger() { return QColor(255, 70, 70); }
 
-inline QFont baseFont(int pt, int weight = QFont::Normal) {
+inline QFont baseFont(int pt, QFont::Weight weight = QFont::Normal) {
     QFont f("Noto Sans");
     if (!QFontInfo(f).exactMatch()) {
         f = QFont("DejaVu Sans");
@@ -27,7 +27,7 @@ inline QFont baseFont(int pt, int weight = QFont::Normal) {
     return f;
 }
 
-inline QFont condensedFont(int pt, int weight = QFont::DemiBold) {
+inline QFont condensedFont(int pt, QFont::Weight weight = QFont::DemiBold) {
     QFont f("Noto Sans Condensed");
     if (!QFontInfo(f).exactMatch()) {
         f = QFont("DejaVu Sans Condensed");
