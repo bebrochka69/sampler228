@@ -102,7 +102,6 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
     QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing, true);
 
     p.fillRect(rect(), Theme::bg0());
     p.setPen(QPen(Theme::stroke(), 1.2));

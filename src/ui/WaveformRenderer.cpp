@@ -9,7 +9,6 @@ void WaveformRenderer::drawWaveform(QPainter &p, const QRectF &rect, const QVect
 
     p.save();
     p.setClipRect(rect);
-    p.setRenderHint(QPainter::Antialiasing, true);
 
     const float midY = rect.center().y();
     const float amp = rect.height() * 0.42f;

@@ -257,7 +257,6 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     clampScroll();
 
     QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing, true);
 
     p.fillRect(rect(), Theme::bg0());
 

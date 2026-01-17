@@ -1,8 +1,10 @@
 #include "MainWindow.h"
 
+#include <QCloseEvent>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
+#include "FramebufferCleaner.h"
 #include "ui/EditPageWidget.h"
 #include "ui/SamplePageWidget.h"
 #include "ui/SeqPageWidget.h"
@@ -13,7 +15,6 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("GrooveBox UI");
-    setFixedSize(1280, 720);
 
     QWidget *central = new QWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(central);
@@ -39,4 +40,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(m_toolbar, &TopToolbarWidget::pageSelected, m_stack, &QStackedWidget::setCurrentIndex);
     connect(m_stack, &QStackedWidget::currentChanged, m_toolbar, &TopToolbarWidget::setActiveIndex);
 
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    FramebufferCleaner::clearIfNeeded();
+    QMainWindow::closeEvent(event);
 }

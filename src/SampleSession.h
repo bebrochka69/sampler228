@@ -41,11 +41,13 @@ private:
     void startDecode();
     void resetDecodeState();
     void rebuildWaveform();
+    void ensureAudioOutput();
 
     QString m_sourcePath;
     QAudioDecoder m_decoder;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
+    bool m_hasAudioOutput = false;
 
     QVector<float> m_pcm;
     QVector<float> m_waveform;

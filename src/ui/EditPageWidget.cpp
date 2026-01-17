@@ -30,7 +30,6 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
     QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing, true);
 
     p.fillRect(rect(), Theme::bg0());
 

@@ -3,6 +3,7 @@
 #include <QAudioBuffer>
 #include <QAudioFormat>
 #include <QAudioOutput>
+#include <QMediaDevices>
 #include <QMediaPlayer>
 #include <QTime>
 #include <QUrl>
@@ -34,16 +35,13 @@ float sampleToFloat(const char *data, QAudioFormat::SampleFormat format) {
 }  // namespace
 
 SampleSession::SampleSession(QObject *parent) : QObject(parent) {
-    m_audioOutput = new QAudioOutput(this);
-    m_player = new QMediaPlayer(this);
-    m_player->setAudioOutput(m_audioOutput);
-
     connect(&m_decoder, &QAudioDecoder::bufferReady, this, &SampleSession::handleBufferReady);
     connect(&m_decoder, &QAudioDecoder::finished, this, &SampleSession::handleDecodeFinished);
     connect(&m_decoder,
             static_cast<void (QAudioDecoder::*)(QAudioDecoder::Error)>(&QAudioDecoder::error),
             this, &SampleSession::handleDecodeError);
-    connect(m_player, &QMediaPlayer::playbackStateChanged, this, &SampleSession::handlePlayerState);
+
+    ensureAudioOutput();
 }
 
 void SampleSession::setSource(const QString &path) {
@@ -52,10 +50,17 @@ void SampleSession::setSource(const QString &path) {
     }
 
     m_sourcePath = path;
-    m_player->stop();
-    m_player->setSource(QUrl::fromLocalFile(path));
+    if (m_player) {
+        m_player->stop();
+        m_player->setSource(QUrl::fromLocalFile(path));
+    }
     resetDecodeState();
     m_errorText.clear();
+
+    if (!m_hasAudioOutput) {
+        m_errorText = "No audio output device";
+        emit errorChanged(m_errorText);
+    }
 
     if (!m_sourcePath.isEmpty()) {
         m_infoText = "Loading...";
@@ -68,6 +73,14 @@ void SampleSession::play() {
     if (m_sourcePath.isEmpty()) {
         return;
     }
+    ensureAudioOutput();
+    if (!m_player || !m_hasAudioOutput) {
+        if (m_errorText != "No audio output device") {
+            m_errorText = "No audio output device";
+            emit errorChanged(m_errorText);
+        }
+        return;
+    }
     if (m_player->source().toLocalFile() != m_sourcePath) {
         m_player->setSource(QUrl::fromLocalFile(m_sourcePath));
     }
@@ -75,11 +88,13 @@ void SampleSession::play() {
 }
 
 void SampleSession::stop() {
-    m_player->stop();
+    if (m_player) {
+        m_player->stop();
+    }
 }
 
 bool SampleSession::isPlaying() const {
-    return m_player->playbackState() == QMediaPlayer::PlayingState;
+    return m_player && m_player->playbackState() == QMediaPlayer::PlayingState;
 }
 
 void SampleSession::startDecode() {
@@ -154,6 +169,34 @@ void SampleSession::handleDecodeError(QAudioDecoder::Error error) {
 
 void SampleSession::handlePlayerState(QMediaPlayer::PlaybackState state) {
     emit playbackChanged(state == QMediaPlayer::PlayingState);
+}
+
+void SampleSession::ensureAudioOutput() {
+    if (m_player) {
+        return;
+    }
+
+    QMediaDevices devices;
+    const QList<QAudioDevice> outputs = devices.audioOutputs();
+    if (outputs.isEmpty()) {
+        m_hasAudioOutput = false;
+        if (m_errorText != "No audio output device") {
+            m_errorText = "No audio output device";
+            emit errorChanged(m_errorText);
+        }
+        return;
+    }
+
+    m_hasAudioOutput = true;
+    m_audioOutput = new QAudioOutput(outputs.front(), this);
+    m_player = new QMediaPlayer(this);
+    m_player->setAudioOutput(m_audioOutput);
+    connect(m_player, &QMediaPlayer::playbackStateChanged, this, &SampleSession::handlePlayerState);
+
+    if (m_errorText == "No audio output device") {
+        m_errorText.clear();
+        emit errorChanged(m_errorText);
+    }
 }
 
 void SampleSession::rebuildWaveform() {
