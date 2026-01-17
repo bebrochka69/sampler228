@@ -1,6 +1,7 @@
 #include "SampleSession.h"
 
 #include <QAudioBuffer>
+#include <QAudioDevice>
 #include <QAudioFormat>
 #include <QAudioOutput>
 #include <QMediaDevices>
@@ -176,9 +177,8 @@ void SampleSession::ensureAudioOutput() {
         return;
     }
 
-    QMediaDevices devices;
-    const QList<QAudioDevice> outputs = devices.audioOutputs();
-    if (outputs.isEmpty()) {
+    const QAudioDevice output = QMediaDevices::defaultAudioOutput();
+    if (output.isNull()) {
         m_hasAudioOutput = false;
         if (m_errorText != "No audio output device") {
             m_errorText = "No audio output device";
@@ -188,7 +188,7 @@ void SampleSession::ensureAudioOutput() {
     }
 
     m_hasAudioOutput = true;
-    m_audioOutput = new QAudioOutput(outputs.front(), this);
+    m_audioOutput = new QAudioOutput(output, this);
     m_player = new QMediaPlayer(this);
     m_player->setAudioOutput(m_audioOutput);
     connect(m_player, &QMediaPlayer::playbackStateChanged, this, &SampleSession::handlePlayerState);
