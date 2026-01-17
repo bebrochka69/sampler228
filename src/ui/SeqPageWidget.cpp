@@ -2,8 +2,6 @@
 
 #include <QMouseEvent>
 #include <QPainter>
-#include <QRandomGenerator>
-
 #include "Theme.h"
 
 SeqPageWidget::SeqPageWidget(QWidget *parent) : QWidget(parent) {
@@ -15,17 +13,7 @@ SeqPageWidget::SeqPageWidget(QWidget *parent) : QWidget(parent) {
 
     for (int pad = 0; pad < 8; ++pad) {
         for (int step = 0; step < 64; ++step) {
-            bool hit = false;
-            if (pad == 0) {
-                hit = (step % 2 == 0);
-            } else if (pad == 1) {
-                hit = (step % 4 == 1);
-            } else if (pad == 2) {
-                hit = (step % 8 == 3);
-            } else {
-                hit = (QRandomGenerator::global()->bounded(100) < 8);
-            }
-            m_steps[pad][step] = hit;
+            m_steps[pad][step] = false;
         }
     }
 }
@@ -93,10 +81,7 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
-    QLinearGradient bg(0, 0, 0, height());
-    bg.setColorAt(0.0, Theme::bg0());
-    bg.setColorAt(1.0, Theme::bg2());
-    p.fillRect(rect(), bg);
+    p.fillRect(rect(), Theme::bg0());
 
     const QRectF grid = gridRect();
     const int cols = 16;
@@ -105,7 +90,7 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     const float cellH = grid.height() / rows;
 
     const QColor groupA = Theme::bg1();
-    const QColor groupB = Theme::withAlpha(Theme::accent(), 40);
+    const QColor groupB = Theme::withAlpha(Theme::stroke(), 40);
 
     // Background groups.
     for (int col = 0; col < cols; ++col) {
@@ -124,7 +109,7 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
 
             p.setPen(QPen(Theme::stroke(), 1.0));
             p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(box, 4, 4);
+            p.drawRect(box);
 
             for (int pad = 0; pad < 8; ++pad) {
                 if (pad == m_activePad) {
@@ -138,13 +123,13 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
                 const QRectF ghostBox = box.adjusted(6, 6, -6, -6);
                 p.setBrush(ghost);
                 p.setPen(Qt::NoPen);
-                p.drawRoundedRect(ghostBox, 3, 3);
+                p.drawRect(ghostBox);
             }
 
             if (m_steps[m_activePad][step]) {
                 p.setBrush(m_padColors[m_activePad]);
                 p.setPen(Qt::NoPen);
-                p.drawRoundedRect(box.adjusted(3, 3, -3, -3), 4, 4);
+                p.drawRect(box.adjusted(3, 3, -3, -3));
             }
         }
     }
@@ -159,15 +144,11 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
         const QRectF padRect(pads.left() + i * padW + 6, pads.top() + 8, padW - 12, padH);
         const bool active = (i == m_activePad);
         p.setBrush(active ? m_padColors[i] : Theme::bg1());
-        p.setPen(QPen(active ? m_padColors[i] : Theme::stroke(), 1.2));
-        p.drawRoundedRect(padRect, 8, 8);
+        p.setPen(QPen(active ? Theme::accentAlt() : Theme::stroke(), 1.2));
+        p.drawRect(padRect);
 
         p.setPen(active ? Theme::bg0() : Theme::textMuted());
         p.drawText(padRect, Qt::AlignCenter, QString("PAD %1").arg(i + 1));
     }
 
-    p.setPen(Theme::textMuted());
-    p.setFont(Theme::baseFont(9));
-    p.drawText(QRectF(pads.left(), pads.bottom() - 10, pads.width(), 20),
-               Qt::AlignCenter, "Shift-click: fill every 2 steps");
 }

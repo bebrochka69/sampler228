@@ -21,7 +21,6 @@ private:
     bool m_hasPrev = false;
 #endif
 
-    float m_cpuUsage = 0.22f;
-    float m_ramUsage = 0.37f;
-    float m_phase = 0.0f;
+    float m_cpuUsage = 0.0f;
+    float m_ramUsage = 0.0f;
 };

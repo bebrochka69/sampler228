@@ -5,20 +5,20 @@
 #include <QFontInfo>
 
 namespace Theme {
-inline QColor bg0() { return QColor(15, 17, 22); }
-inline QColor bg1() { return QColor(24, 27, 34); }
-inline QColor bg2() { return QColor(34, 38, 48); }
-inline QColor bg3() { return QColor(46, 51, 64); }
-inline QColor stroke() { return QColor(70, 77, 92); }
-inline QColor accent() { return QColor(238, 86, 65); }
-inline QColor accentAlt() { return QColor(63, 198, 179); }
-inline QColor text() { return QColor(235, 237, 240); }
-inline QColor textMuted() { return QColor(165, 170, 182); }
-inline QColor warn() { return QColor(255, 120, 30); }
-inline QColor danger() { return QColor(255, 70, 70); }
+inline QColor bg0() { return QColor(30, 33, 44); }
+inline QColor bg1() { return QColor(40, 44, 58); }
+inline QColor bg2() { return QColor(24, 27, 37); }
+inline QColor bg3() { return QColor(52, 57, 72); }
+inline QColor stroke() { return QColor(104, 92, 214); }
+inline QColor accent() { return QColor(122, 255, 205); }
+inline QColor accentAlt() { return QColor(255, 140, 208); }
+inline QColor text() { return QColor(232, 236, 245); }
+inline QColor textMuted() { return QColor(180, 188, 210); }
+inline QColor warn() { return QColor(255, 198, 80); }
+inline QColor danger() { return QColor(255, 110, 120); }
 
 inline QFont baseFont(int pt, QFont::Weight weight = QFont::Normal) {
-    QFont f("Noto Sans");
+    QFont f("DejaVu Sans Mono");
     if (!QFontInfo(f).exactMatch()) {
         f = QFont("DejaVu Sans");
     }
@@ -28,9 +28,9 @@ inline QFont baseFont(int pt, QFont::Weight weight = QFont::Normal) {
 }
 
 inline QFont condensedFont(int pt, QFont::Weight weight = QFont::DemiBold) {
-    QFont f("Noto Sans Condensed");
+    QFont f("DejaVu Sans");
     if (!QFontInfo(f).exactMatch()) {
-        f = QFont("DejaVu Sans Condensed");
+        f = QFont("DejaVu Sans");
     }
     f.setPointSize(pt);
     f.setWeight(weight);

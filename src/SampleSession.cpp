@@ -40,7 +40,9 @@ SampleSession::SampleSession(QObject *parent) : QObject(parent) {
 
     connect(&m_decoder, &QAudioDecoder::bufferReady, this, &SampleSession::handleBufferReady);
     connect(&m_decoder, &QAudioDecoder::finished, this, &SampleSession::handleDecodeFinished);
-    connect(&m_decoder, &QAudioDecoder::errorOccurred, this, &SampleSession::handleDecodeError);
+    connect(&m_decoder,
+            static_cast<void (QAudioDecoder::*)(QAudioDecoder::Error)>(&QAudioDecoder::error),
+            this, &SampleSession::handleDecodeError);
     connect(m_player, &QMediaPlayer::playbackStateChanged, this, &SampleSession::handlePlayerState);
 }
 

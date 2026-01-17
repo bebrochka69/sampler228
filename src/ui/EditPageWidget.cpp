@@ -21,8 +21,6 @@ EditPageWidget::EditPageWidget(SampleSession *session, QWidget *parent)
         {"MODE", 0.42f},
     };
 
-    m_wave = WaveformRenderer::makeDemoWave(220, 21);
-
     if (m_session) {
         connect(m_session, &SampleSession::waveformChanged, this, [this]() { update(); });
     }
@@ -34,25 +32,28 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
-    QLinearGradient bg(0, 0, 0, height());
-    bg.setColorAt(0.0, Theme::bg0());
-    bg.setColorAt(1.0, Theme::bg2());
-    p.fillRect(rect(), bg);
+    p.fillRect(rect(), Theme::bg0());
 
     const int margin = 24;
     const QRectF waveRect(margin, margin, width() - 2 * margin, height() * 0.45f);
 
     p.setBrush(Theme::bg1());
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    p.drawRoundedRect(waveRect, 10, 10);
+    p.setPen(QPen(Theme::stroke(), 1.2));
+    p.drawRect(waveRect);
 
     const QRectF waveInner = waveRect.adjusted(12, 12, -12, -12);
-    QVector<float> wave = m_wave;
+    QVector<float> wave;
     if (m_session && m_session->hasWaveform()) {
         wave = m_session->waveform();
     }
-    WaveformRenderer::drawWaveform(p, waveInner, wave, Theme::accentAlt(),
-                                   Theme::withAlpha(Theme::textMuted(), 120));
+    if (wave.isEmpty()) {
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(12, QFont::DemiBold));
+        p.drawText(waveInner, Qt::AlignCenter, "NO SAMPLE");
+    } else {
+        WaveformRenderer::drawWaveform(p, waveInner, wave, Theme::accent(),
+                                       Theme::withAlpha(Theme::textMuted(), 120));
+    }
 
     // Vertical grid lines with stronger center divisions.
     const int lines = 17;
@@ -84,7 +85,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
         p.setBrush(Theme::bg1());
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(cell, 10, 10);
+        p.drawRect(cell);
 
         const QRectF iconRect = cell.adjusted(14, 12, -14, -28);
         p.setPen(Qt::NoPen);
@@ -117,11 +118,10 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         const QRectF valueLine(cell.left() + 18, cell.bottom() - 10, cell.width() - 36, 3);
         p.setPen(Qt::NoPen);
         p.setBrush(Theme::withAlpha(Theme::stroke(), 160));
-        p.drawRoundedRect(valueLine, 2, 2);
-        p.setBrush(Theme::accent());
-        p.drawRoundedRect(QRectF(valueLine.left(), valueLine.top(), valueLine.width() * m_params[i].value,
-                                 valueLine.height()),
-                          2, 2);
+        p.drawRect(valueLine);
+        p.setBrush(Theme::accentAlt());
+        p.drawRect(QRectF(valueLine.left(), valueLine.top(), valueLine.width() * m_params[i].value,
+                          valueLine.height()));
     }
 
     // Action buttons.
@@ -133,14 +133,14 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.setFont(Theme::condensedFont(12, QFont::DemiBold));
 
     p.setBrush(Theme::bg1());
-    p.setPen(QPen(Theme::accent(), 1.4));
-    p.drawRoundedRect(deleteRect, 8, 8);
-    p.setPen(Theme::accent());
+    p.setPen(QPen(Theme::accentAlt(), 1.2));
+    p.drawRect(deleteRect);
+    p.setPen(Theme::accentAlt());
     p.drawText(deleteRect, Qt::AlignCenter, "DELETE PAD");
 
     p.setBrush(Theme::bg1());
-    p.setPen(QPen(Theme::accentAlt(), 1.4));
-    p.drawRoundedRect(copyRect, 8, 8);
-    p.setPen(Theme::accentAlt());
+    p.setPen(QPen(Theme::accent(), 1.2));
+    p.drawRect(copyRect);
+    p.setPen(Theme::accent());
     p.drawText(copyRect, Qt::AlignCenter, "COPY PAD");
 }

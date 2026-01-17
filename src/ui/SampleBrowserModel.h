@@ -3,6 +3,7 @@
 #include <QVector>
 #include <QString>
 #include <memory>
+#include <vector>
 
 class QFileInfo;
 
@@ -15,7 +16,7 @@ public:
         bool expanded = false;
         bool scanned = false;
         Node *parent = nullptr;
-        QVector<std::unique_ptr<Node>> children;
+        std::vector<std::unique_ptr<Node>> children;
     };
 
     struct Entry {
@@ -30,7 +31,7 @@ public:
     void toggleExpanded(Node *node);
     void setSelected(Node *node);
     Node *selected() const { return m_selected; }
-    bool isEmpty() const { return m_roots.isEmpty(); }
+    bool isEmpty() const { return m_roots.empty(); }
 
 private:
     void rebuildEntries() const;
@@ -38,7 +39,7 @@ private:
     void scanNode(Node *node);
     static bool isAudioFile(const QFileInfo &info);
 
-    QVector<std::unique_ptr<Node>> m_roots;
+    std::vector<std::unique_ptr<Node>> m_roots;
     mutable QVector<Entry> m_entries;
     mutable bool m_dirty = true;
     Node *m_selected = nullptr;

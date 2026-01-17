@@ -1,29 +1,27 @@
 #include "TopToolbarWidget.h"
 
-#include <QLinearGradient>
+#include <QFontMetrics>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QRandomGenerator>
-#include <QtMath>
 
+#include "PadBank.h"
 #include "Theme.h"
 
-TopToolbarWidget::TopToolbarWidget(QWidget *parent)
-    : QWidget(parent), m_stats(this) {
+TopToolbarWidget::TopToolbarWidget(PadBank *pads, QWidget *parent)
+    : QWidget(parent), m_stats(this), m_pads(pads) {
     setFixedHeight(72);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-    m_tabs << "SAMPLE" << "EDIT" << "SEQ" << "FX" << "ARRANG";
-    m_padLoaded.resize(8);
-    for (int i = 0; i < m_padLoaded.size(); ++i) {
-        m_padLoaded[i] = (i % 3 != 0);
-    }
+    m_tabs << "SAMPLES" << "EDIT" << "SEQ" << "FX" << "ARRANGE";
 
     connect(&m_statsTimer, &QTimer::timeout, this, &TopToolbarWidget::updateStats);
     m_statsTimer.start(1000);
+    updateStats();
 
-    connect(&m_meterTimer, &QTimer::timeout, this, &TopToolbarWidget::tickMeters);
-    m_meterTimer.start(33);
+    if (m_pads) {
+        connect(m_pads, &PadBank::padChanged, this, [this](int) { update(); });
+        connect(m_pads, &PadBank::activePadChanged, this, [this](int) { update(); });
+    }
 
     rebuildTabs();
 }
@@ -47,20 +45,21 @@ void TopToolbarWidget::resizeEvent(QResizeEvent *event) {
 void TopToolbarWidget::rebuildTabs() {
     m_tabPolys.clear();
 
-    const int h = height();
-    const int top = 8;
-    const int bottom = h - 8;
-    const int slant = 14;
-    const int gap = 8;
-    const int leftMargin = 16;
+    QFont tabFont = Theme::condensedFont(12, QFont::Bold);
+    QFontMetrics fm(tabFont);
 
-    const int tabCount = m_tabs.size();
-    const int maxWidth = static_cast<int>(width() * 0.48f);
-    int tabWidth = (maxWidth - gap * (tabCount - 1)) / tabCount;
-    tabWidth = qBound(88, tabWidth, 124);
+    const int h = height();
+    const int top = 10;
+    const int bottom = top + 26;
+    const int slant = 10;
+    const int gap = 14;
+    const int leftMargin = 14;
 
     int x = leftMargin;
-    for (int i = 0; i < tabCount; ++i) {
+    for (int i = 0; i < m_tabs.size(); ++i) {
+        const int textWidth = fm.horizontalAdvance(m_tabs[i]);
+        const int tabWidth = qMax(72, textWidth + 24);
+
         QPolygonF poly;
         poly << QPointF(x + slant, top)
              << QPointF(x + tabWidth, top)
@@ -78,48 +77,18 @@ void TopToolbarWidget::updateStats() {
     update();
 }
 
-void TopToolbarWidget::tickMeters() {
-    // Lightweight animation so the meters feel alive without real audio input.
-    m_phase += 0.045f;
-
-    const float targetL = 0.25f + 0.55f * qAbs(qSin(m_phase * 1.2f));
-    const float targetR = 0.22f + 0.55f * qAbs(qSin(m_phase * 1.15f + 0.7f));
-
-    const float jitterL = static_cast<float>(QRandomGenerator::global()->generateDouble() - 0.5) * 0.08f;
-    const float jitterR = static_cast<float>(QRandomGenerator::global()->generateDouble() - 0.5) * 0.08f;
-
-    m_levelL = qBound(0.0f, m_levelL * 0.82f + (targetL + jitterL) * 0.18f, 1.0f);
-    m_levelR = qBound(0.0f, m_levelR * 0.82f + (targetR + jitterR) * 0.18f, 1.0f);
-
-    if (m_levelL > m_peakL) {
-        m_peakL = m_levelL;
-    } else {
-        m_peakL = qMax(0.0f, m_peakL - 0.008f);
-    }
-
-    if (m_levelR > m_peakR) {
-        m_peakR = m_levelR;
-    } else {
-        m_peakR = qMax(0.0f, m_peakR - 0.008f);
-    }
-
-    if (m_levelL > 0.95f) {
-        m_clipHoldL = 8;
-    } else if (m_clipHoldL > 0) {
-        --m_clipHoldL;
-    }
-
-    if (m_levelR > 0.95f) {
-        m_clipHoldR = 8;
-    } else if (m_clipHoldR > 0) {
-        --m_clipHoldR;
-    }
-
-    update();
-}
-
 void TopToolbarWidget::mousePressEvent(QMouseEvent *event) {
     const QPointF pos = event->position();
+
+    for (int i = 0; i < m_padRects.size(); ++i) {
+        if (m_padRects[i].contains(pos)) {
+            if (m_pads) {
+                m_pads->setActivePad(i);
+            }
+            return;
+        }
+    }
+
     for (int i = 0; i < m_tabPolys.size(); ++i) {
         if (m_tabPolys[i].containsPoint(pos, Qt::OddEvenFill)) {
             setActiveIndex(i);
@@ -135,154 +104,117 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
-    QLinearGradient bg(0, 0, 0, height());
-    bg.setColorAt(0.0, Theme::bg2());
-    bg.setColorAt(1.0, Theme::bg0());
-    p.fillRect(rect(), bg);
+    p.fillRect(rect(), Theme::bg0());
+    p.setPen(QPen(Theme::stroke(), 1.2));
+    p.drawRect(rect().adjusted(0, 0, -1, -1));
 
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    p.drawLine(QPointF(0, height() - 1), QPointF(width(), height() - 1));
-
-    QFont tabFont = Theme::condensedFont(12, QFont::DemiBold);
+    QFont tabFont = Theme::condensedFont(12, QFont::Bold);
     p.setFont(tabFont);
 
     for (int i = 0; i < m_tabPolys.size(); ++i) {
         const bool active = (i == m_activeIndex);
-        QColor fill = active ? Theme::accent() : Theme::bg3();
-        QColor text = active ? Theme::bg0() : Theme::text();
-        QColor outline = active ? Theme::accent() : Theme::stroke();
+        const QRectF bounds = m_tabPolys[i].boundingRect();
 
-        p.setBrush(fill);
-        p.setPen(QPen(outline, 1.2));
-        p.drawPolygon(m_tabPolys[i]);
-
-        p.setPen(text);
-        p.drawText(m_tabPolys[i].boundingRect(), Qt::AlignCenter, m_tabs[i]);
+        if (active) {
+            p.setBrush(Theme::accent());
+            p.setPen(QPen(Theme::accent(), 1.2));
+            p.drawPolygon(m_tabPolys[i]);
+            p.setPen(Theme::bg0());
+            p.drawText(bounds, Qt::AlignCenter, m_tabs[i]);
+        } else {
+            p.setPen(Theme::text());
+            p.drawText(bounds, Qt::AlignCenter, m_tabs[i]);
+        }
     }
 
     const int h = height();
-    const int rightReserve = h * 2 + 140;
-    const int leftStart = m_tabsWidth + 24;
-    const int centerWidth = qMax(180, width() - leftStart - rightReserve);
-    const QRectF centerRect(leftStart, 0, centerWidth, h);
+    const int rightMargin = 14;
+    const int bpmWidth = 110;
+    const int bpmHeight = 30;
+    m_bpmRect = QRectF(width() - rightMargin - bpmWidth, (h - bpmHeight) / 2.0, bpmWidth, bpmHeight);
 
-    // CPU/RAM section.
-    const QRectF statsRect(centerRect.left() + 10, 10, 150, h - 20);
-    p.setPen(Theme::textMuted());
-    p.setFont(Theme::baseFont(9, QFont::DemiBold));
+    const int padSize = 12;
+    const int padGap = 6;
+    const int padCount = 8;
+    const int padsWidth = padCount * padSize + (padCount - 1) * padGap;
+    const QRectF padsRect(m_bpmRect.left() - padsWidth - 18, 16, padsWidth, 32);
 
-    const float cpu = m_stats.cpuUsage();
-    const float ram = m_stats.ramUsage();
+    const int centerLeft = m_tabsWidth + 20;
+    const int centerRight = static_cast<int>(padsRect.left()) - 16;
+    const int centerWidth = qMax(0, centerRight - centerLeft);
+    const QRectF centerRect(centerLeft, 8, centerWidth, h - 16);
 
-    const QRectF cpuBar(statsRect.left(), statsRect.top() + 12, 120, 6);
-    const QRectF ramBar(statsRect.left(), statsRect.top() + 32, 120, 6);
+    // CPU/RAM indicators.
+    if (centerRect.width() > 180) {
+        const QRectF statsRect(centerRect.left(), centerRect.top(), 160, centerRect.height());
+        const float cpu = m_stats.cpuUsage();
+        const float ram = m_stats.ramUsage();
 
-    p.drawText(QPointF(statsRect.left(), statsRect.top() + 8), "CPU");
-    p.drawText(QPointF(statsRect.left(), statsRect.top() + 28), "RAM");
+        p.setPen(Theme::text());
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.drawText(QPointF(statsRect.left(), statsRect.top() + 10),
+                   QString("CPU %1%").arg(static_cast<int>(cpu * 100)));
+        p.drawText(QPointF(statsRect.left(), statsRect.top() + 26),
+                   QString("RAM %1%").arg(static_cast<int>(ram * 100)));
 
-    p.setBrush(Theme::withAlpha(Theme::stroke(), 160));
-    p.setPen(Qt::NoPen);
-    p.drawRoundedRect(cpuBar, 2, 2);
-    p.drawRoundedRect(ramBar, 2, 2);
+        const QRectF cpuBar(statsRect.left() + 70, statsRect.top() + 2, 80, 8);
+        const QRectF ramBar(statsRect.left() + 70, statsRect.top() + 18, 80, 8);
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.setBrush(Qt::NoBrush);
+        p.drawRect(cpuBar);
+        p.drawRect(ramBar);
 
-    p.setBrush(Theme::accent());
-    p.drawRoundedRect(QRectF(cpuBar.left(), cpuBar.top(), cpuBar.width() * cpu, cpuBar.height()), 2, 2);
-    p.setBrush(Theme::accentAlt());
-    p.drawRoundedRect(QRectF(ramBar.left(), ramBar.top(), ramBar.width() * ram, ramBar.height()), 2, 2);
-
-    p.setPen(Theme::textMuted());
-    p.setFont(Theme::baseFont(9));
-    p.drawText(QPointF(cpuBar.right() + 6, cpuBar.bottom() + 1),
-               QString::number(static_cast<int>(cpu * 100)) + "%");
-    p.drawText(QPointF(ramBar.right() + 6, ramBar.bottom() + 1),
-               QString::number(static_cast<int>(ram * 100)) + "%");
-
-    // Stereo meter section.
-    const QRectF meterRect(statsRect.right() + 40, 8, 120, h - 16);
-    p.setPen(Qt::NoPen);
-    p.setBrush(Theme::withAlpha(Theme::stroke(), 180));
-    p.drawRoundedRect(meterRect, 6, 6);
-
-    const float meterPadding = 10.0f;
-    const float barWidth = 18.0f;
-    const float barGap = 14.0f;
-    const float barHeight = meterRect.height() - 2 * meterPadding;
-    const float barTop = meterRect.top() + meterPadding;
-    const float barLeft = meterRect.left() + 18.0f;
-
-    auto drawMeterBar = [&](float level, float peak, bool clip, float x) {
-        const QRectF bar(x, barTop, barWidth, barHeight);
-        p.setBrush(Theme::bg1());
-        p.drawRoundedRect(bar, 4, 4);
-
-        const float fillHeight = barHeight * level;
-        const QRectF fill(bar.left(), bar.bottom() - fillHeight, barWidth, fillHeight);
-        QLinearGradient grad(fill.topLeft(), fill.bottomLeft());
-        grad.setColorAt(0.0, Theme::danger());
-        grad.setColorAt(0.4, Theme::warn());
-        grad.setColorAt(1.0, Theme::accentAlt());
-        p.setBrush(grad);
-        p.drawRoundedRect(fill, 4, 4);
-
-        const float peakY = bar.bottom() - barHeight * peak;
-        p.setPen(QPen(Theme::text(), 2));
-        p.drawLine(QPointF(bar.left(), peakY), QPointF(bar.right(), peakY));
-
-        if (clip) {
-            p.setPen(Qt::NoPen);
-            p.setBrush(Theme::danger());
-            p.drawRect(QRectF(bar.left(), bar.top() - 6, barWidth, 4));
-        }
-    };
-
-    drawMeterBar(m_levelL, m_peakL, m_clipHoldL > 0, barLeft);
-    drawMeterBar(m_levelR, m_peakR, m_clipHoldR > 0, barLeft + barWidth + barGap);
-
-    p.setPen(Theme::textMuted());
-    p.setFont(Theme::baseFont(9, QFont::DemiBold));
-    p.drawText(QRectF(barLeft - 2, meterRect.top() + 2, barWidth + 4, 12), Qt::AlignCenter, "L");
-    p.drawText(QRectF(barLeft + barWidth + barGap - 2, meterRect.top() + 2, barWidth + 4, 12),
-               Qt::AlignCenter, "R");
-
-    const float zeroDbY = barTop + barHeight * 0.2f;
-    p.setPen(QPen(Theme::textMuted(), 1.0));
-    p.drawLine(QPointF(meterRect.left() + 6, zeroDbY), QPointF(meterRect.right() - 6, zeroDbY));
-    p.drawText(QPointF(meterRect.right() - 34, zeroDbY - 2), "0 dB");
-
-    // Pad indicators.
-    const int arcSize = h * 2;
-    const int padAreaRight = width() - arcSize - 12;
-    const QRectF padRect(padAreaRight - 150, 10, 140, h - 20);
-
-    const int cols = 4;
-    const int rows = 2;
-    const float size = 16.0f;
-    const float padGap = 10.0f;
-    const float startX = padRect.left() + 10.0f;
-    const float startY = padRect.top() + 6.0f;
-
-    p.setFont(Theme::baseFont(9, QFont::DemiBold));
-    p.setPen(Theme::textMuted());
-    p.drawText(QPointF(padRect.left(), padRect.bottom() + 2), "PADS");
-
-    for (int r = 0; r < rows; ++r) {
-        for (int c = 0; c < cols; ++c) {
-            const int idx = r * cols + c;
-            if (idx >= m_padLoaded.size()) {
-                continue;
-            }
-            const float x = startX + c * (size + padGap);
-            const float y = startY + r * (size + padGap);
-            const QRectF box(x, y, size, size);
-            p.setBrush(m_padLoaded[idx] ? Theme::accentAlt() : Theme::bg1());
-            p.setPen(QPen(Theme::stroke(), 1.0));
-            p.drawRoundedRect(box, 3, 3);
-        }
+        p.setPen(Qt::NoPen);
+        p.setBrush(Theme::accent());
+        p.drawRect(QRectF(cpuBar.left(), cpuBar.top(), cpuBar.width() * cpu, cpuBar.height()));
+        p.setBrush(Theme::accentAlt());
+        p.drawRect(QRectF(ramBar.left(), ramBar.top(), ramBar.width() * ram, ramBar.height()));
     }
 
-    // Right bar lead-in toward the arc.
-    const QRectF barRect(padAreaRight + 6, h * 0.5f - 2.0f, arcSize - 8.0f, 4.0f);
-    p.setPen(Qt::NoPen);
-    p.setBrush(Theme::accent());
-    p.drawRoundedRect(barRect, 2, 2);
+    // Stereo meter outline (no simulated audio).
+    if (centerRect.width() > 320) {
+        const QRectF meterRect(centerRect.left() + 180, centerRect.top(), 120, centerRect.height());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.setBrush(Qt::NoBrush);
+        p.drawRect(meterRect.adjusted(0, 2, 0, -2));
+
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.setPen(Theme::text());
+        p.drawText(QRectF(meterRect.left() + 6, meterRect.top() + 6, 20, 12), Qt::AlignLeft, "L");
+        p.drawText(QRectF(meterRect.left() + 60, meterRect.top() + 6, 20, 12), Qt::AlignLeft, "R");
+
+        const QRectF lBar(meterRect.left() + 16, meterRect.bottom() - 12, 40, 6);
+        const QRectF rBar(meterRect.left() + 62, meterRect.bottom() - 12, 40, 6);
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRect(lBar);
+        p.drawRect(rBar);
+    }
+
+    // Pad indicators.
+    m_padRects.clear();
+    p.setFont(Theme::baseFont(8, QFont::DemiBold));
+    p.setPen(Theme::text());
+    p.drawText(QRectF(padsRect.left(), padsRect.top() - 10, padsRect.width(), 10), Qt::AlignCenter,
+               "PADS");
+
+    for (int i = 0; i < padCount; ++i) {
+        const float x = padsRect.left() + i * (padSize + padGap);
+        const QRectF padRect(x, padsRect.top(), padSize, padSize);
+        m_padRects.push_back(padRect);
+
+        const bool loaded = m_pads ? m_pads->isLoaded(i) : false;
+        const bool active = m_pads ? (m_pads->activePad() == i) : false;
+
+        p.setBrush(loaded ? Theme::accent() : Theme::bg1());
+        p.setPen(QPen(active ? Theme::accentAlt() : Theme::stroke(), 1.2));
+        p.drawRect(padRect);
+    }
+
+    // BPM box.
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(Theme::accentAlt(), 1.2));
+    p.drawRect(m_bpmRect);
+    p.setFont(Theme::condensedFont(12, QFont::Bold));
+    p.setPen(Theme::accentAlt());
+    p.drawText(m_bpmRect, Qt::AlignCenter, QString("BPM %1").arg(m_bpm));
 }

@@ -9,6 +9,8 @@ int main(int argc, char *argv[]) {
     app.setApplicationName("GrooveBoxUI");
     app.setOrganizationName("GrooveBox");
 
+    FramebufferCleaner::clearIfNeeded();
+
     MainWindow window;
     window.show();
 

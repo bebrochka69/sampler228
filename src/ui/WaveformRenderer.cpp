@@ -1,27 +1,6 @@
 #include "WaveformRenderer.h"
 
 #include <QPainter>
-#include <QRandomGenerator>
-#include <QtMath>
-
-QVector<float> WaveformRenderer::makeDemoWave(int count, quint32 seed) {
-    QVector<float> samples;
-    samples.reserve(count);
-
-    QRandomGenerator rng(seed);
-    const float twoPi = 6.2831853f;
-
-    for (int i = 0; i < count; ++i) {
-        const float t = static_cast<float>(i) / static_cast<float>(count - 1);
-        float value = 0.55f * qSin(t * twoPi * 3.0f) + 0.25f * qSin(t * twoPi * 9.0f + 0.4f);
-        value += (static_cast<float>(rng.generateDouble()) - 0.5f) * 0.25f;
-        value = qBound(-1.0f, value, 1.0f);
-        samples.push_back(value);
-    }
-
-    return samples;
-}
-
 void WaveformRenderer::drawWaveform(QPainter &p, const QRectF &rect, const QVector<float> &samples,
                                     const QColor &lineColor, const QColor &midColor) {
     if (samples.isEmpty() || rect.width() <= 1.0 || rect.height() <= 1.0) {

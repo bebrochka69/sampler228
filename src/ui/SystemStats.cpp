@@ -2,7 +2,6 @@
 
 #include <QFile>
 #include <QTextStream>
-#include <QtMath>
 
 SystemStats::SystemStats(QObject *parent) : QObject(parent) {}
 
@@ -30,10 +29,9 @@ void SystemStats::update() {
     }
 #endif
 
-    // Fallback animation for platforms without /proc.
-    m_phase += 0.07f;
-    m_cpuUsage = 0.25f + 0.2f * qSin(m_phase * 1.1f);
-    m_ramUsage = 0.35f + 0.15f * qSin(m_phase * 0.9f + 1.2f);
+    // No /proc available: keep stats at zero instead of simulating.
+    m_cpuUsage = 0.0f;
+    m_ramUsage = 0.0f;
 }
 
 #ifdef Q_OS_LINUX

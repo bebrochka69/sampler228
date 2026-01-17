@@ -23,6 +23,5 @@ private:
     };
 
     QVector<Param> m_params;
-    QVector<float> m_wave;
     SampleSession *m_session = nullptr;
 };

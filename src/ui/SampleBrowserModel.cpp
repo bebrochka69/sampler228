@@ -14,9 +14,6 @@ bool isUsbMount(const QStorageInfo &info) {
     if (root == "/") {
         return false;
     }
-    if (info.isRemovable()) {
-        return true;
-    }
     return root.startsWith("/media/") || root.startsWith("/run/media/") || root.startsWith("/mnt/");
 }
 }  // namespace

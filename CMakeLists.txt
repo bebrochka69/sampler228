@@ -13,6 +13,7 @@ set(SOURCES
     src/main.cpp
     src/MainWindow.cpp
     src/FramebufferCleaner.cpp
+    src/PadBank.cpp
     src/SampleSession.cpp
     src/ui/TopToolbarWidget.cpp
     src/ui/BpmArcWidget.cpp
@@ -28,6 +29,7 @@ set(SOURCES
 set(HEADERS
     src/MainWindow.h
     src/FramebufferCleaner.h
+    src/PadBank.h
     src/SampleSession.h
     src/Theme.h
     src/ui/TopToolbarWidget.h

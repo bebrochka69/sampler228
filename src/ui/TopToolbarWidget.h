@@ -2,6 +2,7 @@
 
 #include <QPolygonF>
 #include <QStringList>
+#include <QRectF>
 #include <QTimer>
 #include <QVector>
 #include <QWidget>
@@ -11,11 +12,12 @@
 class QMouseEvent;
 class QPaintEvent;
 class QResizeEvent;
+class PadBank;
 
 class TopToolbarWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit TopToolbarWidget(QWidget *parent = nullptr);
+    explicit TopToolbarWidget(PadBank *pads, QWidget *parent = nullptr);
 
     int activeIndex() const { return m_activeIndex; }
 
@@ -33,7 +35,6 @@ protected:
 private:
     void rebuildTabs();
     void updateStats();
-    void tickMeters();
 
     QStringList m_tabs;
     QVector<QPolygonF> m_tabPolys;
@@ -42,15 +43,11 @@ private:
 
     SystemStats m_stats;
     QTimer m_statsTimer;
-    QTimer m_meterTimer;
+    float m_levelL = 0.0f;
+    float m_levelR = 0.0f;
 
-    float m_levelL = 0.2f;
-    float m_levelR = 0.26f;
-    float m_peakL = 0.2f;
-    float m_peakR = 0.26f;
-    int m_clipHoldL = 0;
-    int m_clipHoldR = 0;
-    float m_phase = 0.0f;
-
-    QVector<bool> m_padLoaded;
+    PadBank *m_pads = nullptr;
+    QVector<QRectF> m_padRects;
+    QRectF m_bpmRect;
+    int m_bpm = 120;
 };
