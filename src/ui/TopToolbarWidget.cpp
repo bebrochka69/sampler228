@@ -48,17 +48,16 @@ void TopToolbarWidget::rebuildTabs() {
     QFont tabFont = Theme::condensedFont(12, QFont::Bold);
     QFontMetrics fm(tabFont);
 
-    const int h = height();
-    const int top = 10;
-    const int bottom = top + 26;
-    const int slant = 10;
+    const int top = 8;
+    const int bottom = top + 30;
+    const int slant = 12;
     const int gap = 14;
     const int leftMargin = 14;
 
     int x = leftMargin;
     for (int i = 0; i < m_tabs.size(); ++i) {
         const int textWidth = fm.horizontalAdvance(m_tabs[i]);
-        const int tabWidth = qMax(72, textWidth + 24);
+        const int tabWidth = qMax(78, textWidth + 28);
 
         QPolygonF poly;
         poly << QPointF(x + slant, top)
@@ -102,10 +101,11 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
     QPainter p(this);
-
-    p.fillRect(rect(), Theme::bg0());
-    p.setPen(QPen(Theme::stroke(), 1.2));
-    p.drawRect(rect().adjusted(0, 0, -1, -1));
+    Theme::paintBackground(p, rect());
+    p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 160), 1.4));
+    p.drawRect(rect().adjusted(1, 1, -2, -2));
+    p.setPen(QPen(Theme::withAlpha(Theme::accent(), 140), 1.0));
+    p.drawLine(QPointF(2, height() - 2), QPointF(width() - 3, height() - 2));
 
     QFont tabFont = Theme::condensedFont(12, QFont::Bold);
     p.setFont(tabFont);
@@ -115,12 +115,18 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
         const QRectF bounds = m_tabPolys[i].boundingRect();
 
         if (active) {
-            p.setBrush(Theme::accent());
-            p.setPen(QPen(Theme::accent(), 1.2));
+            QLinearGradient grad(bounds.topLeft(), bounds.bottomLeft());
+            grad.setColorAt(0.0, Theme::accent());
+            grad.setColorAt(1.0, Theme::withAlpha(Theme::accent(), 160));
+            p.setBrush(grad);
+            p.setPen(QPen(Theme::accent(), 1.4));
             p.drawPolygon(m_tabPolys[i]);
             p.setPen(Theme::bg0());
             p.drawText(bounds, Qt::AlignCenter, m_tabs[i]);
         } else {
+            p.setPen(Theme::textMuted());
+            p.setBrush(Qt::NoBrush);
+            p.drawPolygon(m_tabPolys[i]);
             p.setPen(Theme::text());
             p.drawText(bounds, Qt::AlignCenter, m_tabs[i]);
         }
@@ -128,15 +134,15 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
 
     const int h = height();
     const int rightMargin = 14;
-    const int bpmWidth = 110;
-    const int bpmHeight = 30;
+    const int bpmWidth = 124;
+    const int bpmHeight = 34;
     m_bpmRect = QRectF(width() - rightMargin - bpmWidth, (h - bpmHeight) / 2.0, bpmWidth, bpmHeight);
 
-    const int padSize = 12;
+    const int padSize = 14;
     const int padGap = 6;
     const int padCount = 8;
     const int padsWidth = padCount * padSize + (padCount - 1) * padGap;
-    const QRectF padsRect(m_bpmRect.left() - padsWidth - 18, 16, padsWidth, 32);
+    const QRectF padsRect(m_bpmRect.left() - padsWidth - 18, 14, padsWidth, 34);
 
     const int centerLeft = m_tabsWidth + 20;
     const int centerRight = static_cast<int>(padsRect.left()) - 16;
@@ -145,36 +151,43 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
 
     // CPU/RAM indicators.
     if (centerRect.width() > 180) {
-        const QRectF statsRect(centerRect.left(), centerRect.top(), 160, centerRect.height());
+        const QRectF statsRect(centerRect.left(), centerRect.top(), 170, centerRect.height());
         const float cpu = m_stats.cpuUsage();
         const float ram = m_stats.ramUsage();
 
         p.setPen(Theme::text());
         p.setFont(Theme::baseFont(9, QFont::DemiBold));
-        p.drawText(QPointF(statsRect.left(), statsRect.top() + 10),
-                   QString("CPU %1%").arg(static_cast<int>(cpu * 100)));
-        p.drawText(QPointF(statsRect.left(), statsRect.top() + 26),
-                   QString("RAM %1%").arg(static_cast<int>(ram * 100)));
+        const QRectF cpuLabel(statsRect.left(), statsRect.top() + 4, 48, 12);
+        const QRectF ramLabel(statsRect.left(), statsRect.top() + 22, 48, 12);
+        p.drawText(cpuLabel, Qt::AlignLeft | Qt::AlignVCenter, "CPU");
+        p.drawText(ramLabel, Qt::AlignLeft | Qt::AlignVCenter, "RAM");
 
-        const QRectF cpuBar(statsRect.left() + 70, statsRect.top() + 2, 80, 8);
-        const QRectF ramBar(statsRect.left() + 70, statsRect.top() + 18, 80, 8);
+        const QRectF cpuBox(statsRect.left() + 48, statsRect.top() + 2, 94, 12);
+        const QRectF ramBox(statsRect.left() + 48, statsRect.top() + 20, 94, 12);
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.setBrush(Qt::NoBrush);
-        p.drawRect(cpuBar);
-        p.drawRect(ramBar);
+        p.setBrush(Theme::bg1());
+        p.drawRect(cpuBox);
+        p.drawRect(ramBox);
 
         p.setPen(Qt::NoPen);
         p.setBrush(Theme::accent());
-        p.drawRect(QRectF(cpuBar.left(), cpuBar.top(), cpuBar.width() * cpu, cpuBar.height()));
+        p.drawRect(QRectF(cpuBox.left(), cpuBox.top(), cpuBox.width() * cpu, cpuBox.height()));
         p.setBrush(Theme::accentAlt());
-        p.drawRect(QRectF(ramBar.left(), ramBar.top(), ramBar.width() * ram, ramBar.height()));
+        p.drawRect(QRectF(ramBox.left(), ramBox.top(), ramBox.width() * ram, ramBox.height()));
+
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(8));
+        p.drawText(QRectF(cpuBox.right() + 6, cpuBox.top(), 30, cpuBox.height()),
+                   Qt::AlignLeft | Qt::AlignVCenter, QString::number(static_cast<int>(cpu * 100)));
+        p.drawText(QRectF(ramBox.right() + 6, ramBox.top(), 30, ramBox.height()),
+                   Qt::AlignLeft | Qt::AlignVCenter, QString::number(static_cast<int>(ram * 100)));
     }
 
     // Stereo meter outline (no simulated audio).
     if (centerRect.width() > 320) {
-        const QRectF meterRect(centerRect.left() + 180, centerRect.top(), 120, centerRect.height());
+        const QRectF meterRect(centerRect.left() + 190, centerRect.top(), 120, centerRect.height());
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.setBrush(Qt::NoBrush);
+        p.setBrush(Theme::bg1());
         p.drawRect(meterRect.adjusted(0, 2, 0, -2));
 
         p.setFont(Theme::baseFont(9, QFont::DemiBold));
@@ -185,6 +198,7 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
         const QRectF lBar(meterRect.left() + 16, meterRect.bottom() - 12, 40, 6);
         const QRectF rBar(meterRect.left() + 62, meterRect.bottom() - 12, 40, 6);
         p.setPen(QPen(Theme::stroke(), 1.0));
+        p.setBrush(Theme::bg2());
         p.drawRect(lBar);
         p.drawRect(rBar);
     }
@@ -210,10 +224,10 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     }
 
     // BPM box.
-    p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(Theme::accentAlt(), 1.2));
+    p.setBrush(Theme::bg1());
+    p.setPen(QPen(Theme::accentAlt(), 1.4));
     p.drawRect(m_bpmRect);
-    p.setFont(Theme::condensedFont(12, QFont::Bold));
+    p.setFont(Theme::condensedFont(13, QFont::Bold));
     p.setPen(Theme::accentAlt());
     p.drawText(m_bpmRect, Qt::AlignCenter, QString("BPM %1").arg(m_bpm));
 }

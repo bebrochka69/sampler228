@@ -20,8 +20,10 @@ SeqPageWidget::SeqPageWidget(QWidget *parent) : QWidget(parent) {
 
 QRectF SeqPageWidget::gridRect() const {
     const int margin = 24;
-    const float heightRatio = 0.58f;
-    return QRectF(margin, margin, width() - 2 * margin, height() * heightRatio);
+    const int headerHeight = 24;
+    const float heightRatio = 0.54f;
+    const int top = margin + headerHeight + 6;
+    return QRectF(margin, top, width() - 2 * margin, height() * heightRatio);
 }
 
 QRectF SeqPageWidget::padsRect() const {
@@ -80,7 +82,12 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
 
-    p.fillRect(rect(), Theme::bg0());
+    Theme::paintBackground(p, rect());
+
+    const QRectF headerRect(24, 18, width() - 48, 22);
+    p.setPen(Theme::accent());
+    p.setFont(Theme::condensedFont(12, QFont::Bold));
+    p.drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, "SEQ / 64 STEPS");
 
     const QRectF grid = gridRect();
     const int cols = 16;
@@ -89,7 +96,7 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     const float cellH = grid.height() / rows;
 
     const QColor groupA = Theme::bg1();
-    const QColor groupB = Theme::withAlpha(Theme::stroke(), 40);
+    const QColor groupB = Theme::withAlpha(Theme::stroke(), 32);
 
     // Background groups.
     for (int col = 0; col < cols; ++col) {

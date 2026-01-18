@@ -2,7 +2,10 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QKeyEvent>
+#include <QScreen>
+#include <QTimer>
 #include <QtGlobal>
+#include <csignal>
 
 #include "FramebufferCleaner.h"
 #include "MainWindow.h"
@@ -32,6 +35,12 @@ bool isFramebufferPlatform(const QString &platform) {
     return platform.contains("linuxfb") || platform.contains("eglfs") ||
            platform.contains("vkkhrdisplay");
 }
+
+volatile std::sig_atomic_t g_sigintRequested = 0;
+
+void handleSigint(int) {
+    g_sigintRequested = 1;
+}
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -51,17 +60,29 @@ int main(int argc, char *argv[]) {
     ExitShortcutFilter exitFilter;
     app.installEventFilter(&exitFilter);
 
+    std::signal(SIGINT, handleSigint);
+    QTimer sigintTimer;
+    sigintTimer.setInterval(100);
+    QObject::connect(&sigintTimer, &QTimer::timeout, []() {
+        if (g_sigintRequested) {
+            QCoreApplication::quit();
+        }
+    });
+    sigintTimer.start();
+
     FramebufferCleaner::clearIfNeeded();
 
     MainWindow window;
-    window.resize(1280, 720);
+    const QScreen *screen = QGuiApplication::primaryScreen();
+    const QRect screenRect = screen ? screen->geometry() : QRect(0, 0, 1280, 720);
+    window.setGeometry(screenRect);
 
     const QString platform = QGuiApplication::platformName();
     if (isFramebufferPlatform(platform)) {
         window.setWindowFlags(Qt::FramelessWindowHint);
         window.showFullScreen();
     } else {
-        window.setFixedSize(1280, 720);
+        window.resize(1280, 720);
         window.show();
     }
 

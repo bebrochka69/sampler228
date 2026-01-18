@@ -30,11 +30,16 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
     QPainter p(this);
-
-    p.fillRect(rect(), Theme::bg0());
+    Theme::paintBackground(p, rect());
 
     const int margin = 24;
-    const QRectF waveRect(margin, margin, width() - 2 * margin, height() * 0.45f);
+    const int headerHeight = 24;
+    const QRectF headerRect(margin, margin, width() - 2 * margin, headerHeight);
+    p.setPen(Theme::accent());
+    p.setFont(Theme::condensedFont(12, QFont::Bold));
+    p.drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, "EDIT / SAMPLE");
+
+    const QRectF waveRect(margin, headerRect.bottom() + 10, width() - 2 * margin, height() * 0.42f);
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::stroke(), 1.2));
@@ -67,7 +72,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     // Parameters grid.
     const QRectF gridRect(margin, waveRect.bottom() + 16, width() - 2 * margin,
-                          height() - waveRect.bottom() - 90);
+                          height() - waveRect.bottom() - 96);
     const int cols = 4;
     const int rows = 2;
     const float cellW = (gridRect.width() - (cols - 1) * 16.0f) / cols;
@@ -89,26 +94,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         const QRectF iconRect = cell.adjusted(14, 12, -14, -28);
         p.setPen(Qt::NoPen);
         p.setBrush(Theme::accentAlt());
-
-        switch (i % 4) {
-            case 0:
-                p.drawEllipse(iconRect.center(), iconRect.width() * 0.25f, iconRect.height() * 0.25f);
-                break;
-            case 1: {
-                QPolygonF tri;
-                tri << QPointF(iconRect.center().x(), iconRect.top())
-                    << QPointF(iconRect.right(), iconRect.bottom())
-                    << QPointF(iconRect.left(), iconRect.bottom());
-                p.drawPolygon(tri);
-                break;
-            }
-            case 2:
-                p.drawRoundedRect(iconRect.adjusted(6, 6, -6, -6), 6, 6);
-                break;
-            case 3:
-                p.drawRect(iconRect.adjusted(10, 10, -10, -10));
-                break;
-        }
+        p.drawRect(iconRect.adjusted(6, 6, -6, -6));
 
         p.setPen(Theme::text());
         p.drawText(QRectF(cell.left(), cell.bottom() - 26, cell.width(), 16),
