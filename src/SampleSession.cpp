@@ -308,42 +308,51 @@ void SampleSession::playExternal() {
     }
 
     m_externalPlayer = new QProcess(this);
-    m_externalPlayer->setProgram(program);
-    m_externalPlayer->setArguments(args);
-    m_externalPlayer->setProcessChannelMode(QProcess::MergedChannels);
+    QProcess *proc = m_externalPlayer;
+    proc->setProgram(program);
+    proc->setArguments(args);
+    proc->setProcessChannelMode(QProcess::MergedChannels);
 
-    connect(m_externalPlayer, &QProcess::started, this, [this]() {
+    connect(proc, &QProcess::started, this, [this]() {
         if (!m_errorText.isEmpty()) {
             m_errorText.clear();
             emit errorChanged(m_errorText);
         }
         emit playbackChanged(true);
     });
-    connect(m_externalPlayer,
+    connect(proc,
             static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this,
-            [this](int, QProcess::ExitStatus) {
+            [this, proc](int, QProcess::ExitStatus) {
                 emit playbackChanged(false);
-                m_externalPlayer->deleteLater();
-                m_externalPlayer = nullptr;
+                if (m_externalPlayer == proc) {
+                    m_externalPlayer = nullptr;
+                }
+                proc->deleteLater();
             });
-    connect(m_externalPlayer, &QProcess::errorOccurred, this, [this](QProcess::ProcessError) {
+    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError) {
         if (m_errorText != "External player failed") {
             m_errorText = "External player failed";
             emit errorChanged(m_errorText);
         }
         emit playbackChanged(false);
+        if (m_externalPlayer == proc) {
+            m_externalPlayer = nullptr;
+        }
+        proc->deleteLater();
     });
 
-    m_externalPlayer->start();
+    proc->start();
 }
 
 void SampleSession::stopExternal() {
     if (!m_externalPlayer) {
         return;
     }
-    m_externalPlayer->kill();
-    m_externalPlayer->deleteLater();
+    QProcess *proc = m_externalPlayer;
     m_externalPlayer = nullptr;
+    proc->disconnect(this);
+    proc->kill();
+    proc->deleteLater();
     emit playbackChanged(false);
 }
 

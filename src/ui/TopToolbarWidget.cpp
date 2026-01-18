@@ -187,12 +187,18 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     const int centerWidth = qMax(0, centerRight - centerLeft);
     const QRectF centerRect(centerLeft, 8, centerWidth, h - 16);
 
-    // CPU/RAM/LOAD indicators (always visible if there is space).
+    // CPU/RAM/LOAD indicators (always visible).
     const float statsWidth = 220.0f;
     QRectF statsRect;
     if (centerRect.width() > 90.0f) {
         const float width = qMin(statsWidth, centerRect.width());
         statsRect = QRectF(centerRect.left(), centerRect.top(), width, centerRect.height());
+    } else {
+        const qreal fallbackWidth = qMax<qreal>(0.0, width() - 28.0);
+        statsRect = QRectF(14, height() - 24, qMin(statsWidth, fallbackWidth), 18);
+    }
+
+    if (statsRect.width() > 60.0f) {
         const float cpu = m_stats.cpuUsage();
         const float ram = m_stats.ramUsage();
         const float load = m_stats.loadUsage();
@@ -206,7 +212,7 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
                 .arg(static_cast<int>(load * 100));
         QFontMetrics fm(p.font());
         statsText = fm.elidedText(statsText, Qt::ElideRight, static_cast<int>(statsRect.width()));
-        p.drawText(statsRect.adjusted(0, 6, 0, -6), Qt::AlignLeft | Qt::AlignVCenter, statsText);
+        p.drawText(statsRect, Qt::AlignLeft | Qt::AlignVCenter, statsText);
     }
 
     // Stereo meter outline (no simulated audio).
