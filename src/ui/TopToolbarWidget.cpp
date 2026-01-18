@@ -16,7 +16,7 @@ TopToolbarWidget::TopToolbarWidget(PadBank *pads, QWidget *parent)
     m_tabs << "SAMPLES" << "EDIT" << "SEQ" << "FX" << "ARRANGE";
 
     connect(&m_statsTimer, &QTimer::timeout, this, &TopToolbarWidget::updateStats);
-    m_statsTimer.start(1000);
+    m_statsTimer.start(2000);
     updateStats();
 
     if (m_pads) {
@@ -187,8 +187,8 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     const int centerWidth = qMax(0, centerRight - centerLeft);
     const QRectF centerRect(centerLeft, 8, centerWidth, h - 16);
 
-    // CPU/RAM/LOAD indicators.
-    const float statsWidth = 190.0f;
+    // CPU/RAM/LOAD indicators (compact text).
+    const float statsWidth = 210.0f;
     QRectF statsRect;
     if (centerRect.width() > statsWidth + 20.0f) {
         statsRect = QRectF(centerRect.left(), centerRect.top(), statsWidth, centerRect.height());
@@ -196,48 +196,14 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
         const float ram = m_stats.ramUsage();
         const float load = m_stats.loadUsage();
 
-        struct StatLine {
-            const char *label;
-            float value;
-            QColor color;
-        };
-        const StatLine lines[] = {
-            {"CPU", cpu, Theme::accent()},
-            {"RAM", ram, Theme::accentAlt()},
-            {"LOAD", load, Theme::warn()},
-        };
-
         p.setPen(Theme::text());
         p.setFont(Theme::baseFont(9, QFont::DemiBold));
-
-        const float lineH = 12.0f;
-        const float gap = 6.0f;
-        float y = statsRect.top() + 4.0f;
-
-        for (const auto &line : lines) {
-            const QRectF labelRect(statsRect.left(), y, 48, lineH);
-            const QRectF barRect(statsRect.left() + 48, y, 96, lineH);
-
-            p.setPen(Theme::text());
-            p.drawText(labelRect, Qt::AlignLeft | Qt::AlignVCenter, line.label);
-
-            p.setPen(QPen(Theme::stroke(), 1.0));
-            p.setBrush(Theme::bg1());
-            p.drawRect(barRect);
-
-            p.setPen(Qt::NoPen);
-            p.setBrush(line.color);
-            p.drawRect(QRectF(barRect.left(), barRect.top(), barRect.width() * line.value, barRect.height()));
-
-            p.setPen(Theme::textMuted());
-            p.setFont(Theme::baseFont(8));
-            p.drawText(QRectF(barRect.right() + 6, barRect.top(), 32, barRect.height()),
-                       Qt::AlignLeft | Qt::AlignVCenter,
-                       QString::number(static_cast<int>(line.value * 100)));
-            p.setFont(Theme::baseFont(9, QFont::DemiBold));
-
-            y += lineH + gap;
-        }
+        const QString statsText =
+            QString("CPU %1%  RAM %2%  LOAD %3%")
+                .arg(static_cast<int>(cpu * 100))
+                .arg(static_cast<int>(ram * 100))
+                .arg(static_cast<int>(load * 100));
+        p.drawText(statsRect.adjusted(0, 6, 0, -6), Qt::AlignLeft | Qt::AlignVCenter, statsText);
     }
 
     // Stereo meter outline (no simulated audio).

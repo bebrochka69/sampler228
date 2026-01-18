@@ -11,7 +11,6 @@
 #include "PadBank.h"
 #include "SampleSession.h"
 #include "Theme.h"
-#include "WaveformRenderer.h"
 
 SamplePageWidget::SamplePageWidget(SampleSession *session, PadBank *pads, QWidget *parent)
     : QWidget(parent), m_session(session), m_pads(pads) {
@@ -421,28 +420,9 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(QRectF(previewRect.left() + 8, previewRect.top() + 4, previewRect.width() - 16, 16),
                Qt::AlignLeft | Qt::AlignVCenter, "PREVIEW");
 
-    const QRectF waveRect(previewRect.left() + 10, previewRect.top() + 26,
-                          previewRect.width() - 20, previewRect.height() * 0.45f);
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    p.setBrush(Theme::bg1());
-    p.drawRect(waveRect);
-
-    QVector<float> wave;
-    if (m_session && m_session->hasWaveform()) {
-        wave = m_session->waveform();
-    }
-    if (wave.isEmpty()) {
-        p.setPen(Theme::textMuted());
-        p.setFont(Theme::baseFont(10, QFont::DemiBold));
-        p.drawText(waveRect, Qt::AlignCenter, "NO SAMPLE");
-    } else {
-        WaveformRenderer::drawWaveform(p, waveRect.adjusted(4, 4, -4, -4), wave, Theme::accent(),
-                                       Theme::withAlpha(Theme::textMuted(), 140));
-    }
-
-    const QRectF infoRect(previewRect.left() + 10, waveRect.bottom() + 8,
-                          previewRect.width() - 20, previewRect.bottom() - waveRect.bottom() - 12);
-    const float infoSplit = 0.6f;
+    const QRectF infoRect(previewRect.left() + 10, previewRect.top() + 26,
+                          previewRect.width() - 20, previewRect.height() - 36);
+    const float infoSplit = 0.62f;
     const QRectF infoLeft(infoRect.left(), infoRect.top(), infoRect.width() * infoSplit - 6,
                           infoRect.height());
     const QRectF infoRight(infoRect.left() + infoRect.width() * infoSplit + 6, infoRect.top(),
@@ -477,7 +457,7 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(8, QFont::DemiBold));
     p.drawText(QRectF(transportRect.left() + 44, transportRect.top(), transportRect.width() - 44, 20),
-               Qt::AlignLeft | Qt::AlignVCenter, "PREVIEW");
+               Qt::AlignLeft | Qt::AlignVCenter, "PLAY/STOP");
 
     // Info left column.
     p.setPen(Theme::text());
