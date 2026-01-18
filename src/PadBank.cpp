@@ -103,54 +103,55 @@ struct PadBank::PadRuntime {
 
 PadBank::PadBank(QObject *parent) : QObject(parent) {
     m_paths.fill(QString());
-    for (int i = 0; i < kPadCount; ++i) {
-        m_runtime[i] = new PadRuntime();
-        m_runtime[i]->output = new QAudioOutput(this);
-        m_runtime[i]->player = new QMediaPlayer(this);
-        m_runtime[i]->player->setAudioOutput(m_runtime[i]->output);
-
-        const int index = i;
-        connect(m_runtime[i]->player, &QMediaPlayer::durationChanged, this,
-                [this, index](qint64 duration) {
-                    m_runtime[index]->durationMs = duration;
-                });
-        connect(m_runtime[i]->player, &QMediaPlayer::errorOccurred, this,
-                [this, index](QMediaPlayer::Error error, const QString &) {
-                    if (error == QMediaPlayer::NoError) {
-                        return;
-                    }
-                    m_runtime[index]->useExternal = true;
-                });
-        connect(m_runtime[i]->player, &QMediaPlayer::positionChanged, this,
-                [this, index](qint64 position) {
-                    PadRuntime *rt = m_runtime[index];
-                    if (rt->segmentEndMs <= rt->segmentStartMs) {
-                        return;
-                    }
-                    if (position >= rt->segmentEndMs) {
-                        if (rt->loop) {
-                            rt->player->setPosition(rt->segmentStartMs);
-                        } else {
-                            rt->player->stop();
-                        }
-                    }
-                });
-    }
-
+    bool forceExternal = false;
 #ifdef Q_OS_LINUX
     const QString platform = QGuiApplication::platformName();
     if (platform.contains("linuxfb") || platform.contains("eglfs") ||
         platform.contains("vkkhrdisplay")) {
-        for (int i = 0; i < kPadCount; ++i) {
-            m_runtime[i]->useExternal = true;
-        }
+        forceExternal = true;
     }
     if (qEnvironmentVariableIsSet("GROOVEBOX_FORCE_ALSA")) {
-        for (int i = 0; i < kPadCount; ++i) {
-            m_runtime[i]->useExternal = true;
-        }
+        forceExternal = true;
     }
 #endif
+
+    for (int i = 0; i < kPadCount; ++i) {
+        m_runtime[i] = new PadRuntime();
+        m_runtime[i]->useExternal = forceExternal;
+
+        if (!forceExternal) {
+            m_runtime[i]->output = new QAudioOutput(this);
+            m_runtime[i]->player = new QMediaPlayer(this);
+            m_runtime[i]->player->setAudioOutput(m_runtime[i]->output);
+
+            const int index = i;
+            connect(m_runtime[i]->player, &QMediaPlayer::durationChanged, this,
+                    [this, index](qint64 duration) {
+                        m_runtime[index]->durationMs = duration;
+                    });
+            connect(m_runtime[i]->player, &QMediaPlayer::errorOccurred, this,
+                    [this, index](QMediaPlayer::Error error, const QString &) {
+                        if (error == QMediaPlayer::NoError) {
+                            return;
+                        }
+                        m_runtime[index]->useExternal = true;
+                    });
+            connect(m_runtime[i]->player, &QMediaPlayer::positionChanged, this,
+                    [this, index](qint64 position) {
+                        PadRuntime *rt = m_runtime[index];
+                        if (rt->segmentEndMs <= rt->segmentStartMs) {
+                            return;
+                        }
+                        if (position >= rt->segmentEndMs) {
+                            if (rt->loop) {
+                                rt->player->setPosition(rt->segmentStartMs);
+                            } else {
+                                rt->player->stop();
+                            }
+                        }
+                    });
+        }
+    }
 }
 
 PadBank::~PadBank() {
@@ -405,6 +406,38 @@ static qint64 stretchTargetMs(int bpm, int stretchIndex) {
     }
 }
 
+static qint64 probeDurationMs(const QString &path) {
+#ifdef Q_OS_LINUX
+    const QString ffprobe = QStandardPaths::findExecutable("ffprobe");
+    if (ffprobe.isEmpty()) {
+        return 0;
+    }
+
+    QProcess proc;
+    proc.setProgram(ffprobe);
+    proc.setArguments({"-v", "error",
+                       "-show_entries", "format=duration",
+                       "-of", "default=noprint_wrappers=1:nokey=1",
+                       path});
+    proc.start();
+    if (!proc.waitForFinished(700)) {
+        proc.kill();
+        return 0;
+    }
+
+    const QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+    bool ok = false;
+    const double seconds = out.toDouble(&ok);
+    if (!ok || seconds <= 0.0) {
+        return 0;
+    }
+    return static_cast<qint64>(seconds * 1000.0);
+#else
+    Q_UNUSED(path);
+    return 0;
+#endif
+}
+
 void PadBank::triggerPad(int index) {
     if (index < 0 || index >= padCount()) {
         return;
@@ -418,6 +451,10 @@ void PadBank::triggerPad(int index) {
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (!rt) {
         return;
+    }
+
+    if (rt->durationMs == 0 && rt->useExternal) {
+        rt->durationMs = probeDurationMs(path);
     }
 
     float start = clamp01(params.start);

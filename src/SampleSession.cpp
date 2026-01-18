@@ -283,12 +283,6 @@ bool SampleSession::buildExternalCommand(QString &program, QStringList &args) co
             args = {"-q", m_sourcePath};
             return true;
         }
-
-        program = QStandardPaths::findExecutable("ffplay");
-        if (!program.isEmpty()) {
-            args = {"-nodisp", "-autoexit", "-loglevel", "quiet", m_sourcePath};
-            return true;
-        }
     }
 #else
     Q_UNUSED(program);

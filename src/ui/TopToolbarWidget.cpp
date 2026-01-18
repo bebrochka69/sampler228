@@ -187,22 +187,25 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     const int centerWidth = qMax(0, centerRight - centerLeft);
     const QRectF centerRect(centerLeft, 8, centerWidth, h - 16);
 
-    // CPU/RAM/LOAD indicators (compact text).
-    const float statsWidth = 210.0f;
+    // CPU/RAM/LOAD indicators (always visible if there is space).
+    const float statsWidth = 220.0f;
     QRectF statsRect;
-    if (centerRect.width() > statsWidth + 20.0f) {
-        statsRect = QRectF(centerRect.left(), centerRect.top(), statsWidth, centerRect.height());
+    if (centerRect.width() > 90.0f) {
+        const float width = qMin(statsWidth, centerRect.width());
+        statsRect = QRectF(centerRect.left(), centerRect.top(), width, centerRect.height());
         const float cpu = m_stats.cpuUsage();
         const float ram = m_stats.ramUsage();
         const float load = m_stats.loadUsage();
 
         p.setPen(Theme::text());
         p.setFont(Theme::baseFont(9, QFont::DemiBold));
-        const QString statsText =
+        QString statsText =
             QString("CPU %1%  RAM %2%  LOAD %3%")
                 .arg(static_cast<int>(cpu * 100))
                 .arg(static_cast<int>(ram * 100))
                 .arg(static_cast<int>(load * 100));
+        QFontMetrics fm(p.font());
+        statsText = fm.elidedText(statsText, Qt::ElideRight, static_cast<int>(statsRect.width()));
         p.drawText(statsRect.adjusted(0, 6, 0, -6), Qt::AlignLeft | Qt::AlignVCenter, statsText);
     }
 
