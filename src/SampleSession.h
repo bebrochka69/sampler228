@@ -3,7 +3,9 @@
 #include <QAudioDecoder>
 #include <QMediaPlayer>
 #include <QObject>
+#include <QProcess>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 class QAudioOutput;
@@ -42,12 +44,17 @@ private:
     void resetDecodeState();
     void rebuildWaveform();
     void ensureAudioOutput();
+    void playExternal();
+    void stopExternal();
+    bool buildExternalCommand(QString &program, QStringList &args) const;
 
     QString m_sourcePath;
     QAudioDecoder m_decoder;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
     bool m_hasAudioOutput = false;
+    bool m_forceExternal = false;
+    QProcess *m_externalPlayer = nullptr;
 
     QVector<float> m_pcm;
     QVector<float> m_waveform;

@@ -98,7 +98,6 @@ void SamplePageWidget::selectIndex(int index) {
     const QRectF leftRect(12, contentTop, leftWidth - 18, height() - contentTop - 12);
     const QRectF listRect(leftRect.left(), leftRect.top() + 36, leftRect.width(),
                           leftRect.height() - 36);
-    const int listTop = static_cast<int>(listRect.top());
     const int viewHeight = static_cast<int>(listRect.height());
     const int posY = clamped * rowHeight;
     if (posY < m_scrollOffset) {

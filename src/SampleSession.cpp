@@ -4,8 +4,10 @@
 #include <QAudioDevice>
 #include <QAudioFormat>
 #include <QAudioOutput>
+#include <QFileInfo>
 #include <QMediaDevices>
 #include <QMediaPlayer>
+#include <QStandardPaths>
 #include <QTime>
 #include <QUrl>
 #include <QtMath>
@@ -55,6 +57,7 @@ void SampleSession::setSource(const QString &path) {
         m_player->stop();
         m_player->setSource(QUrl::fromLocalFile(path));
     }
+    stopExternal();
     resetDecodeState();
     m_errorText.clear();
 
@@ -75,11 +78,12 @@ void SampleSession::play() {
         return;
     }
     ensureAudioOutput();
-    if (!m_player || !m_hasAudioOutput) {
+    if (m_forceExternal || !m_player || !m_hasAudioOutput) {
         if (m_errorText != "No audio output device") {
             m_errorText = "No audio output device";
             emit errorChanged(m_errorText);
         }
+        playExternal();
         return;
     }
     if (m_player->source().toLocalFile() != m_sourcePath) {
@@ -92,9 +96,13 @@ void SampleSession::stop() {
     if (m_player) {
         m_player->stop();
     }
+    stopExternal();
 }
 
 bool SampleSession::isPlaying() const {
+    if (m_externalPlayer) {
+        return m_externalPlayer->state() == QProcess::Running;
+    }
     return m_player && m_player->playbackState() == QMediaPlayer::PlayingState;
 }
 
@@ -192,11 +200,112 @@ void SampleSession::ensureAudioOutput() {
     m_player = new QMediaPlayer(this);
     m_player->setAudioOutput(m_audioOutput);
     connect(m_player, &QMediaPlayer::playbackStateChanged, this, &SampleSession::handlePlayerState);
+    connect(m_player, &QMediaPlayer::errorOccurred, this,
+            [this](QMediaPlayer::Error error, const QString &errorString) {
+                if (error == QMediaPlayer::NoError) {
+                    return;
+                }
+                m_errorText = errorString;
+                emit errorChanged(m_errorText);
+                m_forceExternal = true;
+                if (!m_externalPlayer) {
+                    playExternal();
+                }
+            });
 
     if (m_errorText == "No audio output device") {
         m_errorText.clear();
         emit errorChanged(m_errorText);
     }
+}
+
+bool SampleSession::buildExternalCommand(QString &program, QStringList &args) const {
+#ifdef Q_OS_LINUX
+    const QFileInfo info(m_sourcePath);
+    const QString ext = info.suffix().toLower();
+    if (ext == "wav") {
+        program = QStandardPaths::findExecutable("aplay");
+        if (program.isEmpty()) {
+            return false;
+        }
+        args = {"-q", m_sourcePath};
+        return true;
+    }
+
+    if (ext == "mp3") {
+        program = QStandardPaths::findExecutable("mpg123");
+        if (!program.isEmpty()) {
+            args = {"-q", m_sourcePath};
+            return true;
+        }
+
+        program = QStandardPaths::findExecutable("ffplay");
+        if (!program.isEmpty()) {
+            args = {"-nodisp", "-autoexit", "-loglevel", "quiet", m_sourcePath};
+            return true;
+        }
+    }
+#else
+    Q_UNUSED(program);
+    Q_UNUSED(args);
+#endif
+    return false;
+}
+
+void SampleSession::playExternal() {
+    if (m_sourcePath.isEmpty()) {
+        return;
+    }
+    stopExternal();
+
+    QString program;
+    QStringList args;
+    if (!buildExternalCommand(program, args)) {
+        if (m_errorText != "External player not found") {
+            m_errorText = "External player not found";
+            emit errorChanged(m_errorText);
+        }
+        return;
+    }
+
+    m_externalPlayer = new QProcess(this);
+    m_externalPlayer->setProgram(program);
+    m_externalPlayer->setArguments(args);
+    m_externalPlayer->setProcessChannelMode(QProcess::MergedChannels);
+
+    connect(m_externalPlayer, &QProcess::started, this, [this]() {
+        if (!m_errorText.isEmpty()) {
+            m_errorText.clear();
+            emit errorChanged(m_errorText);
+        }
+        emit playbackChanged(true);
+    });
+    connect(m_externalPlayer,
+            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this,
+            [this](int, QProcess::ExitStatus) {
+                emit playbackChanged(false);
+                m_externalPlayer->deleteLater();
+                m_externalPlayer = nullptr;
+            });
+    connect(m_externalPlayer, &QProcess::errorOccurred, this, [this](QProcess::ProcessError) {
+        if (m_errorText != "External player failed") {
+            m_errorText = "External player failed";
+            emit errorChanged(m_errorText);
+        }
+        emit playbackChanged(false);
+    });
+
+    m_externalPlayer->start();
+}
+
+void SampleSession::stopExternal() {
+    if (!m_externalPlayer) {
+        return;
+    }
+    m_externalPlayer->kill();
+    m_externalPlayer->deleteLater();
+    m_externalPlayer = nullptr;
+    emit playbackChanged(false);
 }
 
 void SampleSession::rebuildWaveform() {
