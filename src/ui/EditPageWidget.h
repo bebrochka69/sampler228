@@ -8,11 +8,12 @@ class QPaintEvent;
 class QKeyEvent;
 
 class SampleSession;
+class PadBank;
 
 class EditPageWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit EditPageWidget(SampleSession *session, QWidget *parent = nullptr);
+    explicit EditPageWidget(SampleSession *session, PadBank *pads, QWidget *parent = nullptr);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -21,10 +22,20 @@ protected:
 private:
     struct Param {
         QString label;
-        float value = 0.0f;
+        enum Type {
+            Volume,
+            Pan,
+            Pitch,
+            Stretch,
+            Start,
+            End,
+            Slice,
+            Mode
+        } type;
     };
 
     QVector<Param> m_params;
     SampleSession *m_session = nullptr;
+    PadBank *m_pads = nullptr;
     int m_selectedParam = 0;
 };

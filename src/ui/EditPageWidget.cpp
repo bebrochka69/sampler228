@@ -4,33 +4,39 @@
 #include <QPainter>
 #include <QtGlobal>
 
+#include "PadBank.h"
 #include "SampleSession.h"
 #include "Theme.h"
 #include "WaveformRenderer.h"
 
-EditPageWidget::EditPageWidget(SampleSession *session, QWidget *parent)
-    : QWidget(parent), m_session(session) {
+EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *parent)
+    : QWidget(parent), m_session(session), m_pads(pads) {
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
     m_params = {
-        {"VOLUME", 0.72f},
-        {"PAN", 0.44f},
-        {"PITCH", 0.58f},
-        {"STRETCH", 0.36f},
-        {"START", 0.18f},
-        {"END", 0.92f},
-        {"SLICE", 0.60f},
-        {"MODE", 0.42f},
+        {"VOLUME", Param::Volume},
+        {"PAN", Param::Pan},
+        {"PITCH", Param::Pitch},
+        {"STRETCH", Param::Stretch},
+        {"START", Param::Start},
+        {"END", Param::End},
+        {"SLICE", Param::Slice},
+        {"MODE", Param::Mode},
     };
 
     if (m_session) {
         connect(m_session, &SampleSession::waveformChanged, this, [this]() { update(); });
     }
+    if (m_pads) {
+        connect(m_pads, &PadBank::padParamsChanged, this, [this](int) { update(); });
+        connect(m_pads, &PadBank::activePadChanged, this, [this](int) { update(); });
+        connect(m_pads, &PadBank::padChanged, this, [this](int) { update(); });
+    }
 }
 
 void EditPageWidget::keyPressEvent(QKeyEvent *event) {
-    if (m_params.isEmpty()) {
+    if (m_params.isEmpty() || !m_pads) {
         return;
     }
 
@@ -46,27 +52,150 @@ void EditPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
 
-    auto clampValue = [](float value) {
-        return qBound(0.0f, value, 1.0f);
+    const int pad = m_pads->activePad();
+    const bool shift = event->modifiers().testFlag(Qt::ShiftModifier);
+    const Param::Type type = m_params[m_selectedParam].type;
+
+    if (key == Qt::Key_Space) {
+        if (m_pads->isPlaying(pad)) {
+            m_pads->stopPad(pad);
+        } else {
+            m_pads->triggerPad(pad);
+        }
+        update();
+        return;
+    }
+
+    auto adjust = [&](float delta) {
+        PadBank::PadParams params = m_pads->params(pad);
+        switch (type) {
+            case Param::Volume:
+                m_pads->setVolume(pad, params.volume + delta);
+                break;
+            case Param::Pan:
+                m_pads->setPan(pad, params.pan + delta);
+                break;
+            case Param::Pitch:
+                m_pads->setPitch(pad, params.pitch + delta * 12.0f);
+                break;
+            case Param::Start:
+                m_pads->setStart(pad, params.start + delta);
+                break;
+            case Param::End:
+                m_pads->setEnd(pad, params.end + delta);
+                break;
+            default:
+                break;
+        }
     };
 
     if (key == Qt::Key_Left || key == Qt::Key_Minus) {
-        m_params[m_selectedParam].value = clampValue(m_params[m_selectedParam].value - 0.02f);
+        switch (type) {
+            case Param::Stretch:
+                m_pads->setStretchIndex(pad, m_pads->params(pad).stretchIndex - 1);
+                break;
+            case Param::Slice:
+                if (shift) {
+                    m_pads->setSliceCountIndex(pad, m_pads->params(pad).sliceCountIndex - 1);
+                } else {
+                    m_pads->setSliceIndex(pad, m_pads->params(pad).sliceIndex - 1);
+                }
+                break;
+            case Param::Mode:
+                m_pads->setLoop(pad, !m_pads->params(pad).loop);
+                break;
+            case Param::Pitch:
+                adjust(-1.0f / 12.0f);
+                break;
+            case Param::Pan:
+                adjust(-0.05f);
+                break;
+            case Param::Volume:
+                adjust(-0.02f);
+                break;
+            case Param::Start:
+            case Param::End:
+                adjust(-0.01f);
+                break;
+        }
         update();
         return;
     }
     if (key == Qt::Key_Right || key == Qt::Key_Plus || key == Qt::Key_Equal) {
-        m_params[m_selectedParam].value = clampValue(m_params[m_selectedParam].value + 0.02f);
+        switch (type) {
+            case Param::Stretch:
+                m_pads->setStretchIndex(pad, m_pads->params(pad).stretchIndex + 1);
+                break;
+            case Param::Slice:
+                if (shift) {
+                    m_pads->setSliceCountIndex(pad, m_pads->params(pad).sliceCountIndex + 1);
+                } else {
+                    m_pads->setSliceIndex(pad, m_pads->params(pad).sliceIndex + 1);
+                }
+                break;
+            case Param::Mode:
+                m_pads->setLoop(pad, !m_pads->params(pad).loop);
+                break;
+            case Param::Pitch:
+                adjust(1.0f / 12.0f);
+                break;
+            case Param::Pan:
+                adjust(0.05f);
+                break;
+            case Param::Volume:
+                adjust(0.02f);
+                break;
+            case Param::Start:
+            case Param::End:
+                adjust(0.01f);
+                break;
+        }
         update();
         return;
     }
     if (key == Qt::Key_Home) {
-        m_params[m_selectedParam].value = 0.0f;
+        switch (type) {
+            case Param::Volume:
+                m_pads->setVolume(pad, 0.0f);
+                break;
+            case Param::Pan:
+                m_pads->setPan(pad, -1.0f);
+                break;
+            case Param::Pitch:
+                m_pads->setPitch(pad, -12.0f);
+                break;
+            case Param::Start:
+                m_pads->setStart(pad, 0.0f);
+                break;
+            case Param::End:
+                m_pads->setEnd(pad, 0.0f);
+                break;
+            default:
+                break;
+        }
         update();
         return;
     }
     if (key == Qt::Key_End) {
-        m_params[m_selectedParam].value = 1.0f;
+        switch (type) {
+            case Param::Volume:
+                m_pads->setVolume(pad, 1.0f);
+                break;
+            case Param::Pan:
+                m_pads->setPan(pad, 1.0f);
+                break;
+            case Param::Pitch:
+                m_pads->setPitch(pad, 12.0f);
+                break;
+            case Param::Start:
+                m_pads->setStart(pad, 1.0f);
+                break;
+            case Param::End:
+                m_pads->setEnd(pad, 1.0f);
+                break;
+            default:
+                break;
+        }
         update();
         return;
     }
@@ -78,6 +207,13 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     QPainter p(this);
     Theme::paintBackground(p, rect());
 
+    if (m_pads && m_session) {
+        const QString padPath = m_pads->padPath(m_pads->activePad());
+        if (!padPath.isEmpty() && padPath != m_session->sourcePath()) {
+            m_session->setSource(padPath);
+        }
+    }
+
     const int margin = 24;
     const int headerHeight = 24;
     const QRectF headerRect(margin, margin, width() - 2 * margin, headerHeight);
@@ -87,7 +223,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(8));
     p.drawText(QRectF(headerRect.left(), headerRect.top(), headerRect.width(), headerRect.height()),
-               Qt::AlignRight | Qt::AlignVCenter, "UP/DOWN select  LEFT/RIGHT adjust");
+               Qt::AlignRight | Qt::AlignVCenter, "UP/DOWN select  LEFT/RIGHT adjust  SHIFT=Slice");
 
     const QRectF waveRect(margin, headerRect.bottom() + 10, width() - 2 * margin, height() * 0.42f);
 
@@ -120,6 +256,48 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         p.drawLine(QPointF(x, waveInner.top()), QPointF(x, waveInner.bottom()));
     }
 
+    PadBank::PadParams params;
+    if (m_pads) {
+        params = m_pads->params(m_pads->activePad());
+    }
+
+    const float start = qBound(0.0f, params.start, 1.0f);
+    const float end = qBound(0.0f, params.end, 1.0f);
+    const float sliceStart = qMin(start, end);
+    const float sliceEnd = qMax(start, end);
+
+    const float startX = waveInner.left() + waveInner.width() * sliceStart;
+    const float endX = waveInner.left() + waveInner.width() * sliceEnd;
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(Theme::withAlpha(Theme::accentAlt(), 28));
+    p.drawRect(QRectF(startX, waveInner.top(), endX - startX, waveInner.height()));
+
+    const int sliceCount = PadBank::sliceCountForIndex(params.sliceCountIndex);
+    const int sliceIndex = qBound(0, params.sliceIndex, sliceCount - 1);
+    const float sliceW = (sliceEnd - sliceStart) / static_cast<float>(sliceCount);
+
+    if (sliceCount > 1 && sliceW > 0.0f) {
+        for (int i = 1; i < sliceCount; ++i) {
+            const float sx = waveInner.left() + waveInner.width() * (sliceStart + sliceW * i);
+            p.setPen(QPen(Theme::withAlpha(Theme::accentAlt(), 120), 1.0));
+            p.drawLine(QPointF(sx, waveInner.top() + 4), QPointF(sx, waveInner.bottom() - 4));
+        }
+
+        const float selStart = sliceStart + sliceW * sliceIndex;
+        const float selEnd = selStart + sliceW;
+        const float selX = waveInner.left() + waveInner.width() * selStart;
+        const float selW = waveInner.width() * sliceW;
+        p.setPen(Qt::NoPen);
+        p.setBrush(Theme::withAlpha(Theme::accent(), 48));
+        p.drawRect(QRectF(selX, waveInner.top(), selW, waveInner.height()));
+    }
+
+    p.setPen(QPen(Theme::accentAlt(), 2.0));
+    p.drawLine(QPointF(startX, waveInner.top()), QPointF(startX, waveInner.bottom()));
+    p.setPen(QPen(Theme::accent(), 2.0));
+    p.drawLine(QPointF(endX, waveInner.top()), QPointF(endX, waveInner.bottom()));
+
     // Parameters grid.
     const QRectF gridRect(margin, waveRect.bottom() + 16, width() - 2 * margin,
                           height() - waveRect.bottom() - 96);
@@ -151,19 +329,67 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         p.drawText(QRectF(cell.left(), cell.bottom() - 26, cell.width(), 16),
                    Qt::AlignCenter, m_params[i].label);
 
+        float valueNorm = 0.0f;
+        QString valueText;
+
+        switch (m_params[i].type) {
+            case Param::Volume:
+                valueNorm = params.volume;
+                valueText = QString("%1%").arg(static_cast<int>(params.volume * 100));
+                break;
+            case Param::Pan: {
+                valueNorm = (params.pan + 1.0f) * 0.5f;
+                const int panVal = static_cast<int>(qAbs(params.pan) * 100);
+                valueText = params.pan < 0.0f ? QString("L%1").arg(panVal)
+                                              : QString("R%1").arg(panVal);
+                if (panVal == 0) {
+                    valueText = "C";
+                }
+                break;
+            }
+            case Param::Pitch: {
+                valueNorm = (params.pitch + 12.0f) / 24.0f;
+                const int pitchVal = static_cast<int>(params.pitch);
+                valueText = QString("%1%2 st").arg(pitchVal >= 0 ? "+" : "").arg(pitchVal);
+                break;
+            }
+            case Param::Stretch:
+                valueNorm = static_cast<float>(params.stretchIndex) /
+                            static_cast<float>(qMax(1, PadBank::stretchCount() - 1));
+                valueText = PadBank::stretchLabel(params.stretchIndex);
+                break;
+            case Param::Start:
+                valueNorm = params.start;
+                valueText = QString("%1%").arg(static_cast<int>(params.start * 100));
+                break;
+            case Param::End:
+                valueNorm = params.end;
+                valueText = QString("%1%").arg(static_cast<int>(params.end * 100));
+                break;
+            case Param::Slice: {
+                const int count = PadBank::sliceCountForIndex(params.sliceCountIndex);
+                valueNorm = static_cast<float>(params.sliceIndex) / static_cast<float>(qMax(1, count - 1));
+                valueText = QString("%1 / %2").arg(count).arg(params.sliceIndex + 1);
+                break;
+            }
+            case Param::Mode:
+                valueNorm = params.loop ? 1.0f : 0.0f;
+                valueText = params.loop ? "LOOP" : "ONESHOT";
+                break;
+        }
+
         const QRectF valueLine(cell.left() + 18, cell.bottom() - 10, cell.width() - 36, 3);
         p.setPen(Qt::NoPen);
         p.setBrush(Theme::withAlpha(Theme::stroke(), 160));
         p.drawRect(valueLine);
         p.setBrush(selected ? Theme::accent() : Theme::accentAlt());
-        p.drawRect(QRectF(valueLine.left(), valueLine.top(), valueLine.width() * m_params[i].value,
+        p.drawRect(QRectF(valueLine.left(), valueLine.top(), valueLine.width() * valueNorm,
                           valueLine.height()));
 
         p.setPen(Theme::textMuted());
         p.setFont(Theme::baseFont(8));
-        const int percent = static_cast<int>(m_params[i].value * 100.0f);
         p.drawText(QRectF(cell.left(), cell.top() + 6, cell.width(), 12),
-                   Qt::AlignCenter, QString::number(percent));
+                   Qt::AlignCenter, valueText);
         p.setFont(Theme::baseFont(10, QFont::DemiBold));
     }
 

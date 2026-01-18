@@ -1,7 +1,108 @@
 #include "PadBank.h"
 
+#include <QAudioOutput>
+#include <QFileInfo>
+#include <QMediaPlayer>
+#include <QProcess>
+#include <QStandardPaths>
+#include <QStringList>
+#include <QTimer>
+#include <QUrl>
+#include <QtGlobal>
+#include <QtMath>
+
+namespace {
+constexpr int kPadCount = 8;
+constexpr int kSliceCounts[] = {4, 8, 16};
+constexpr const char *kStretchLabels[] = {
+    "1 BEAT",
+    "2 BEAT",
+    "1 BAR",
+    "2 BAR",
+    "4 BAR",
+    "8 BAR",
+};
+
+float clamp01(float value) {
+    return qBound(0.0f, value, 1.0f);
+}
+
+double pitchToRate(float semitones) {
+    return std::pow(2.0, static_cast<double>(semitones) / 12.0);
+}
+}  // namespace
+
+struct PadBank::PadRuntime {
+    QMediaPlayer *player = nullptr;
+    QAudioOutput *output = nullptr;
+    QProcess *external = nullptr;
+    QTimer *externalLoop = nullptr;
+    qint64 durationMs = 0;
+    qint64 segmentStartMs = 0;
+    qint64 segmentEndMs = 0;
+    bool loop = false;
+    bool useExternal = false;
+    QString sourcePath;
+};
+
 PadBank::PadBank(QObject *parent) : QObject(parent) {
     m_paths.fill(QString());
+    for (int i = 0; i < kPadCount; ++i) {
+        m_runtime[i] = new PadRuntime();
+        m_runtime[i]->output = new QAudioOutput(this);
+        m_runtime[i]->player = new QMediaPlayer(this);
+        m_runtime[i]->player->setAudioOutput(m_runtime[i]->output);
+
+        const int index = i;
+        connect(m_runtime[i]->player, &QMediaPlayer::durationChanged, this,
+                [this, index](qint64 duration) {
+                    m_runtime[index]->durationMs = duration;
+                });
+        connect(m_runtime[i]->player, &QMediaPlayer::errorOccurred, this,
+                [this, index](QMediaPlayer::Error error, const QString &) {
+                    if (error == QMediaPlayer::NoError) {
+                        return;
+                    }
+                    m_runtime[index]->useExternal = true;
+                });
+        connect(m_runtime[i]->player, &QMediaPlayer::positionChanged, this,
+                [this, index](qint64 position) {
+                    PadRuntime *rt = m_runtime[index];
+                    if (rt->segmentEndMs <= rt->segmentStartMs) {
+                        return;
+                    }
+                    if (position >= rt->segmentEndMs) {
+                        if (rt->loop) {
+                            rt->player->setPosition(rt->segmentStartMs);
+                        } else {
+                            rt->player->stop();
+                        }
+                    }
+                });
+    }
+
+#ifdef Q_OS_LINUX
+    if (qEnvironmentVariableIsSet("GROOVEBOX_FORCE_ALSA")) {
+        for (int i = 0; i < kPadCount; ++i) {
+            m_runtime[i]->useExternal = true;
+        }
+    }
+#endif
+}
+
+PadBank::~PadBank() {
+    for (int i = 0; i < kPadCount; ++i) {
+        PadRuntime *rt = m_runtime[i];
+        if (!rt) {
+            continue;
+        }
+        if (rt->external) {
+            rt->external->kill();
+            rt->external->deleteLater();
+        }
+        delete rt;
+        m_runtime[i] = nullptr;
+    }
 }
 
 void PadBank::setActivePad(int index) {
@@ -23,7 +124,17 @@ void PadBank::setPadPath(int index, const QString &path) {
         return;
     }
     m_paths[static_cast<size_t>(index)] = path;
+    m_params[static_cast<size_t>(index)].start = 0.0f;
+    m_params[static_cast<size_t>(index)].end = 1.0f;
+    m_params[static_cast<size_t>(index)].sliceIndex = 0;
+
+    PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (rt && rt->player) {
+        rt->player->setSource(QUrl::fromLocalFile(path));
+        rt->sourcePath = path;
+    }
     emit padChanged(index);
+    emit padParamsChanged(index);
 }
 
 QString PadBank::padPath(int index) const {
@@ -44,4 +155,320 @@ QString PadBank::padName(int index) const {
 
 bool PadBank::isLoaded(int index) const {
     return !padPath(index).isEmpty();
+}
+
+PadBank::PadParams PadBank::params(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return PadParams();
+    }
+    return m_params[static_cast<size_t>(index)];
+}
+
+void PadBank::setVolume(int index, float value) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    m_params[static_cast<size_t>(index)].volume = clamp01(value);
+    emit padParamsChanged(index);
+}
+
+void PadBank::setPan(int index, float value) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    m_params[static_cast<size_t>(index)].pan = qBound(-1.0f, value, 1.0f);
+    emit padParamsChanged(index);
+}
+
+void PadBank::setPitch(int index, float semitones) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    m_params[static_cast<size_t>(index)].pitch = qBound(-12.0f, semitones, 12.0f);
+    emit padParamsChanged(index);
+}
+
+void PadBank::setStretchIndex(int index, int stretchIndex) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    const int maxIndex = stretchCount() - 1;
+    m_params[static_cast<size_t>(index)].stretchIndex = qBound(0, stretchIndex, maxIndex);
+    emit padParamsChanged(index);
+}
+
+void PadBank::setStart(int index, float value) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    value = clamp01(value);
+    float end = m_params[static_cast<size_t>(index)].end;
+    if (value >= end) {
+        value = qMax(0.0f, end - 0.01f);
+    }
+    m_params[static_cast<size_t>(index)].start = value;
+    emit padParamsChanged(index);
+}
+
+void PadBank::setEnd(int index, float value) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    value = clamp01(value);
+    float start = m_params[static_cast<size_t>(index)].start;
+    if (value <= start) {
+        value = qMin(1.0f, start + 0.01f);
+    }
+    m_params[static_cast<size_t>(index)].end = value;
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSliceCountIndex(int index, int sliceCountIndex) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    const int clamped = qBound(0, sliceCountIndex, 2);
+    m_params[static_cast<size_t>(index)].sliceCountIndex = clamped;
+
+    const int count = sliceCountForIndex(clamped);
+    int &sliceIndex = m_params[static_cast<size_t>(index)].sliceIndex;
+    sliceIndex = qBound(0, sliceIndex, count - 1);
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSliceIndex(int index, int sliceIndex) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    const int count = sliceCountForIndex(m_params[static_cast<size_t>(index)].sliceCountIndex);
+    m_params[static_cast<size_t>(index)].sliceIndex = qBound(0, sliceIndex, count - 1);
+    emit padParamsChanged(index);
+}
+
+void PadBank::setLoop(int index, bool loop) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    m_params[static_cast<size_t>(index)].loop = loop;
+    emit padParamsChanged(index);
+}
+
+bool PadBank::isPlaying(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return false;
+    }
+    const PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (rt->external) {
+        return rt->external->state() == QProcess::Running;
+    }
+    return rt->player && rt->player->playbackState() == QMediaPlayer::PlayingState;
+}
+
+static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 durationMs,
+                                 QString &program, QStringList &args) {
+#ifdef Q_OS_LINUX
+    const QFileInfo info(path);
+    const QString ext = info.suffix().toLower();
+
+    const QString ffplay = QStandardPaths::findExecutable("ffplay");
+    if (!ffplay.isEmpty()) {
+        program = ffplay;
+        args = {"-nodisp", "-autoexit", "-loglevel", "quiet"};
+        if (startMs > 0) {
+            args << "-ss" << QString::number(static_cast<double>(startMs) / 1000.0, 'f', 3);
+        }
+        if (durationMs > 0) {
+            args << "-t" << QString::number(static_cast<double>(durationMs) / 1000.0, 'f', 3);
+        }
+        args << path;
+        return true;
+    }
+
+    if (ext == "wav") {
+        program = QStandardPaths::findExecutable("aplay");
+        if (program.isEmpty()) {
+            return false;
+        }
+        args = {"-q"};
+        if (durationMs > 0) {
+            const int seconds = static_cast<int>(qCeil(durationMs / 1000.0));
+            args << "-d" << QString::number(qMax(1, seconds));
+        }
+        args << path;
+        return true;
+    }
+
+    if (ext == "mp3") {
+        program = QStandardPaths::findExecutable("mpg123");
+        if (!program.isEmpty()) {
+            args = {"-q", path};
+            return true;
+        }
+    }
+#else
+    Q_UNUSED(path);
+    Q_UNUSED(startMs);
+    Q_UNUSED(durationMs);
+    Q_UNUSED(program);
+    Q_UNUSED(args);
+#endif
+    return false;
+}
+
+static qint64 stretchTargetMs(int bpm, int stretchIndex) {
+    const int beatMs = 60000 / qMax(1, bpm);
+    switch (stretchIndex) {
+        case 0:
+            return beatMs;
+        case 1:
+            return beatMs * 2;
+        case 2:
+            return beatMs * 4;
+        case 3:
+            return beatMs * 8;
+        case 4:
+            return beatMs * 16;
+        case 5:
+            return beatMs * 32;
+        default:
+            return beatMs * 4;
+    }
+}
+
+void PadBank::triggerPad(int index) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    const QString path = padPath(index);
+    if (path.isEmpty()) {
+        return;
+    }
+
+    PadParams &params = m_params[static_cast<size_t>(index)];
+    PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (!rt) {
+        return;
+    }
+
+    float start = clamp01(params.start);
+    float end = clamp01(params.end);
+    if (end <= start) {
+        end = qMin(1.0f, start + 0.01f);
+    }
+
+    const int sliceCount = sliceCountForIndex(params.sliceCountIndex);
+    const int sliceIndex = qBound(0, params.sliceIndex, sliceCount - 1);
+    const float sliceLen = (end - start) / static_cast<float>(sliceCount);
+    const float sliceStart = start + sliceLen * sliceIndex;
+    const float sliceEnd = sliceStart + sliceLen;
+
+    const qint64 durationMs = rt->durationMs;
+    qint64 startMs = durationMs > 0 ? static_cast<qint64>(sliceStart * durationMs) : 0;
+    qint64 endMs = durationMs > 0 ? static_cast<qint64>(sliceEnd * durationMs) : 0;
+    if (durationMs > 0 && endMs <= startMs) {
+        endMs = qMin(durationMs, startMs + 5);
+    }
+
+    rt->segmentStartMs = startMs;
+    rt->segmentEndMs = endMs;
+    rt->loop = params.loop;
+
+    const qint64 segmentMs = (durationMs > 0) ? qMax<qint64>(1, endMs - startMs) : 0;
+    const qint64 targetMs = stretchTargetMs(m_bpm, params.stretchIndex);
+    double rate = 1.0;
+    if (segmentMs > 0 && targetMs > 0) {
+        rate = static_cast<double>(segmentMs) / static_cast<double>(targetMs);
+    }
+    rate *= pitchToRate(params.pitch);
+    rate = qBound(0.25, rate, 4.0);
+
+    if (!rt->useExternal && rt->player) {
+        if (rt->sourcePath != path) {
+            rt->player->setSource(QUrl::fromLocalFile(path));
+            rt->sourcePath = path;
+        }
+        rt->output->setVolume(params.volume);
+        rt->player->setPlaybackRate(rate);
+        if (durationMs > 0 && startMs > 0) {
+            rt->player->setPosition(startMs);
+        } else {
+            rt->player->setPosition(0);
+        }
+        rt->player->play();
+        return;
+    }
+
+    QString program;
+    QStringList args;
+    if (!buildExternalCommand(path, startMs, segmentMs, program, args)) {
+        return;
+    }
+
+    if (rt->external) {
+        rt->external->kill();
+        rt->external->deleteLater();
+        rt->external = nullptr;
+    }
+
+    rt->external = new QProcess(this);
+    rt->external->setProgram(program);
+    rt->external->setArguments(args);
+    rt->external->setProcessChannelMode(QProcess::MergedChannels);
+
+    connect(rt->external,
+            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this,
+            [this, index](int, QProcess::ExitStatus) {
+                PadRuntime *loopRt = m_runtime[static_cast<size_t>(index)];
+                if (!loopRt) {
+                    return;
+                }
+                if (loopRt->loop) {
+                    QTimer::singleShot(10, this, [this, index]() { triggerPad(index); });
+                }
+            });
+
+    rt->external->start();
+}
+
+void PadBank::stopPad(int index) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (!rt) {
+        return;
+    }
+    if (rt->player) {
+        rt->player->stop();
+    }
+    if (rt->external) {
+        rt->external->kill();
+        rt->external->deleteLater();
+        rt->external = nullptr;
+    }
+}
+
+void PadBank::stopAll() {
+    for (int i = 0; i < padCount(); ++i) {
+        stopPad(i);
+    }
+}
+
+void PadBank::setBpm(int bpm) {
+    m_bpm = qBound(30, bpm, 300);
+}
+
+int PadBank::stretchCount() {
+    return static_cast<int>(sizeof(kStretchLabels) / sizeof(kStretchLabels[0]));
+}
+
+QString PadBank::stretchLabel(int index) {
+    const int maxIndex = stretchCount() - 1;
+    const int idx = qBound(0, index, maxIndex);
+    return QString::fromLatin1(kStretchLabels[idx]);
+}
+
+int PadBank::sliceCountForIndex(int index) {
+    const int idx = qBound(0, index, 2);
+    return kSliceCounts[idx];
 }

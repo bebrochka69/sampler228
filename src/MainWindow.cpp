@@ -29,8 +29,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     m_stack = new QStackedWidget(central);
     m_sampleSession = new SampleSession(this);
     m_stack->addWidget(new SamplePageWidget(m_sampleSession, m_padBank, m_stack));
-    m_stack->addWidget(new EditPageWidget(m_sampleSession, m_stack));
-    m_stack->addWidget(new SeqPageWidget(m_stack));
+    m_stack->addWidget(new EditPageWidget(m_sampleSession, m_padBank, m_stack));
+    m_stack->addWidget(new SeqPageWidget(m_padBank, m_stack));
     m_stack->addWidget(new SimplePageWidget("FX", m_stack));
     m_stack->addWidget(new SimplePageWidget("ARRANGE", m_stack));
 

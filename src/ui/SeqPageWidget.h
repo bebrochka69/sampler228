@@ -8,11 +8,12 @@
 class QMouseEvent;
 class QPaintEvent;
 class QKeyEvent;
+class PadBank;
 
 class SeqPageWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit SeqPageWidget(QWidget *parent = nullptr);
+    explicit SeqPageWidget(PadBank *pads, QWidget *parent = nullptr);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -25,6 +26,7 @@ private:
     int stepIntervalMs() const;
     void togglePlayback();
     void advancePlayhead();
+    void triggerStep(int step);
 
     std::array<std::array<bool, 64>, 8> m_steps;
     std::array<QColor, 8> m_padColors;
@@ -33,4 +35,5 @@ private:
     bool m_playing = false;
     int m_playStep = 0;
     int m_bpm = 120;
+    PadBank *m_pads = nullptr;
 };
