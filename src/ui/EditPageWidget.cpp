@@ -1,5 +1,7 @@
 #include "EditPageWidget.h"
 
+#include <QCoreApplication>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QPainter>
 #include <QtGlobal>
@@ -33,6 +35,64 @@ EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *p
         connect(m_pads, &PadBank::activePadChanged, this, [this](int) { update(); });
         connect(m_pads, &PadBank::padChanged, this, [this](int) { update(); });
     }
+}
+
+QString EditPageWidget::iconFileFor(Param::Type type) const {
+    QString base;
+    switch (type) {
+        case Param::Volume:
+            base = "volume";
+            break;
+        case Param::Pan:
+            base = "pan";
+            break;
+        case Param::Pitch:
+            base = "pitch";
+            break;
+        case Param::Stretch:
+            base = "stretch";
+            break;
+        case Param::Start:
+            base = "start";
+            break;
+        case Param::End:
+            base = "end";
+            break;
+        case Param::Slice:
+            base = "slice";
+            break;
+        case Param::Mode:
+            base = "mode";
+            break;
+    }
+
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QStringList searchDirs = {appDir + "/icons", appDir + "/assets/icons"};
+    const QStringList files = {base + ".png"};
+
+    for (const QString &dir : searchDirs) {
+        for (const QString &file : files) {
+            const QString path = dir + "/" + file;
+            if (QFileInfo::exists(path)) {
+                return path;
+            }
+        }
+    }
+    return QString();
+}
+
+QPixmap EditPageWidget::iconForType(Param::Type type) {
+    const int key = static_cast<int>(type);
+    if (m_iconCache.contains(key)) {
+        return m_iconCache.value(key);
+    }
+    QPixmap pix;
+    const QString path = iconFileFor(type);
+    if (!path.isEmpty()) {
+        pix.load(path);
+    }
+    m_iconCache.insert(key, pix);
+    return pix;
 }
 
 void EditPageWidget::keyPressEvent(QKeyEvent *event) {
@@ -321,9 +381,20 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         p.drawRect(cell);
 
         const QRectF iconRect = cell.adjusted(14, 12, -14, -28);
-        p.setPen(Qt::NoPen);
-        p.setBrush(selected ? Theme::accent() : Theme::accentAlt());
-        p.drawRect(iconRect.adjusted(6, 6, -6, -6));
+        const QPixmap icon = iconForType(m_params[i].type);
+        if (!icon.isNull()) {
+            const QRectF drawRect = iconRect.adjusted(6, 6, -6, -6);
+            const QPixmap scaled = icon.scaled(drawRect.size().toSize(), Qt::KeepAspectRatio,
+                                              Qt::SmoothTransformation);
+            const QPointF center = drawRect.center();
+            const QRectF target(center.x() - scaled.width() / 2.0, center.y() - scaled.height() / 2.0,
+                                scaled.width(), scaled.height());
+            p.drawPixmap(target, scaled);
+        } else {
+            p.setPen(Qt::NoPen);
+            p.setBrush(selected ? Theme::accent() : Theme::accentAlt());
+            p.drawRect(iconRect.adjusted(6, 6, -6, -6));
+        }
 
         p.setPen(selected ? Theme::accentAlt() : Theme::text());
         p.drawText(QRectF(cell.left(), cell.bottom() - 26, cell.width(), 16),

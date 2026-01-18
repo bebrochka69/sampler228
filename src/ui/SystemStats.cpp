@@ -2,14 +2,17 @@
 
 #include <QFile>
 #include <QTextStream>
+#include <QThread>
+#include <QtGlobal>
 
 SystemStats::SystemStats(QObject *parent) : QObject(parent) {}
 
 void SystemStats::update() {
 #ifdef Q_OS_LINUX
+    bool updated = false;
+
     quint64 idle = 0;
     quint64 total = 0;
-
     if (readCpu(idle, total)) {
         if (m_hasPrev && total > m_prevTotal) {
             const quint64 idleDelta = idle - m_prevIdle;
@@ -20,11 +23,24 @@ void SystemStats::update() {
         m_prevIdle = idle;
         m_prevTotal = total;
         m_hasPrev = true;
+        updated = true;
     }
 
     float ramUsage = 0.0f;
     if (readRam(ramUsage)) {
         m_ramUsage = ramUsage;
+        updated = true;
+    }
+
+    float loadUsage = 0.0f;
+    if (readLoad(loadUsage)) {
+        m_loadUsage = loadUsage;
+        updated = true;
+    } else {
+        m_loadUsage = 0.0f;
+    }
+
+    if (updated) {
         return;
     }
 #endif
@@ -32,6 +48,7 @@ void SystemStats::update() {
     // No /proc available: keep stats at zero instead of simulating.
     m_cpuUsage = 0.0f;
     m_ramUsage = 0.0f;
+    m_loadUsage = 0.0f;
 }
 
 #ifdef Q_OS_LINUX
@@ -96,6 +113,35 @@ bool SystemStats::readRam(float &usage) const {
 
     usage = 1.0f - static_cast<float>(available) / static_cast<float>(total);
     usage = qBound(0.0f, usage, 1.0f);
+    return true;
+}
+
+bool SystemStats::readLoad(float &usage) const {
+    QFile file("/proc/loadavg");
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    QTextStream in(&file);
+    const QString line = in.readLine().trimmed();
+    const QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+    if (parts.isEmpty()) {
+        return false;
+    }
+
+    bool ok = false;
+    const double load1 = parts[0].toDouble(&ok);
+    if (!ok) {
+        return false;
+    }
+
+    int cores = QThread::idealThreadCount();
+    if (cores <= 0) {
+        cores = 1;
+    }
+
+    const double normalized = load1 / static_cast<double>(cores);
+    usage = static_cast<float>(qBound(0.0, normalized, 1.0));
     return true;
 }
 #endif

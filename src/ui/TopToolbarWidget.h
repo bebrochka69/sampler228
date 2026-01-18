@@ -12,6 +12,7 @@
 class QMouseEvent;
 class QPaintEvent;
 class QResizeEvent;
+class QWheelEvent;
 class PadBank;
 
 class TopToolbarWidget : public QWidget {
@@ -31,10 +32,12 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
 private:
     void rebuildTabs();
     void updateStats();
+    void adjustBpm(int delta);
 
     QStringList m_tabs;
     QVector<QPolygonF> m_tabPolys;

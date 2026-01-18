@@ -58,6 +58,7 @@ signals:
     void padChanged(int index);
     void activePadChanged(int index);
     void padParamsChanged(int index);
+    void bpmChanged(int bpm);
 
 private:
     struct PadRuntime;

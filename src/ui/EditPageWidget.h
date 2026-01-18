@@ -1,11 +1,14 @@
 #pragma once
 
+#include <QHash>
+#include <QPixmap>
 #include <QString>
 #include <QVector>
 #include <QWidget>
 
 class QPaintEvent;
 class QKeyEvent;
+class QPixmap;
 
 class SampleSession;
 class PadBank;
@@ -38,4 +41,8 @@ private:
     SampleSession *m_session = nullptr;
     PadBank *m_pads = nullptr;
     int m_selectedParam = 0;
+    QHash<int, QPixmap> m_iconCache;
+
+    QString iconFileFor(Param::Type type) const;
+    QPixmap iconForType(Param::Type type);
 };

@@ -3,6 +3,7 @@
 #include <QFontMetrics>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QWheelEvent>
 
 #include "PadBank.h"
 #include "Theme.h"
@@ -21,6 +22,10 @@ TopToolbarWidget::TopToolbarWidget(PadBank *pads, QWidget *parent)
     if (m_pads) {
         connect(m_pads, &PadBank::padChanged, this, [this](int) { update(); });
         connect(m_pads, &PadBank::activePadChanged, this, [this](int) { update(); });
+        connect(m_pads, &PadBank::bpmChanged, this, [this](int bpm) {
+            m_bpm = bpm;
+            update();
+        });
     }
 
     rebuildTabs();
@@ -73,11 +78,21 @@ void TopToolbarWidget::rebuildTabs() {
 
 void TopToolbarWidget::updateStats() {
     m_stats.update();
+    if (m_pads) {
+        m_bpm = m_pads->bpm();
+    }
     update();
 }
 
 void TopToolbarWidget::mousePressEvent(QMouseEvent *event) {
     const QPointF pos = event->position();
+
+    if (m_bpmRect.contains(pos)) {
+        const bool shift = event->modifiers().testFlag(Qt::ShiftModifier);
+        const int delta = shift ? 5 : 1;
+        adjustBpm(event->button() == Qt::RightButton ? -delta : delta);
+        return;
+    }
 
     for (int i = 0; i < m_padRects.size(); ++i) {
         if (m_padRects[i].contains(pos)) {
@@ -95,6 +110,29 @@ void TopToolbarWidget::mousePressEvent(QMouseEvent *event) {
             break;
         }
     }
+}
+
+void TopToolbarWidget::wheelEvent(QWheelEvent *event) {
+    if (!m_bpmRect.contains(event->position())) {
+        QWidget::wheelEvent(event);
+        return;
+    }
+
+    const int delta = event->angleDelta().y() > 0 ? 1 : -1;
+    adjustBpm(delta);
+    event->accept();
+}
+
+void TopToolbarWidget::adjustBpm(int delta) {
+    const int next = qBound(30, m_bpm + delta, 300);
+    if (next == m_bpm) {
+        return;
+    }
+    m_bpm = next;
+    if (m_pads) {
+        m_pads->setBpm(next);
+    }
+    update();
 }
 
 void TopToolbarWidget::paintEvent(QPaintEvent *event) {
@@ -149,43 +187,63 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     const int centerWidth = qMax(0, centerRight - centerLeft);
     const QRectF centerRect(centerLeft, 8, centerWidth, h - 16);
 
-    // CPU/RAM indicators.
-    if (centerRect.width() > 180) {
-        const QRectF statsRect(centerRect.left(), centerRect.top(), 170, centerRect.height());
+    // CPU/RAM/LOAD indicators.
+    const float statsWidth = 190.0f;
+    QRectF statsRect;
+    if (centerRect.width() > statsWidth + 20.0f) {
+        statsRect = QRectF(centerRect.left(), centerRect.top(), statsWidth, centerRect.height());
         const float cpu = m_stats.cpuUsage();
         const float ram = m_stats.ramUsage();
+        const float load = m_stats.loadUsage();
+
+        struct StatLine {
+            const char *label;
+            float value;
+            QColor color;
+        };
+        const StatLine lines[] = {
+            {"CPU", cpu, Theme::accent()},
+            {"RAM", ram, Theme::accentAlt()},
+            {"LOAD", load, Theme::warn()},
+        };
 
         p.setPen(Theme::text());
         p.setFont(Theme::baseFont(9, QFont::DemiBold));
-        const QRectF cpuLabel(statsRect.left(), statsRect.top() + 4, 48, 12);
-        const QRectF ramLabel(statsRect.left(), statsRect.top() + 22, 48, 12);
-        p.drawText(cpuLabel, Qt::AlignLeft | Qt::AlignVCenter, "CPU");
-        p.drawText(ramLabel, Qt::AlignLeft | Qt::AlignVCenter, "RAM");
 
-        const QRectF cpuBox(statsRect.left() + 48, statsRect.top() + 2, 94, 12);
-        const QRectF ramBox(statsRect.left() + 48, statsRect.top() + 20, 94, 12);
-        p.setPen(QPen(Theme::stroke(), 1.0));
-        p.setBrush(Theme::bg1());
-        p.drawRect(cpuBox);
-        p.drawRect(ramBox);
+        const float lineH = 12.0f;
+        const float gap = 6.0f;
+        float y = statsRect.top() + 4.0f;
 
-        p.setPen(Qt::NoPen);
-        p.setBrush(Theme::accent());
-        p.drawRect(QRectF(cpuBox.left(), cpuBox.top(), cpuBox.width() * cpu, cpuBox.height()));
-        p.setBrush(Theme::accentAlt());
-        p.drawRect(QRectF(ramBox.left(), ramBox.top(), ramBox.width() * ram, ramBox.height()));
+        for (const auto &line : lines) {
+            const QRectF labelRect(statsRect.left(), y, 48, lineH);
+            const QRectF barRect(statsRect.left() + 48, y, 96, lineH);
 
-        p.setPen(Theme::textMuted());
-        p.setFont(Theme::baseFont(8));
-        p.drawText(QRectF(cpuBox.right() + 6, cpuBox.top(), 30, cpuBox.height()),
-                   Qt::AlignLeft | Qt::AlignVCenter, QString::number(static_cast<int>(cpu * 100)));
-        p.drawText(QRectF(ramBox.right() + 6, ramBox.top(), 30, ramBox.height()),
-                   Qt::AlignLeft | Qt::AlignVCenter, QString::number(static_cast<int>(ram * 100)));
+            p.setPen(Theme::text());
+            p.drawText(labelRect, Qt::AlignLeft | Qt::AlignVCenter, line.label);
+
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.setBrush(Theme::bg1());
+            p.drawRect(barRect);
+
+            p.setPen(Qt::NoPen);
+            p.setBrush(line.color);
+            p.drawRect(QRectF(barRect.left(), barRect.top(), barRect.width() * line.value, barRect.height()));
+
+            p.setPen(Theme::textMuted());
+            p.setFont(Theme::baseFont(8));
+            p.drawText(QRectF(barRect.right() + 6, barRect.top(), 32, barRect.height()),
+                       Qt::AlignLeft | Qt::AlignVCenter,
+                       QString::number(static_cast<int>(line.value * 100)));
+            p.setFont(Theme::baseFont(9, QFont::DemiBold));
+
+            y += lineH + gap;
+        }
     }
 
     // Stereo meter outline (no simulated audio).
-    if (centerRect.width() > 320) {
-        const QRectF meterRect(centerRect.left() + 190, centerRect.top(), 120, centerRect.height());
+    if (centerRect.width() > statsWidth + 140.0f) {
+        const float meterLeft = statsRect.isNull() ? centerRect.left() : statsRect.right() + 16.0f;
+        const QRectF meterRect(meterLeft, centerRect.top(), 120, centerRect.height());
         p.setPen(QPen(Theme::stroke(), 1.0));
         p.setBrush(Theme::bg1());
         p.drawRect(meterRect.adjusted(0, 2, 0, -2));

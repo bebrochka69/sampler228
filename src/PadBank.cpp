@@ -2,6 +2,7 @@
 
 #include <QAudioOutput>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QMediaPlayer>
 #include <QProcess>
 #include <QStandardPaths>
@@ -29,6 +30,61 @@ float clamp01(float value) {
 
 double pitchToRate(float semitones) {
     return std::pow(2.0, static_cast<double>(semitones) / 12.0);
+}
+
+bool isNear(double value, double target) {
+    return qAbs(value - target) < 0.001;
+}
+
+QStringList buildAtempoFilters(double factor) {
+    QStringList filters;
+    if (isNear(factor, 1.0)) {
+        return filters;
+    }
+
+    factor = qBound(0.125, factor, 8.0);
+    while (factor > 2.0) {
+        filters << "atempo=2.0";
+        factor /= 2.0;
+    }
+    while (factor < 0.5) {
+        filters << "atempo=0.5";
+        factor /= 0.5;
+    }
+    if (!isNear(factor, 1.0)) {
+        filters << QString("atempo=%1").arg(factor, 0, 'f', 3);
+    }
+    return filters;
+}
+
+QString buildAudioFilter(const PadBank::PadParams &params, double tempoFactor, double pitchRate) {
+    QStringList filters;
+
+    if (!isNear(params.volume, 1.0)) {
+        filters << QString("volume=%1").arg(params.volume, 0, 'f', 3);
+    }
+
+    if (!isNear(params.pan, 0.0)) {
+        const double left = params.pan <= 0.0 ? 1.0 : 1.0 - params.pan;
+        const double right = params.pan >= 0.0 ? 1.0 : 1.0 + params.pan;
+        filters << QString("pan=stereo|c0=%1*c0|c1=%2*c1")
+                       .arg(left, 0, 'f', 3)
+                       .arg(right, 0, 'f', 3);
+    }
+
+    const bool pitchActive = !isNear(pitchRate, 1.0);
+    if (pitchActive) {
+        filters << QString("asetrate=sample_rate*%1").arg(pitchRate, 0, 'f', 4);
+        filters << "aresample=sample_rate";
+    }
+
+    double atempoFactor = tempoFactor;
+    if (pitchActive) {
+        atempoFactor = tempoFactor / pitchRate;
+    }
+    filters.append(buildAtempoFilters(atempoFactor));
+
+    return filters.join(',');
 }
 }  // namespace
 
@@ -82,6 +138,13 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
     }
 
 #ifdef Q_OS_LINUX
+    const QString platform = QGuiApplication::platformName();
+    if (platform.contains("linuxfb") || platform.contains("eglfs") ||
+        platform.contains("vkkhrdisplay")) {
+        for (int i = 0; i < kPadCount; ++i) {
+            m_runtime[i]->useExternal = true;
+        }
+    }
     if (qEnvironmentVariableIsSet("GROOVEBOX_FORCE_ALSA")) {
         for (int i = 0; i < kPadCount; ++i) {
             m_runtime[i]->useExternal = true;
@@ -265,13 +328,13 @@ bool PadBank::isPlaying(int index) const {
 }
 
 static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 durationMs,
-                                 QString &program, QStringList &args) {
+                                 const QString &filter, QString &program, QStringList &args) {
 #ifdef Q_OS_LINUX
     const QFileInfo info(path);
     const QString ext = info.suffix().toLower();
 
     const QString ffplay = QStandardPaths::findExecutable("ffplay");
-    if (!ffplay.isEmpty()) {
+    if (!ffplay.isEmpty() && (!filter.isEmpty() || ext == "mp3")) {
         program = ffplay;
         args = {"-nodisp", "-autoexit", "-loglevel", "quiet"};
         if (startMs > 0) {
@@ -280,8 +343,15 @@ static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 dur
         if (durationMs > 0) {
             args << "-t" << QString::number(static_cast<double>(durationMs) / 1000.0, 'f', 3);
         }
+        if (!filter.isEmpty()) {
+            args << "-af" << filter;
+        }
         args << path;
         return true;
+    }
+
+    if (!filter.isEmpty()) {
+        return false;
     }
 
     if (ext == "wav") {
@@ -375,20 +445,25 @@ void PadBank::triggerPad(int index) {
 
     const qint64 segmentMs = (durationMs > 0) ? qMax<qint64>(1, endMs - startMs) : 0;
     const qint64 targetMs = stretchTargetMs(m_bpm, params.stretchIndex);
-    double rate = 1.0;
+    double tempoFactor = 1.0;
     if (segmentMs > 0 && targetMs > 0) {
-        rate = static_cast<double>(segmentMs) / static_cast<double>(targetMs);
+        tempoFactor = static_cast<double>(segmentMs) / static_cast<double>(targetMs);
     }
-    rate *= pitchToRate(params.pitch);
-    rate = qBound(0.25, rate, 4.0);
+    tempoFactor = qBound(0.25, tempoFactor, 4.0);
 
-    if (!rt->useExternal && rt->player) {
+    const double pitchRate = pitchToRate(params.pitch);
+    const double internalRate = qBound(0.25, tempoFactor * pitchRate, 4.0);
+
+    const bool wantsStretch = !isNear(tempoFactor, 1.0);
+    const bool needsExternal = rt->useExternal || wantsStretch;
+
+    if (!needsExternal && rt->player) {
         if (rt->sourcePath != path) {
             rt->player->setSource(QUrl::fromLocalFile(path));
             rt->sourcePath = path;
         }
         rt->output->setVolume(params.volume);
-        rt->player->setPlaybackRate(rate);
+        rt->player->setPlaybackRate(internalRate);
         if (durationMs > 0 && startMs > 0) {
             rt->player->setPosition(startMs);
         } else {
@@ -398,10 +473,22 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
+    const QString filter = buildAudioFilter(params, tempoFactor, pitchRate);
     QString program;
     QStringList args;
-    if (!buildExternalCommand(path, startMs, segmentMs, program, args)) {
-        return;
+    if (!buildExternalCommand(path, startMs, segmentMs, filter, program, args)) {
+        if (!filter.isEmpty() &&
+            buildExternalCommand(path, startMs, segmentMs, QString(), program, args)) {
+            // Fallback without filters if ffplay is missing.
+        } else if (rt->player) {
+            rt->output->setVolume(params.volume);
+            rt->player->setPlaybackRate(internalRate);
+            rt->player->setPosition(startMs);
+            rt->player->play();
+            return;
+        } else {
+            return;
+        }
     }
 
     if (rt->external) {
@@ -455,7 +542,12 @@ void PadBank::stopAll() {
 }
 
 void PadBank::setBpm(int bpm) {
-    m_bpm = qBound(30, bpm, 300);
+    const int next = qBound(30, bpm, 300);
+    if (m_bpm == next) {
+        return;
+    }
+    m_bpm = next;
+    emit bpmChanged(m_bpm);
 }
 
 int PadBank::stretchCount() {

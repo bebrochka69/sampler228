@@ -30,6 +30,12 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
             m_activePad = index;
             update();
         });
+        connect(m_pads, &PadBank::bpmChanged, this, [this](int) {
+            if (m_playing) {
+                m_playTimer.setInterval(stepIntervalMs());
+            }
+            update();
+        });
     }
 }
 
