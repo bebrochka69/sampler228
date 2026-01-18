@@ -5,11 +5,13 @@
 #include <QAudioFormat>
 #include <QAudioOutput>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QMediaDevices>
 #include <QMediaPlayer>
 #include <QStandardPaths>
 #include <QTime>
 #include <QUrl>
+#include <QtGlobal>
 #include <QtMath>
 
 namespace {
@@ -44,6 +46,17 @@ SampleSession::SampleSession(QObject *parent) : QObject(parent) {
             static_cast<void (QAudioDecoder::*)(QAudioDecoder::Error)>(&QAudioDecoder::error),
             this, &SampleSession::handleDecodeError);
 
+#ifdef Q_OS_LINUX
+    const QString platform = QGuiApplication::platformName();
+    if (platform.contains("linuxfb") || platform.contains("eglfs") ||
+        platform.contains("vkkhrdisplay")) {
+        m_forceExternal = true;
+    }
+    if (qEnvironmentVariableIsSet("GROOVEBOX_FORCE_ALSA")) {
+        m_forceExternal = true;
+    }
+#endif
+
     ensureAudioOutput();
 }
 
@@ -61,7 +74,7 @@ void SampleSession::setSource(const QString &path) {
     resetDecodeState();
     m_errorText.clear();
 
-    if (!m_hasAudioOutput) {
+    if (!m_hasAudioOutput && !m_forceExternal) {
         m_errorText = "No audio output device";
         emit errorChanged(m_errorText);
     }
@@ -75,6 +88,10 @@ void SampleSession::setSource(const QString &path) {
 
 void SampleSession::play() {
     if (m_sourcePath.isEmpty()) {
+        return;
+    }
+    if (m_forceExternal) {
+        playExternal();
         return;
     }
     ensureAudioOutput();
@@ -182,6 +199,9 @@ void SampleSession::handlePlayerState(QMediaPlayer::PlaybackState state) {
 
 void SampleSession::ensureAudioOutput() {
     if (m_player) {
+        return;
+    }
+    if (m_forceExternal) {
         return;
     }
 

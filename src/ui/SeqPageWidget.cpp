@@ -1,7 +1,9 @@
 #include "SeqPageWidget.h"
 
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QtGlobal>
 #include "Theme.h"
 
 SeqPageWidget::SeqPageWidget(QWidget *parent) : QWidget(parent) {
@@ -16,6 +18,10 @@ SeqPageWidget::SeqPageWidget(QWidget *parent) : QWidget(parent) {
             m_steps[pad][step] = false;
         }
     }
+
+    m_playTimer.setTimerType(Qt::PreciseTimer);
+    m_playTimer.setInterval(stepIntervalMs());
+    connect(&m_playTimer, &QTimer::timeout, this, &SeqPageWidget::advancePlayhead);
 }
 
 QRectF SeqPageWidget::gridRect() const {
@@ -31,7 +37,47 @@ QRectF SeqPageWidget::padsRect() const {
     return QRectF(grid.left(), grid.bottom() + 28, grid.width(), 110);
 }
 
+int SeqPageWidget::stepIntervalMs() const {
+    const int ms = 60000 / qMax(1, m_bpm) / 4;
+    return qMax(20, ms);
+}
+
+void SeqPageWidget::togglePlayback() {
+    m_playing = !m_playing;
+    if (m_playing) {
+        m_playTimer.setInterval(stepIntervalMs());
+        m_playTimer.start();
+    } else {
+        m_playTimer.stop();
+    }
+    update();
+}
+
+void SeqPageWidget::advancePlayhead() {
+    m_playStep = (m_playStep + 1) % 64;
+    update();
+}
+
+void SeqPageWidget::keyPressEvent(QKeyEvent *event) {
+    const int key = event->key();
+    if (key == Qt::Key_Space) {
+        togglePlayback();
+        return;
+    }
+    if (key >= Qt::Key_1 && key <= Qt::Key_8) {
+        m_activePad = key - Qt::Key_1;
+        update();
+        return;
+    }
+    if (key == Qt::Key_R) {
+        m_playStep = 0;
+        update();
+        return;
+    }
+}
+
 void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
+    setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
     const QRectF pads = padsRect();
 
@@ -88,6 +134,9 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     p.setPen(Theme::accent());
     p.setFont(Theme::condensedFont(12, QFont::Bold));
     p.drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, "SEQ / 64 STEPS");
+    p.setPen(Theme::textMuted());
+    p.drawText(headerRect, Qt::AlignRight | Qt::AlignVCenter,
+               m_playing ? "PLAYING [SPACE]" : "STOPPED [SPACE]");
 
     const QRectF grid = gridRect();
     const int cols = 16;
@@ -136,6 +185,12 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
                 p.setBrush(m_padColors[m_activePad]);
                 p.setPen(Qt::NoPen);
                 p.drawRect(box.adjusted(3, 3, -3, -3));
+            }
+
+            if (step == m_playStep) {
+                p.setPen(QPen(Theme::accentAlt(), 2.0));
+                p.setBrush(Qt::NoBrush);
+                p.drawRect(cell.adjusted(2, 2, -2, -2));
             }
         }
     }

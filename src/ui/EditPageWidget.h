@@ -5,6 +5,7 @@
 #include <QWidget>
 
 class QPaintEvent;
+class QKeyEvent;
 
 class SampleSession;
 
@@ -15,6 +16,7 @@ public:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
 
 private:
     struct Param {
@@ -24,4 +26,5 @@ private:
 
     QVector<Param> m_params;
     SampleSession *m_session = nullptr;
+    int m_selectedParam = 0;
 };
