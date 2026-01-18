@@ -5,6 +5,7 @@
 #include <QFontInfo>
 #include <QLinearGradient>
 #include <QPainter>
+#include <QtGlobal>
 
 namespace Theme {
 inline QColor bg0() { return QColor(12, 14, 22); }
@@ -45,6 +46,10 @@ inline QColor withAlpha(const QColor &c, int alpha) {
     return out;
 }
 
+inline bool liteMode() {
+    return qEnvironmentVariableIsSet("GROOVEBOX_LITE");
+}
+
 inline void paintBackground(QPainter &p, const QRectF &rect) {
     QLinearGradient grad(rect.topLeft(), rect.bottomLeft());
     grad.setColorAt(0.0, bg0());
@@ -52,10 +57,12 @@ inline void paintBackground(QPainter &p, const QRectF &rect) {
     p.fillRect(rect, grad);
 
     // Subtle scanlines for a CRT feel.
-    p.setPen(QPen(withAlpha(stroke(), 20), 1.0));
-    for (int y = 0; y < rect.height(); y += 6) {
-        const qreal yy = rect.top() + y;
-        p.drawLine(QPointF(rect.left(), yy), QPointF(rect.right(), yy));
+    if (!liteMode()) {
+        p.setPen(QPen(withAlpha(stroke(), 20), 1.0));
+        for (int y = 0; y < rect.height(); y += 6) {
+            const qreal yy = rect.top() + y;
+            p.drawLine(QPointF(rect.left(), yy), QPointF(rect.right(), yy));
+        }
     }
 }
 }

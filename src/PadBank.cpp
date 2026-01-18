@@ -14,8 +14,9 @@
 
 namespace {
 constexpr int kPadCount = 8;
-constexpr int kSliceCounts[] = {4, 8, 16};
+constexpr int kSliceCounts[] = {1, 4, 8, 16};
 constexpr const char *kStretchLabels[] = {
+    "OFF",
     "1 BEAT",
     "2 BEAT",
     "1 BAR",
@@ -291,7 +292,7 @@ void PadBank::setSliceCountIndex(int index, int sliceCountIndex) {
     if (index < 0 || index >= padCount()) {
         return;
     }
-    const int clamped = qBound(0, sliceCountIndex, 2);
+    const int clamped = qBound(0, sliceCountIndex, 3);
     m_params[static_cast<size_t>(index)].sliceCountIndex = clamped;
 
     const int count = sliceCountForIndex(clamped);
@@ -329,13 +330,14 @@ bool PadBank::isPlaying(int index) const {
 }
 
 static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 durationMs,
-                                 const QString &filter, QString &program, QStringList &args) {
+                                 const QString &filter, bool preferFfplay, QString &program,
+                                 QStringList &args) {
 #ifdef Q_OS_LINUX
     const QFileInfo info(path);
     const QString ext = info.suffix().toLower();
 
     const QString ffplay = QStandardPaths::findExecutable("ffplay");
-    if (!ffplay.isEmpty() && (!filter.isEmpty() || ext == "mp3")) {
+    if (!ffplay.isEmpty() && (preferFfplay || !filter.isEmpty())) {
         program = ffplay;
         args = {"-nodisp", "-autoexit", "-loglevel", "quiet"};
         if (startMs > 0) {
@@ -351,7 +353,7 @@ static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 dur
         return true;
     }
 
-    if (!filter.isEmpty()) {
+    if (!filter.isEmpty() || preferFfplay) {
         return false;
     }
 
@@ -389,20 +391,20 @@ static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 dur
 static qint64 stretchTargetMs(int bpm, int stretchIndex) {
     const int beatMs = 60000 / qMax(1, bpm);
     switch (stretchIndex) {
-        case 0:
-            return beatMs;
         case 1:
-            return beatMs * 2;
+            return beatMs;
         case 2:
-            return beatMs * 4;
+            return beatMs * 2;
         case 3:
-            return beatMs * 8;
+            return beatMs * 4;
         case 4:
-            return beatMs * 16;
+            return beatMs * 8;
         case 5:
+            return beatMs * 16;
+        case 6:
             return beatMs * 32;
         default:
-            return beatMs * 4;
+            return 0;
     }
 }
 
@@ -453,7 +455,11 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
-    if (rt->durationMs == 0 && rt->useExternal) {
+    const bool stretchEnabled = params.stretchIndex > 0;
+    const bool needsSlice = (params.sliceCountIndex > 0) || !isNear(params.start, 0.0) ||
+                            !isNear(params.end, 1.0);
+
+    if (rt->durationMs == 0 && rt->useExternal && (needsSlice || stretchEnabled)) {
         rt->durationMs = probeDurationMs(path);
     }
 
@@ -481,10 +487,12 @@ void PadBank::triggerPad(int index) {
     rt->loop = params.loop;
 
     const qint64 segmentMs = (durationMs > 0) ? qMax<qint64>(1, endMs - startMs) : 0;
-    const qint64 targetMs = stretchTargetMs(m_bpm, params.stretchIndex);
     double tempoFactor = 1.0;
-    if (segmentMs > 0 && targetMs > 0) {
-        tempoFactor = static_cast<double>(segmentMs) / static_cast<double>(targetMs);
+    if (stretchEnabled && segmentMs > 0) {
+        const qint64 targetMs = stretchTargetMs(m_bpm, params.stretchIndex);
+        if (targetMs > 0) {
+            tempoFactor = static_cast<double>(segmentMs) / static_cast<double>(targetMs);
+        }
     }
     tempoFactor = qBound(0.25, tempoFactor, 4.0);
 
@@ -510,12 +518,15 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
-    const QString filter = buildAudioFilter(params, tempoFactor, pitchRate);
+    const bool needsTransform = wantsStretch || !isNear(params.pitch, 0.0) ||
+                                !isNear(params.pan, 0.0) || !isNear(params.volume, 1.0);
+    const QString filter = needsTransform ? buildAudioFilter(params, tempoFactor, pitchRate) : QString();
     QString program;
     QStringList args;
-    if (!buildExternalCommand(path, startMs, segmentMs, filter, program, args)) {
+    if (!buildExternalCommand(path, startMs, segmentMs, filter, needsSlice || needsTransform, program,
+                              args)) {
         if (!filter.isEmpty() &&
-            buildExternalCommand(path, startMs, segmentMs, QString(), program, args)) {
+            buildExternalCommand(path, startMs, segmentMs, QString(), false, program, args)) {
             // Fallback without filters if ffplay is missing.
         } else if (rt->player) {
             rt->output->setVolume(params.volume);
@@ -598,6 +609,6 @@ QString PadBank::stretchLabel(int index) {
 }
 
 int PadBank::sliceCountForIndex(int index) {
-    const int idx = qBound(0, index, 2);
+    const int idx = qBound(0, index, 3);
     return kSliceCounts[idx];
 }

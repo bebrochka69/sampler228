@@ -91,6 +91,9 @@ bool SystemStats::readRam(float &usage) const {
     QTextStream in(&file);
     quint64 total = 0;
     quint64 available = 0;
+    quint64 freeMem = 0;
+    quint64 buffers = 0;
+    quint64 cached = 0;
 
     while (!in.atEnd()) {
         const QString line = in.readLine();
@@ -104,11 +107,30 @@ bool SystemStats::readRam(float &usage) const {
             if (parts.size() >= 2) {
                 available = parts[1].toULongLong();
             }
+        } else if (line.startsWith("MemFree:")) {
+            const QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+            if (parts.size() >= 2) {
+                freeMem = parts[1].toULongLong();
+            }
+        } else if (line.startsWith("Buffers:")) {
+            const QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+            if (parts.size() >= 2) {
+                buffers = parts[1].toULongLong();
+            }
+        } else if (line.startsWith("Cached:")) {
+            const QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+            if (parts.size() >= 2) {
+                cached = parts[1].toULongLong();
+            }
         }
     }
 
     if (total == 0) {
         return false;
+    }
+
+    if (available == 0) {
+        available = freeMem + buffers + cached;
     }
 
     usage = 1.0f - static_cast<float>(available) / static_cast<float>(total);

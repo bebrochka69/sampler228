@@ -440,7 +440,11 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
             case Param::Slice: {
                 const int count = PadBank::sliceCountForIndex(params.sliceCountIndex);
                 valueNorm = static_cast<float>(params.sliceIndex) / static_cast<float>(qMax(1, count - 1));
-                valueText = QString("%1 / %2").arg(count).arg(params.sliceIndex + 1);
+                if (count <= 1) {
+                    valueText = "OFF";
+                } else {
+                    valueText = QString("%1 / %2").arg(count).arg(params.sliceIndex + 1);
+                }
                 break;
             }
             case Param::Mode:

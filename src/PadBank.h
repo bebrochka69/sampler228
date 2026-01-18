@@ -20,10 +20,10 @@ public:
     bool isLoaded(int index) const;
 
     struct PadParams {
-        float volume = 0.8f;
+        float volume = 1.0f;
         float pan = 0.0f;
         float pitch = 0.0f;
-        int stretchIndex = 2;
+        int stretchIndex = 0;
         float start = 0.0f;
         float end = 1.0f;
         int sliceCountIndex = 0;

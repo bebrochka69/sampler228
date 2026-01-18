@@ -74,6 +74,9 @@ int main(int argc, char *argv[]) {
     sigintTimer.start();
 
     const QString platform = QGuiApplication::platformName();
+    if (isFramebufferPlatform(platform) && qEnvironmentVariableIsEmpty("GROOVEBOX_LITE")) {
+        qputenv("GROOVEBOX_LITE", QByteArray("1"));
+    }
     std::unique_ptr<ConsoleModeGuard> consoleGuard;
     if (isFramebufferPlatform(platform)) {
         consoleGuard = std::make_unique<ConsoleModeGuard>();
