@@ -269,7 +269,9 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     if (m_pads && m_session) {
         const QString padPath = m_pads->padPath(m_pads->activePad());
-        if (!padPath.isEmpty() && padPath != m_session->sourcePath()) {
+        if (!padPath.isEmpty() &&
+            (padPath != m_session->sourcePath() ||
+             m_session->decodeMode() != SampleSession::DecodeMode::Full)) {
             m_session->setSource(padPath, SampleSession::DecodeMode::Full);
         }
     }

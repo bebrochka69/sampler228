@@ -5,6 +5,7 @@
 #include <QGuiApplication>
 #include <QMediaPlayer>
 #include <QProcess>
+#include <QSoundEffect>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QTimer>
@@ -92,6 +93,7 @@ QString buildAudioFilter(const PadBank::PadParams &params, double tempoFactor, d
 struct PadBank::PadRuntime {
     QMediaPlayer *player = nullptr;
     QAudioOutput *output = nullptr;
+    QSoundEffect *effect = nullptr;
     QProcess *external = nullptr;
     QTimer *externalLoop = nullptr;
     qint64 durationMs = 0;
@@ -100,6 +102,8 @@ struct PadBank::PadRuntime {
     bool loop = false;
     bool useExternal = false;
     QString sourcePath;
+    QString effectPath;
+    bool effectReady = false;
 };
 
 PadBank::PadBank(QObject *parent) : QObject(parent) {
@@ -119,13 +123,24 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
     for (int i = 0; i < kPadCount; ++i) {
         m_runtime[i] = new PadRuntime();
         m_runtime[i]->useExternal = forceExternal;
+        m_runtime[i]->effect = new QSoundEffect(this);
+        m_runtime[i]->effect->setLoopCount(1);
+        m_runtime[i]->effect->setVolume(1.0f);
+
+        const int index = i;
+        connect(m_runtime[i]->effect, &QSoundEffect::statusChanged, this, [this, index]() {
+            PadRuntime *rt = m_runtime[index];
+            if (!rt || !rt->effect) {
+                return;
+            }
+            rt->effectReady = (rt->effect->status() == QSoundEffect::Ready);
+        });
 
         if (!forceExternal) {
             m_runtime[i]->output = new QAudioOutput(this);
             m_runtime[i]->player = new QMediaPlayer(this);
             m_runtime[i]->player->setAudioOutput(m_runtime[i]->output);
 
-            const int index = i;
             connect(m_runtime[i]->player, &QMediaPlayer::durationChanged, this,
                     [this, index](qint64 duration) {
                         m_runtime[index]->durationMs = duration;
@@ -197,6 +212,22 @@ void PadBank::setPadPath(int index, const QString &path) {
     if (rt && rt->player) {
         rt->player->setSource(QUrl::fromLocalFile(path));
         rt->sourcePath = path;
+    }
+    if (rt && rt->effect) {
+        const QString ext = QFileInfo(path).suffix().toLower();
+        if (ext == "wav") {
+            if (rt->effectPath != path) {
+                rt->effect->stop();
+                rt->effect->setSource(QUrl::fromLocalFile(path));
+                rt->effectPath = path;
+                rt->effectReady = false;
+            }
+        } else {
+            rt->effect->stop();
+            rt->effect->setSource(QUrl());
+            rt->effectPath.clear();
+            rt->effectReady = false;
+        }
     }
     emit padChanged(index);
     emit padParamsChanged(index);
@@ -458,6 +489,15 @@ void PadBank::triggerPad(int index) {
     const bool stretchEnabled = params.stretchIndex > 0;
     const bool needsSlice = (params.sliceCountIndex > 0) || !isNear(params.start, 0.0) ||
                             !isNear(params.end, 1.0);
+    const bool needsEffectTransform =
+        stretchEnabled || !isNear(params.pitch, 0.0) || !isNear(params.pan, 0.0);
+
+    if (rt->effect && !rt->effectPath.isEmpty() && !needsSlice && !needsEffectTransform) {
+        rt->effect->setLoopCount(params.loop ? QSoundEffect::Infinite : 1);
+        rt->effect->setVolume(params.volume);
+        rt->effect->play();
+        return;
+    }
 
     if (rt->durationMs == 0 && rt->useExternal && (needsSlice || stretchEnabled)) {
         rt->durationMs = probeDurationMs(path);
@@ -518,12 +558,13 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
-    const bool needsTransform = wantsStretch || !isNear(params.pitch, 0.0) ||
-                                !isNear(params.pan, 0.0) || !isNear(params.volume, 1.0);
-    const QString filter = needsTransform ? buildAudioFilter(params, tempoFactor, pitchRate) : QString();
+    const bool needsTransformExternal = wantsStretch || !isNear(params.pitch, 0.0) ||
+                                        !isNear(params.pan, 0.0) || !isNear(params.volume, 1.0);
+    const QString filter =
+        needsTransformExternal ? buildAudioFilter(params, tempoFactor, pitchRate) : QString();
     QString program;
     QStringList args;
-    if (!buildExternalCommand(path, startMs, segmentMs, filter, needsSlice || needsTransform, program,
+    if (!buildExternalCommand(path, startMs, segmentMs, filter, needsSlice || needsTransformExternal, program,
                               args)) {
         if (!filter.isEmpty() &&
             buildExternalCommand(path, startMs, segmentMs, QString(), false, program, args)) {
@@ -572,6 +613,9 @@ void PadBank::stopPad(int index) {
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (!rt) {
         return;
+    }
+    if (rt->effect) {
+        rt->effect->stop();
     }
     if (rt->player) {
         rt->player->stop();

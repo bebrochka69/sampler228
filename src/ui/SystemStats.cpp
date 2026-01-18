@@ -8,6 +8,11 @@
 #include <sys/sysinfo.h>
 #endif
 
+#ifdef Q_OS_LINUX
+static bool readSysinfoRam(float &usage);
+static bool readSysinfoLoad(float &usage);
+#endif
+
 SystemStats::SystemStats(QObject *parent) : QObject(parent) {}
 
 void SystemStats::update() {

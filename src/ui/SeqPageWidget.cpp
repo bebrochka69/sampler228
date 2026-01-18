@@ -20,7 +20,7 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
         }
     }
 
-    m_playTimer.setTimerType(Theme::liteMode() ? Qt::CoarseTimer : Qt::PreciseTimer);
+    m_playTimer.setTimerType(Qt::PreciseTimer);
     m_playTimer.setInterval(stepIntervalMs());
     connect(&m_playTimer, &QTimer::timeout, this, &SeqPageWidget::advancePlayhead);
 
