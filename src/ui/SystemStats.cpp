@@ -4,6 +4,9 @@
 #include <QTextStream>
 #include <QThread>
 #include <QtGlobal>
+#ifdef Q_OS_LINUX
+#include <sys/sysinfo.h>
+#endif
 
 SystemStats::SystemStats(QObject *parent) : QObject(parent) {}
 
@@ -27,13 +30,13 @@ void SystemStats::update() {
     }
 
     float ramUsage = 0.0f;
-    if (readRam(ramUsage)) {
+    if (readRam(ramUsage) || readSysinfoRam(ramUsage)) {
         m_ramUsage = ramUsage;
         updated = true;
     }
 
     float loadUsage = 0.0f;
-    if (readLoad(loadUsage)) {
+    if (readLoad(loadUsage) || readSysinfoLoad(loadUsage)) {
         m_loadUsage = loadUsage;
         updated = true;
     } else {
@@ -162,6 +165,35 @@ bool SystemStats::readLoad(float &usage) const {
         cores = 1;
     }
 
+    const double normalized = load1 / static_cast<double>(cores);
+    usage = static_cast<float>(qBound(0.0, normalized, 1.0));
+    return true;
+}
+
+static bool readSysinfoRam(float &usage) {
+    struct sysinfo info;
+    if (sysinfo(&info) != 0 || info.totalram == 0) {
+        return false;
+    }
+    const quint64 total = static_cast<quint64>(info.totalram) * info.mem_unit;
+    const quint64 free = static_cast<quint64>(info.freeram) * info.mem_unit;
+    const quint64 buffer = static_cast<quint64>(info.bufferram) * info.mem_unit;
+    const quint64 available = free + buffer;
+    usage = 1.0f - static_cast<float>(available) / static_cast<float>(total);
+    usage = qBound(0.0f, usage, 1.0f);
+    return true;
+}
+
+static bool readSysinfoLoad(float &usage) {
+    struct sysinfo info;
+    if (sysinfo(&info) != 0) {
+        return false;
+    }
+    int cores = QThread::idealThreadCount();
+    if (cores <= 0) {
+        cores = 1;
+    }
+    const double load1 = static_cast<double>(info.loads[0]) / 65536.0;
     const double normalized = load1 / static_cast<double>(cores);
     usage = static_cast<float>(qBound(0.0, normalized, 1.0));
     return true;

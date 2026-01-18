@@ -20,7 +20,7 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
         }
     }
 
-    m_playTimer.setTimerType(Qt::PreciseTimer);
+    m_playTimer.setTimerType(Theme::liteMode() ? Qt::CoarseTimer : Qt::PreciseTimer);
     m_playTimer.setInterval(stepIntervalMs());
     connect(&m_playTimer, &QTimer::timeout, this, &SeqPageWidget::advancePlayhead);
 
@@ -168,6 +168,7 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     QPainter p(this);
 
     Theme::paintBackground(p, rect());
+    const bool lite = Theme::liteMode();
 
     const QRectF headerRect(24, 18, width() - 48, 22);
     p.setPen(Theme::accent());
@@ -188,11 +189,15 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     const QColor groupB = Theme::withAlpha(Theme::stroke(), 32);
 
     // Background groups.
-    for (int col = 0; col < cols; ++col) {
-        const int group = col / 4;
-        const QColor groupColor = (group % 2 == 0) ? groupA : groupB;
-        const QRectF groupRect(grid.left() + col * cellW, grid.top(), cellW, grid.height());
-        p.fillRect(groupRect, groupColor);
+    if (!lite) {
+        for (int col = 0; col < cols; ++col) {
+            const int group = col / 4;
+            const QColor groupColor = (group % 2 == 0) ? groupA : groupB;
+            const QRectF groupRect(grid.left() + col * cellW, grid.top(), cellW, grid.height());
+            p.fillRect(groupRect, groupColor);
+        }
+    } else {
+        p.fillRect(grid, Theme::bg1());
     }
 
     // Grid and notes.
@@ -206,19 +211,21 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
             p.setBrush(Qt::NoBrush);
             p.drawRect(box);
 
-            for (int pad = 0; pad < 8; ++pad) {
-                if (pad == m_activePad) {
-                    continue;
+            if (!lite) {
+                for (int pad = 0; pad < 8; ++pad) {
+                    if (pad == m_activePad) {
+                        continue;
+                    }
+                    if (!m_steps[pad][step]) {
+                        continue;
+                    }
+                    QColor ghost = m_padColors[pad];
+                    ghost.setAlpha(70);
+                    const QRectF ghostBox = box.adjusted(6, 6, -6, -6);
+                    p.setBrush(ghost);
+                    p.setPen(Qt::NoPen);
+                    p.drawRect(ghostBox);
                 }
-                if (!m_steps[pad][step]) {
-                    continue;
-                }
-                QColor ghost = m_padColors[pad];
-                ghost.setAlpha(70);
-                const QRectF ghostBox = box.adjusted(6, 6, -6, -6);
-                p.setBrush(ghost);
-                p.setPen(Qt::NoPen);
-                p.drawRect(ghostBox);
             }
 
             if (m_steps[m_activePad][step]) {
