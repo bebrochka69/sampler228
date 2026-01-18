@@ -389,7 +389,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
             const QPointF center = drawRect.center();
             const QRectF target(center.x() - scaled.width() / 2.0, center.y() - scaled.height() / 2.0,
                                 scaled.width(), scaled.height());
-            p.drawPixmap(target, scaled);
+            p.drawPixmap(target, scaled, scaled.rect());
         } else {
             p.setPen(Qt::NoPen);
             p.setBrush(selected ? Theme::accent() : Theme::accentAlt());
