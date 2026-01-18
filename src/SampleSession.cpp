@@ -15,6 +15,8 @@
 #include <QtMath>
 
 namespace {
+constexpr int kFastPcmLimit = 6000;
+
 float sampleToFloat(const char *data, QAudioFormat::SampleFormat format) {
     switch (format) {
         case QAudioFormat::UInt8: {
@@ -60,12 +62,13 @@ SampleSession::SampleSession(QObject *parent) : QObject(parent) {
     ensureAudioOutput();
 }
 
-void SampleSession::setSource(const QString &path) {
-    if (m_sourcePath == path) {
+void SampleSession::setSource(const QString &path, DecodeMode mode) {
+    if (m_sourcePath == path && m_decodeMode == mode) {
         return;
     }
 
     m_sourcePath = path;
+    m_decodeMode = mode;
     if (m_player) {
         m_player->stop();
         m_player->setSource(QUrl::fromLocalFile(path));
@@ -80,6 +83,12 @@ void SampleSession::setSource(const QString &path) {
     }
 
     if (!m_sourcePath.isEmpty()) {
+        if (m_decodeMode == DecodeMode::None) {
+            m_infoText = QFileInfo(m_sourcePath).fileName();
+            emit infoChanged();
+            return;
+        }
+
         m_infoText = "Loading...";
         emit infoChanged();
         startDecode();
@@ -91,6 +100,10 @@ void SampleSession::play() {
         return;
     }
     if (m_forceExternal) {
+        playExternal();
+        return;
+    }
+    if (m_decodeMode == DecodeMode::None) {
         playExternal();
         return;
     }
@@ -165,7 +178,19 @@ void SampleSession::handleBufferReady() {
     const int frames = buffer.frameCount();
 
     const char *data = buffer.constData<char>();
-    for (int frame = 0; frame < frames; ++frame) {
+    const bool fast = (m_decodeMode == DecodeMode::Fast);
+    if (fast && m_pcm.size() >= kFastPcmLimit) {
+        m_frames += buffer.frameCount();
+        return;
+    }
+
+    int stride = 1;
+    if (fast) {
+        const int remaining = qMax(1, kFastPcmLimit - m_pcm.size());
+        stride = qMax(1, frames / remaining);
+    }
+
+    for (int frame = 0; frame < frames; frame += stride) {
         const char *framePtr = data + frame * bytesPerFrame;
         float maxValue = 0.0f;
         for (int channel = 0; channel < channelCount; ++channel) {

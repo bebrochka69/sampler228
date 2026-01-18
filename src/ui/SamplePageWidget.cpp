@@ -87,7 +87,7 @@ void SamplePageWidget::selectIndex(int index) {
     m_browser.setSelected(node);
 
     if (node && !node->isDir && m_session) {
-        m_session->setSource(node->path);
+        m_session->setSource(node->path, SampleSession::DecodeMode::None);
     }
 
     const int rowHeight = 26;
@@ -256,7 +256,7 @@ void SamplePageWidget::mousePressEvent(QMouseEvent *event) {
     if (node->isDir) {
         m_browser.toggleExpanded(node);
     } else if (m_session) {
-        m_session->setSource(node->path);
+        m_session->setSource(node->path, SampleSession::DecodeMode::None);
     }
 
     m_entries = m_browser.entries();

@@ -15,8 +15,15 @@ class SampleSession : public QObject {
 public:
     explicit SampleSession(QObject *parent = nullptr);
 
-    void setSource(const QString &path);
+    enum class DecodeMode {
+        Full,
+        Fast,
+        None
+    };
+
+    void setSource(const QString &path, DecodeMode mode = DecodeMode::Full);
     QString sourcePath() const { return m_sourcePath; }
+    DecodeMode decodeMode() const { return m_decodeMode; }
 
     void play();
     void stop();
@@ -49,6 +56,7 @@ private:
     bool buildExternalCommand(QString &program, QStringList &args) const;
 
     QString m_sourcePath;
+    DecodeMode m_decodeMode = DecodeMode::Full;
     QAudioDecoder m_decoder;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
