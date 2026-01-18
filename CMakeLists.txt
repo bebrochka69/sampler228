@@ -12,6 +12,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia)
 set(SOURCES
     src/main.cpp
     src/MainWindow.cpp
+    src/ConsoleModeGuard.cpp
     src/FramebufferCleaner.cpp
     src/PadBank.cpp
     src/SampleSession.cpp
@@ -28,6 +29,7 @@ set(SOURCES
 
 set(HEADERS
     src/MainWindow.h
+    src/ConsoleModeGuard.h
     src/FramebufferCleaner.h
     src/PadBank.h
     src/SampleSession.h

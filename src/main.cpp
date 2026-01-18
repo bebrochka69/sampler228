@@ -5,8 +5,11 @@
 #include <QScreen>
 #include <QTimer>
 #include <QtGlobal>
+#include <cstdio>
+#include <memory>
 #include <csignal>
 
+#include "ConsoleModeGuard.h"
 #include "FramebufferCleaner.h"
 #include "MainWindow.h"
 
@@ -70,6 +73,16 @@ int main(int argc, char *argv[]) {
     });
     sigintTimer.start();
 
+    const QString platform = QGuiApplication::platformName();
+    std::unique_ptr<ConsoleModeGuard> consoleGuard;
+    if (isFramebufferPlatform(platform)) {
+        consoleGuard = std::make_unique<ConsoleModeGuard>();
+        if (qEnvironmentVariableIsEmpty("GROOVEBOX_KEEP_CONSOLE")) {
+            std::freopen("/dev/null", "w", stdout);
+            std::freopen("/dev/null", "w", stderr);
+        }
+    }
+
     FramebufferCleaner::clearIfNeeded();
 
     MainWindow window;
@@ -77,7 +90,6 @@ int main(int argc, char *argv[]) {
     const QRect screenRect = screen ? screen->geometry() : QRect(0, 0, 1280, 720);
     window.setGeometry(screenRect);
 
-    const QString platform = QGuiApplication::platformName();
     if (isFramebufferPlatform(platform)) {
         window.setWindowFlags(Qt::FramelessWindowHint);
         window.showFullScreen();
