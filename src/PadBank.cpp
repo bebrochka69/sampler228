@@ -492,10 +492,11 @@ void PadBank::triggerPad(int index) {
     const bool needsEffectTransform =
         stretchEnabled || !isNear(params.pitch, 0.0) || !isNear(params.pan, 0.0);
 
-    const bool allowEffect = qEnvironmentVariableIsSet("GROOVEBOX_USE_EFFECT");
-    if (rt->effect && (allowEffect || !rt->useExternal) && !rt->effectPath.isEmpty() &&
-        !needsSlice && !needsEffectTransform) {
+    if (rt->effect && !rt->effectPath.isEmpty() && !needsSlice && !needsEffectTransform) {
         if (rt->effect->status() == QSoundEffect::Ready) {
+            if (rt->effect->isPlaying()) {
+                rt->effect->stop();
+            }
             rt->effect->setLoopCount(params.loop ? QSoundEffect::Infinite : 1);
             rt->effect->setVolume(params.volume);
             rt->effect->play();
