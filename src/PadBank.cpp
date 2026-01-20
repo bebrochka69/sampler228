@@ -1,5 +1,7 @@
 #include "PadBank.h"
 
+#include "AudioEngine.h"
+
 #include <QAudioOutput>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -12,6 +14,7 @@
 #include <QUrl>
 #include <QtGlobal>
 #include <QtMath>
+#include <cstdint>
 
 namespace {
 constexpr int kPadCount = 8;
@@ -36,6 +39,10 @@ double pitchToRate(float semitones) {
 
 bool isNear(double value, double target) {
     return qAbs(value - target) < 0.001;
+}
+
+int toMilli(float value) {
+    return qBound(0, static_cast<int>(qRound(value * 1000.0f)), 1000);
 }
 
 QStringList buildAtempoFilters(double factor) {
@@ -88,7 +95,41 @@ QString buildAudioFilter(const PadBank::PadParams &params, double tempoFactor, d
 
     return filters.join(',');
 }
+
+QString buildRenderFilter(double tempoFactor, double pitchRate) {
+    QStringList filters;
+    const bool pitchActive = !isNear(pitchRate, 1.0);
+    if (pitchActive) {
+        filters << QString("asetrate=sample_rate*%1").arg(pitchRate, 0, 'f', 4);
+        filters << "aresample=sample_rate";
+    }
+
+    double atempoFactor = tempoFactor;
+    if (pitchActive) {
+        atempoFactor = tempoFactor / pitchRate;
+    }
+    filters.append(buildAtempoFilters(atempoFactor));
+    return filters.join(',');
+}
 }  // namespace
+
+struct RenderSignature {
+    QString path;
+    int pitchCents = 0;
+    int stretchIndex = 0;
+    int bpm = 120;
+    int startMilli = 0;
+    int endMilli = 1000;
+    int sliceCountIndex = 0;
+    int sliceIndex = 0;
+
+    bool operator==(const RenderSignature &other) const {
+        return path == other.path && pitchCents == other.pitchCents &&
+               stretchIndex == other.stretchIndex && bpm == other.bpm &&
+               startMilli == other.startMilli && endMilli == other.endMilli &&
+               sliceCountIndex == other.sliceCountIndex && sliceIndex == other.sliceIndex;
+    }
+};
 
 struct PadBank::PadRuntime {
     QMediaPlayer *player = nullptr;
@@ -101,21 +142,44 @@ struct PadBank::PadRuntime {
     qint64 segmentEndMs = 0;
     bool loop = false;
     bool useExternal = false;
+    bool useEngine = false;
     QString sourcePath;
     QString effectPath;
     bool effectReady = false;
+
+    std::shared_ptr<AudioEngine::Buffer> rawBuffer;
+    std::shared_ptr<AudioEngine::Buffer> processedBuffer;
+    QString rawPath;
+    qint64 rawDurationMs = 0;
+
+    QProcess *renderProcess = nullptr;
+    QByteArray renderBytes;
+    bool renderProcessed = false;
+    RenderSignature renderSignature;
+    RenderSignature processedSignature;
+    bool processedReady = false;
+    bool pendingProcessed = false;
+    int renderJobId = 0;
 };
 
 PadBank::PadBank(QObject *parent) : QObject(parent) {
     m_paths.fill(QString());
+    m_engine = std::make_unique<AudioEngine>(this);
+    m_engineAvailable = m_engine && m_engine->isAvailable();
+    if (m_engineAvailable) {
+        m_engineRate = m_engine->sampleRate();
+    }
+    m_ffmpegPath = QStandardPaths::findExecutable("ffmpeg");
+
     bool forceExternal = false;
 #ifdef Q_OS_LINUX
     const QString platform = QGuiApplication::platformName();
-    if (platform.contains("linuxfb") || platform.contains("eglfs") ||
-        platform.contains("vkkhrdisplay")) {
+    if (!m_engineAvailable &&
+        (platform.contains("linuxfb") || platform.contains("eglfs") ||
+         platform.contains("vkkhrdisplay"))) {
         forceExternal = true;
     }
-    if (qEnvironmentVariableIsSet("GROOVEBOX_FORCE_ALSA")) {
+    if (!m_engineAvailable && qEnvironmentVariableIsSet("GROOVEBOX_FORCE_ALSA")) {
         forceExternal = true;
     }
 #endif
@@ -123,20 +187,25 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
     for (int i = 0; i < kPadCount; ++i) {
         m_runtime[i] = new PadRuntime();
         m_runtime[i]->useExternal = forceExternal;
-        m_runtime[i]->effect = new QSoundEffect(this);
-        m_runtime[i]->effect->setLoopCount(1);
-        m_runtime[i]->effect->setVolume(1.0f);
+        m_runtime[i]->useEngine = m_engineAvailable;
+        if (!m_engineAvailable) {
+            m_runtime[i]->effect = new QSoundEffect(this);
+            m_runtime[i]->effect->setLoopCount(1);
+            m_runtime[i]->effect->setVolume(1.0f);
+        }
 
         const int index = i;
-        connect(m_runtime[i]->effect, &QSoundEffect::statusChanged, this, [this, index]() {
-            PadRuntime *rt = m_runtime[index];
-            if (!rt || !rt->effect) {
-                return;
-            }
-            rt->effectReady = (rt->effect->status() == QSoundEffect::Ready);
-        });
+        if (m_runtime[i]->effect) {
+            connect(m_runtime[i]->effect, &QSoundEffect::statusChanged, this, [this, index]() {
+                PadRuntime *rt = m_runtime[index];
+                if (!rt || !rt->effect) {
+                    return;
+                }
+                rt->effectReady = (rt->effect->status() == QSoundEffect::Ready);
+            });
+        }
 
-        if (!forceExternal) {
+        if (!forceExternal && !m_engineAvailable) {
             m_runtime[i]->output = new QAudioOutput(this);
             m_runtime[i]->player = new QMediaPlayer(this);
             m_runtime[i]->player->setAudioOutput(m_runtime[i]->output);
@@ -180,6 +249,10 @@ PadBank::~PadBank() {
             rt->external->kill();
             rt->external->deleteLater();
         }
+        if (rt->renderProcess) {
+            rt->renderProcess->kill();
+            rt->renderProcess->deleteLater();
+        }
         delete rt;
         m_runtime[i] = nullptr;
     }
@@ -209,6 +282,14 @@ void PadBank::setPadPath(int index, const QString &path) {
     m_params[static_cast<size_t>(index)].sliceIndex = 0;
 
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (rt) {
+        rt->rawBuffer.reset();
+        rt->processedBuffer.reset();
+        rt->processedReady = false;
+        rt->pendingProcessed = false;
+        rt->rawPath.clear();
+        rt->rawDurationMs = 0;
+    }
     if (rt && rt->player) {
         rt->player->setSource(QUrl::fromLocalFile(path));
         rt->sourcePath = path;
@@ -229,6 +310,7 @@ void PadBank::setPadPath(int index, const QString &path) {
             rt->effectReady = false;
         }
     }
+    scheduleRawRender(index);
     emit padChanged(index);
     emit padParamsChanged(index);
 }
@@ -281,6 +363,7 @@ void PadBank::setPitch(int index, float semitones) {
         return;
     }
     m_params[static_cast<size_t>(index)].pitch = qBound(-12.0f, semitones, 12.0f);
+    scheduleProcessedRender(index);
     emit padParamsChanged(index);
 }
 
@@ -290,6 +373,7 @@ void PadBank::setStretchIndex(int index, int stretchIndex) {
     }
     const int maxIndex = stretchCount() - 1;
     m_params[static_cast<size_t>(index)].stretchIndex = qBound(0, stretchIndex, maxIndex);
+    scheduleProcessedRender(index);
     emit padParamsChanged(index);
 }
 
@@ -303,6 +387,7 @@ void PadBank::setStart(int index, float value) {
         value = qMax(0.0f, end - 0.01f);
     }
     m_params[static_cast<size_t>(index)].start = value;
+    scheduleProcessedRender(index);
     emit padParamsChanged(index);
 }
 
@@ -316,6 +401,7 @@ void PadBank::setEnd(int index, float value) {
         value = qMin(1.0f, start + 0.01f);
     }
     m_params[static_cast<size_t>(index)].end = value;
+    scheduleProcessedRender(index);
     emit padParamsChanged(index);
 }
 
@@ -329,6 +415,7 @@ void PadBank::setSliceCountIndex(int index, int sliceCountIndex) {
     const int count = sliceCountForIndex(clamped);
     int &sliceIndex = m_params[static_cast<size_t>(index)].sliceIndex;
     sliceIndex = qBound(0, sliceIndex, count - 1);
+    scheduleProcessedRender(index);
     emit padParamsChanged(index);
 }
 
@@ -338,6 +425,7 @@ void PadBank::setSliceIndex(int index, int sliceIndex) {
     }
     const int count = sliceCountForIndex(m_params[static_cast<size_t>(index)].sliceCountIndex);
     m_params[static_cast<size_t>(index)].sliceIndex = qBound(0, sliceIndex, count - 1);
+    scheduleProcessedRender(index);
     emit padParamsChanged(index);
 }
 
@@ -354,6 +442,9 @@ bool PadBank::isPlaying(int index) const {
         return false;
     }
     const PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (rt && rt->useEngine && m_engineAvailable && m_engine) {
+        return m_engine->isPadActive(index);
+    }
     if (rt->external) {
         return rt->external->state() == QProcess::Running;
     }
@@ -471,6 +562,275 @@ static qint64 probeDurationMs(const QString &path) {
 #endif
 }
 
+static RenderSignature makeSignature(const QString &path, const PadBank::PadParams &params, int bpm) {
+    RenderSignature sig;
+    sig.path = path;
+    sig.pitchCents = qRound(params.pitch * 100.0f);
+    sig.stretchIndex = params.stretchIndex;
+    sig.bpm = bpm;
+    if (params.stretchIndex > 0) {
+        sig.startMilli = toMilli(params.start);
+        sig.endMilli = toMilli(params.end);
+        sig.sliceCountIndex = params.sliceCountIndex;
+        sig.sliceIndex = params.sliceIndex;
+    }
+    return sig;
+}
+
+static std::shared_ptr<AudioEngine::Buffer> decodePcm16(const QByteArray &bytes, int sampleRate,
+                                                        int channels) {
+    if (bytes.isEmpty() || channels <= 0 || sampleRate <= 0) {
+        return nullptr;
+    }
+    const int sampleCount = bytes.size() / static_cast<int>(sizeof(int16_t));
+    if (sampleCount <= 0) {
+        return nullptr;
+    }
+    auto buffer = std::make_shared<AudioEngine::Buffer>();
+    buffer->channels = channels;
+    buffer->sampleRate = sampleRate;
+    buffer->samples.resize(sampleCount);
+    const int16_t *src = reinterpret_cast<const int16_t *>(bytes.constData());
+    for (int i = 0; i < sampleCount; ++i) {
+        buffer->samples[i] = static_cast<float>(src[i]) / 32768.0f;
+    }
+    return buffer;
+}
+
+static QStringList buildFfmpegArgs(const QString &path, const QString &filter, int sampleRate,
+                                   int channels) {
+    QStringList args = {"-v", "error", "-i", path, "-vn"};
+    if (!filter.isEmpty()) {
+        args << "-af" << filter;
+    }
+    args << "-ac" << QString::number(qMax(1, channels));
+    args << "-ar" << QString::number(qMax(8000, sampleRate));
+    args << "-f" << "s16le" << "-";
+    return args;
+}
+
+bool PadBank::needsProcessing(const PadParams &params) const {
+    return params.stretchIndex > 0 || !isNear(params.pitch, 0.0);
+}
+
+void PadBank::scheduleRawRender(int index) {
+    if (!m_engineAvailable) {
+        return;
+    }
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (!rt) {
+        return;
+    }
+    const QString path = padPath(index);
+    if (path.isEmpty()) {
+        return;
+    }
+    if (rt->rawPath == path && rt->rawBuffer && rt->rawBuffer->isValid()) {
+        if (needsProcessing(m_params[static_cast<size_t>(index)])) {
+            scheduleProcessedRender(index);
+        }
+        return;
+    }
+    if (m_ffmpegPath.isEmpty()) {
+        return;
+    }
+
+    if (rt->renderProcess) {
+        rt->renderProcess->kill();
+        rt->renderProcess->deleteLater();
+        rt->renderProcess = nullptr;
+    }
+
+    rt->renderBytes.clear();
+    rt->renderProcessed = false;
+    rt->renderSignature = RenderSignature();
+    rt->renderSignature.path = path;
+    rt->pendingProcessed = false;
+    const int jobId = ++m_renderSerial;
+    rt->renderJobId = jobId;
+
+    QProcess *proc = new QProcess(this);
+    rt->renderProcess = proc;
+    proc->setProgram(m_ffmpegPath);
+    proc->setArguments(buildFfmpegArgs(path, QString(), m_engineRate, 2));
+    proc->setProcessChannelMode(QProcess::SeparateChannels);
+
+    connect(proc, &QProcess::readyReadStandardOutput, this, [this, index, jobId]() {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        if (!rt || rt->renderJobId != jobId || !rt->renderProcess) {
+            return;
+        }
+        rt->renderBytes.append(rt->renderProcess->readAllStandardOutput());
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, index, jobId](QProcess::ProcessError) {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        if (!rt || rt->renderJobId != jobId) {
+            return;
+        }
+        if (rt->renderProcess) {
+            rt->renderProcess->deleteLater();
+            rt->renderProcess = nullptr;
+        }
+    });
+    connect(proc,
+            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this,
+            [this, index, jobId](int, QProcess::ExitStatus) {
+                PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+                if (!rt || rt->renderJobId != jobId) {
+                    return;
+                }
+                if (rt->renderProcess) {
+                    rt->renderProcess->deleteLater();
+                    rt->renderProcess = nullptr;
+                }
+                const QByteArray bytes = rt->renderBytes;
+                rt->renderBytes.clear();
+                auto buffer = decodePcm16(bytes, m_engineRate, 2);
+                if (buffer && buffer->isValid()) {
+                    rt->rawBuffer = buffer;
+                    rt->rawPath = rt->renderSignature.path;
+                    rt->rawDurationMs =
+                        (buffer->frames() * 1000LL) / qMax(1, buffer->sampleRate);
+                    rt->durationMs = rt->rawDurationMs;
+                }
+                if (needsProcessing(m_params[static_cast<size_t>(index)])) {
+                    scheduleProcessedRender(index);
+                }
+            });
+
+    proc->start();
+}
+
+void PadBank::scheduleProcessedRender(int index) {
+    if (!m_engineAvailable) {
+        return;
+    }
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (!rt) {
+        return;
+    }
+
+    const QString path = padPath(index);
+    if (path.isEmpty()) {
+        return;
+    }
+    const PadParams params = m_params[static_cast<size_t>(index)];
+    if (!needsProcessing(params)) {
+        rt->processedBuffer.reset();
+        rt->processedReady = false;
+        return;
+    }
+    if (m_ffmpegPath.isEmpty()) {
+        return;
+    }
+
+    if (!rt->rawBuffer || !rt->rawBuffer->isValid() || rt->rawPath != path) {
+        rt->pendingProcessed = true;
+        scheduleRawRender(index);
+        return;
+    }
+
+    const RenderSignature sig = makeSignature(path, params, m_bpm);
+    if (rt->processedReady && sig == rt->processedSignature) {
+        return;
+    }
+
+    if (rt->renderProcess) {
+        rt->renderProcess->kill();
+        rt->renderProcess->deleteLater();
+        rt->renderProcess = nullptr;
+    }
+
+    double tempoFactor = 1.0;
+    if (params.stretchIndex > 0 && rt->rawDurationMs > 0) {
+        float start = clamp01(params.start);
+        float end = clamp01(params.end);
+        if (end <= start) {
+            end = qMin(1.0f, start + 0.01f);
+        }
+        const int sliceCount = sliceCountForIndex(params.sliceCountIndex);
+        const int sliceIndex = qBound(0, params.sliceIndex, sliceCount - 1);
+        const float sliceLen = (end - start) / static_cast<float>(sliceCount);
+        const float sliceStart = start + sliceLen * sliceIndex;
+        const float sliceEnd = sliceStart + sliceLen;
+        const double segmentMs = static_cast<double>(rt->rawDurationMs) * (sliceEnd - sliceStart);
+        const qint64 targetMs = stretchTargetMs(m_bpm, params.stretchIndex);
+        if (targetMs > 0 && segmentMs > 0.0) {
+            tempoFactor = segmentMs / static_cast<double>(targetMs);
+        }
+    }
+    tempoFactor = qBound(0.25, tempoFactor, 4.0);
+
+    const double pitchRate = pitchToRate(params.pitch);
+    const QString filter = buildRenderFilter(tempoFactor, pitchRate);
+    if (filter.isEmpty()) {
+        rt->processedBuffer = rt->rawBuffer;
+        rt->processedSignature = sig;
+        rt->processedReady = true;
+        return;
+    }
+
+    rt->renderBytes.clear();
+    rt->renderProcessed = true;
+    rt->renderSignature = sig;
+    rt->pendingProcessed = false;
+    rt->processedReady = false;
+    const int jobId = ++m_renderSerial;
+    rt->renderJobId = jobId;
+
+    QProcess *proc = new QProcess(this);
+    rt->renderProcess = proc;
+    proc->setProgram(m_ffmpegPath);
+    proc->setArguments(buildFfmpegArgs(path, filter, m_engineRate, 2));
+    proc->setProcessChannelMode(QProcess::SeparateChannels);
+
+    connect(proc, &QProcess::readyReadStandardOutput, this, [this, index, jobId]() {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        if (!rt || rt->renderJobId != jobId || !rt->renderProcess) {
+            return;
+        }
+        rt->renderBytes.append(rt->renderProcess->readAllStandardOutput());
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, index, jobId](QProcess::ProcessError) {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        if (!rt || rt->renderJobId != jobId) {
+            return;
+        }
+        if (rt->renderProcess) {
+            rt->renderProcess->deleteLater();
+            rt->renderProcess = nullptr;
+        }
+    });
+    connect(proc,
+            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this,
+            [this, index, jobId](int, QProcess::ExitStatus) {
+                PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+                if (!rt || rt->renderJobId != jobId) {
+                    return;
+                }
+                if (rt->renderProcess) {
+                    rt->renderProcess->deleteLater();
+                    rt->renderProcess = nullptr;
+                }
+                const QByteArray bytes = rt->renderBytes;
+                rt->renderBytes.clear();
+                auto buffer = decodePcm16(bytes, m_engineRate, 2);
+                if (buffer && buffer->isValid()) {
+                    rt->processedBuffer = buffer;
+                    rt->processedSignature = rt->renderSignature;
+                    rt->processedReady = true;
+                }
+            });
+
+    proc->start();
+}
+
 void PadBank::triggerPad(int index) {
     if (index < 0 || index >= padCount()) {
         return;
@@ -484,6 +844,45 @@ void PadBank::triggerPad(int index) {
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (!rt) {
         return;
+    }
+
+    const bool wantsProcessing = needsProcessing(params);
+    if (rt->useEngine && m_engineAvailable && m_engine) {
+        std::shared_ptr<AudioEngine::Buffer> buffer;
+        if (wantsProcessing) {
+            const RenderSignature sig = makeSignature(path, params, m_bpm);
+            if (rt->processedReady && sig == rt->processedSignature) {
+                buffer = rt->processedBuffer;
+            } else {
+                buffer = rt->rawBuffer;
+            }
+        } else {
+            buffer = rt->rawBuffer;
+        }
+        if (buffer && buffer->isValid()) {
+            float start = clamp01(params.start);
+            float end = clamp01(params.end);
+            if (end <= start) {
+                end = qMin(1.0f, start + 0.01f);
+            }
+
+            const int sliceCount = sliceCountForIndex(params.sliceCountIndex);
+            const int sliceIndex = qBound(0, params.sliceIndex, sliceCount - 1);
+            const float sliceLen = (end - start) / static_cast<float>(sliceCount);
+            const float sliceStart = start + sliceLen * sliceIndex;
+            const float sliceEnd = sliceStart + sliceLen;
+
+            const int totalFrames = buffer->frames();
+            int startFrame = static_cast<int>(sliceStart * totalFrames);
+            int endFrame = static_cast<int>(sliceEnd * totalFrames);
+            if (endFrame <= startFrame) {
+                endFrame = qMin(totalFrames, startFrame + 1);
+            }
+
+            m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, params.volume,
+                              params.pan);
+            return;
+        }
     }
 
     const bool stretchEnabled = params.stretchIndex > 0;
@@ -504,7 +903,8 @@ void PadBank::triggerPad(int index) {
         }
     }
 
-    if (rt->durationMs == 0 && rt->useExternal && (needsSlice || stretchEnabled)) {
+    if (rt->durationMs == 0 && (rt->useExternal || !rt->player) &&
+        (needsSlice || stretchEnabled)) {
         rt->durationMs = probeDurationMs(path);
     }
 
@@ -619,6 +1019,9 @@ void PadBank::stopPad(int index) {
     if (!rt) {
         return;
     }
+    if (rt->useEngine && m_engineAvailable && m_engine) {
+        m_engine->stopPad(index);
+    }
     if (rt->effect) {
         rt->effect->stop();
     }
@@ -633,6 +1036,9 @@ void PadBank::stopPad(int index) {
 }
 
 void PadBank::stopAll() {
+    if (m_engineAvailable && m_engine) {
+        m_engine->stopAll();
+    }
     for (int i = 0; i < padCount(); ++i) {
         stopPad(i);
     }
@@ -644,6 +1050,11 @@ void PadBank::setBpm(int bpm) {
         return;
     }
     m_bpm = next;
+    for (int i = 0; i < padCount(); ++i) {
+        if (m_params[static_cast<size_t>(i)].stretchIndex > 0) {
+            scheduleProcessedRender(i);
+        }
+    }
     emit bpmChanged(m_bpm);
 }
 

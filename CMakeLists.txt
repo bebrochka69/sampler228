@@ -9,11 +9,16 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia)
 
+if(UNIX AND NOT APPLE)
+    find_package(ALSA)
+endif()
+
 set(SOURCES
     src/main.cpp
     src/MainWindow.cpp
     src/ConsoleModeGuard.cpp
     src/FramebufferCleaner.cpp
+    src/AudioEngine.cpp
     src/PadBank.cpp
     src/SampleSession.cpp
     src/ui/TopToolbarWidget.cpp
@@ -31,6 +36,7 @@ set(HEADERS
     src/MainWindow.h
     src/ConsoleModeGuard.h
     src/FramebufferCleaner.h
+    src/AudioEngine.h
     src/PadBank.h
     src/SampleSession.h
     src/Theme.h
@@ -49,3 +55,9 @@ add_executable(GrooveBoxUI ${SOURCES} ${HEADERS})
 
 target_link_libraries(GrooveBoxUI PRIVATE Qt6::Widgets Qt6::Multimedia)
 target_include_directories(GrooveBoxUI PRIVATE src)
+
+if(ALSA_FOUND)
+    target_include_directories(GrooveBoxUI PRIVATE ${ALSA_INCLUDE_DIRS})
+    target_link_libraries(GrooveBoxUI PRIVATE ${ALSA_LIBRARIES})
+    target_compile_definitions(GrooveBoxUI PRIVATE GROOVEBOX_WITH_ALSA=1)
+endif()

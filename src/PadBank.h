@@ -3,6 +3,9 @@
 #include <QObject>
 #include <QString>
 #include <array>
+#include <memory>
+
+class AudioEngine;
 
 class PadBank : public QObject {
     Q_OBJECT
@@ -62,10 +65,18 @@ signals:
 
 private:
     struct PadRuntime;
+    void scheduleRawRender(int index);
+    void scheduleProcessedRender(int index);
+    bool needsProcessing(const PadParams &params) const;
 
     std::array<QString, 8> m_paths;
     std::array<PadParams, 8> m_params;
     std::array<PadRuntime *, 8> m_runtime;
     int m_activePad = 0;
     int m_bpm = 120;
+    int m_engineRate = 48000;
+    bool m_engineAvailable = false;
+    int m_renderSerial = 0;
+    QString m_ffmpegPath;
+    std::unique_ptr<class AudioEngine> m_engine;
 };
