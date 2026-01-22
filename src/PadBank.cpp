@@ -160,6 +160,7 @@ struct PadBank::PadRuntime {
     bool processedReady = false;
     bool pendingProcessed = false;
     int renderJobId = 0;
+    bool pendingTrigger = false;
 };
 
 PadBank::PadBank(QObject *parent) : QObject(parent) {
@@ -698,6 +699,9 @@ void PadBank::scheduleRawRender(int index) {
                 }
                 if (needsProcessing(m_params[static_cast<size_t>(index)])) {
                     scheduleProcessedRender(index);
+                } else if (rt->pendingTrigger) {
+                    rt->pendingTrigger = false;
+                    triggerPad(index);
                 }
             });
 
@@ -826,6 +830,10 @@ void PadBank::scheduleProcessedRender(int index) {
                     rt->processedSignature = rt->renderSignature;
                     rt->processedReady = true;
                 }
+                if (rt->pendingTrigger) {
+                    rt->pendingTrigger = false;
+                    triggerPad(index);
+                }
             });
 
     proc->start();
@@ -854,10 +862,17 @@ void PadBank::triggerPad(int index) {
             if (rt->processedReady && sig == rt->processedSignature) {
                 buffer = rt->processedBuffer;
             } else {
-                buffer = rt->rawBuffer;
+                rt->pendingTrigger = true;
+                scheduleProcessedRender(index);
+                return;
             }
         } else {
             buffer = rt->rawBuffer;
+        }
+        if (!buffer || !buffer->isValid()) {
+            rt->pendingTrigger = true;
+            scheduleRawRender(index);
+            return;
         }
         if (buffer && buffer->isValid()) {
             float start = clamp01(params.start);
@@ -881,6 +896,7 @@ void PadBank::triggerPad(int index) {
 
             m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, params.volume,
                               params.pan);
+            rt->pendingTrigger = false;
             return;
         }
     }
@@ -1019,6 +1035,7 @@ void PadBank::stopPad(int index) {
     if (!rt) {
         return;
     }
+    rt->pendingTrigger = false;
     if (rt->useEngine && m_engineAvailable && m_engine) {
         m_engine->stopPad(index);
     }

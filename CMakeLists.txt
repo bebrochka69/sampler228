@@ -26,6 +26,7 @@ set(SOURCES
     src/ui/SamplePageWidget.cpp
     src/ui/EditPageWidget.cpp
     src/ui/SeqPageWidget.cpp
+    src/ui/FxPageWidget.cpp
     src/ui/SimplePageWidget.cpp
     src/ui/SystemStats.cpp
     src/ui/SampleBrowserModel.cpp
@@ -45,6 +46,7 @@ set(HEADERS
     src/ui/SamplePageWidget.h
     src/ui/EditPageWidget.h
     src/ui/SeqPageWidget.h
+    src/ui/FxPageWidget.h
     src/ui/SimplePageWidget.h
     src/ui/SystemStats.h
     src/ui/SampleBrowserModel.h

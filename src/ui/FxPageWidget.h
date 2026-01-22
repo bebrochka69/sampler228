@@ -1,0 +1,45 @@
+#pragma once
+
+#include <QVector>
+#include <QWidget>
+
+class FxPageWidget : public QWidget {
+    Q_OBJECT
+public:
+    explicit FxPageWidget(QWidget *parent = nullptr);
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+
+private:
+    struct Track {
+        QString name;
+        QVector<QString> inserts;
+    };
+
+    struct SlotHit {
+        QRectF rect;
+        int track = 0;
+        int slot = 0;
+    };
+
+    struct EffectHit {
+        QRectF rect;
+        int index = 0;
+    };
+
+    void assignEffect(int effectIndex);
+    void swapSlot(int track, int a, int b);
+
+    QVector<Track> m_tracks;
+    QStringList m_effects;
+
+    int m_selectedTrack = 0;
+    int m_selectedSlot = 0;
+    int m_selectedEffect = 0;
+
+    QVector<SlotHit> m_slotHits;
+    QVector<EffectHit> m_effectHits;
+};
