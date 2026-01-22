@@ -139,6 +139,8 @@ struct RenderSignature {
     }
 };
 
+static RenderSignature makeSignature(const QString &path, const PadBank::PadParams &params, int bpm);
+
 struct PadBank::PadRuntime {
     QMediaPlayer *player = nullptr;
     QAudioOutput *output = nullptr;
