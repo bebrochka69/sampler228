@@ -21,6 +21,7 @@ public:
 protected:
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     struct Param {
@@ -42,6 +43,8 @@ private:
     PadBank *m_pads = nullptr;
     int m_selectedParam = 0;
     QHash<int, QPixmap> m_iconCache;
+    QRectF m_fxBusRect;
+    QVector<QRectF> m_paramRects;
 
     QString iconFileFor(Param::Type type) const;
     QPixmap iconForType(Param::Type type);

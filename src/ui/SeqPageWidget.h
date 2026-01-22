@@ -24,6 +24,8 @@ private:
     QRectF gridRect() const;
     QRectF padsRect() const;
     int stepIntervalMs() const;
+    bool padsReady() const;
+    void startPlayback();
     void togglePlayback();
     void advancePlayhead();
     void triggerStep(int step);
@@ -32,7 +34,9 @@ private:
     std::array<QColor, 8> m_padColors;
     int m_activePad = 0;
     QTimer m_playTimer;
+    QTimer m_readyTimer;
     bool m_playing = false;
+    bool m_waiting = false;
     int m_playStep = 0;
     int m_bpm = 120;
     PadBank *m_pads = nullptr;

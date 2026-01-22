@@ -39,6 +39,7 @@ private:
     int m_selectedTrack = 0;
     int m_selectedSlot = 0;
     int m_selectedEffect = 0;
+    bool m_showMenu = false;
 
     QVector<SlotHit> m_slotHits;
     QVector<EffectHit> m_effectHits;

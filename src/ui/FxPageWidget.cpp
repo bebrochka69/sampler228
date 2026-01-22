@@ -101,6 +101,7 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
         if (hit.rect.contains(pos)) {
             m_selectedTrack = hit.track;
             m_selectedSlot = hit.slot;
+            m_showMenu = true;
             update();
             return;
         }
@@ -113,6 +114,9 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
             return;
         }
     }
+
+    m_showMenu = false;
+    update();
 }
 
 void FxPageWidget::paintEvent(QPaintEvent *event) {
@@ -123,7 +127,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
     const int margin = 20;
     const int headerH = 26;
-    const int rightPanelW = 280;
+    const int rightPanelW = 560;
     const int gap = 12;
 
     const QRectF headerRect(margin, margin, width() - 2 * margin, headerH);
@@ -135,36 +139,101 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(headerRect, Qt::AlignRight | Qt::AlignVCenter,
                "Click slot + click effect  |  Ctrl+Up/Down = reorder  Del = clear");
 
-    const QRectF panelRect(width() - rightPanelW - margin, margin + headerH + 8,
-                           rightPanelW, height() - margin * 2 - headerH - 8);
-    const QRectF stripsRect(margin, panelRect.top(), panelRect.left() - margin - gap,
-                            panelRect.height());
+    const QRectF rightRect(width() - rightPanelW - margin, margin + headerH + 8, rightPanelW,
+                           height() - margin * 2 - headerH - 8);
+    const float pluginW = qMax(220.0f, rightRect.width() * 0.48f);
+    const float editorW = rightRect.width() - pluginW - gap;
+    const QRectF pluginRect(rightRect.left(), rightRect.top(), pluginW, rightRect.height());
+    const QRectF editorRect(pluginRect.right() + gap, rightRect.top(), editorW,
+                            rightRect.height());
+    const QRectF stripsRect(margin, rightRect.top(), pluginRect.left() - margin - gap,
+                            rightRect.height());
 
-    // FX list panel.
+    // Plugin menu panel.
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::stroke(), 1.2));
-    p.drawRect(panelRect);
+    p.drawRect(pluginRect);
 
-    QRectF listHeader(panelRect.left() + 12, panelRect.top() + 8, panelRect.width() - 24, 20);
+    QRectF listHeader(pluginRect.left() + 12, pluginRect.top() + 8, pluginRect.width() - 24, 20);
     p.setFont(Theme::condensedFont(11, QFont::DemiBold));
     p.setPen(Theme::accentAlt());
-    p.drawText(listHeader, Qt::AlignLeft | Qt::AlignVCenter, "EFFECTS");
+    p.drawText(listHeader, Qt::AlignLeft | Qt::AlignVCenter, "PLUGINS");
 
     m_effectHits.clear();
-    const float itemH = 30.0f;
-    QRectF itemRect(panelRect.left() + 12, listHeader.bottom() + 8,
-                    panelRect.width() - 24, itemH);
-    p.setFont(Theme::baseFont(10, QFont::DemiBold));
+    const int rows = 2;
+    const int cols = 4;
+    const float gridGap = 8.0f;
+    const QRectF gridRect(pluginRect.left() + 12, listHeader.bottom() + 12,
+                          pluginRect.width() - 24, 2 * 60 + gridGap);
+    const float cellW = (gridRect.width() - (cols - 1) * gridGap) / cols;
+    const float cellH = (gridRect.height() - (rows - 1) * gridGap) / rows;
+
+    p.setFont(Theme::baseFont(9, QFont::DemiBold));
     for (int i = 0; i < m_effects.size(); ++i) {
+        const int r = i / cols;
+        const int c = i % cols;
+        const QRectF cell(gridRect.left() + c * (cellW + gridGap),
+                          gridRect.top() + r * (cellH + gridGap), cellW, cellH);
         const bool selected = (i == m_selectedEffect);
         p.setBrush(selected ? Theme::bg3() : Theme::bg2());
         p.setPen(QPen(selected ? Theme::accent() : Theme::stroke(), 1.0));
-        p.drawRect(itemRect);
+        p.drawRect(cell);
         p.setPen(selected ? Theme::accent() : Theme::text());
-        p.drawText(itemRect.adjusted(10, 0, -10, 0), Qt::AlignVCenter | Qt::AlignLeft,
-                   m_effects[i].toUpper());
-        m_effectHits.push_back({itemRect, i});
-        itemRect.translate(0, itemH + 6);
+        p.drawText(cell.adjusted(6, 0, -6, 0), Qt::AlignCenter, m_effects[i].toUpper());
+        if (m_showMenu) {
+            m_effectHits.push_back({cell, i});
+        }
+    }
+
+    if (!m_showMenu) {
+        p.setPen(Theme::textMuted());
+        p.drawText(QRectF(pluginRect.left() + 12, gridRect.bottom() + 12,
+                          pluginRect.width() - 24, 20),
+                   Qt::AlignLeft | Qt::AlignVCenter, "Select an INSERT to add plugins");
+    }
+
+    // Editor panel.
+    p.setBrush(Theme::bg1());
+    p.setPen(QPen(Theme::stroke(), 1.2));
+    p.drawRect(editorRect);
+
+    QRectF editorHeader(editorRect.left() + 12, editorRect.top() + 8, editorRect.width() - 24, 20);
+    p.setFont(Theme::condensedFont(11, QFont::DemiBold));
+    p.setPen(Theme::accentAlt());
+    p.drawText(editorHeader, Qt::AlignLeft | Qt::AlignVCenter, "EDITOR");
+
+    QString currentEffect;
+    if (m_selectedTrack >= 0 && m_selectedTrack < m_tracks.size()) {
+        const Track &track = m_tracks[m_selectedTrack];
+        if (m_selectedSlot >= 0 && m_selectedSlot < track.inserts.size()) {
+            currentEffect = track.inserts[m_selectedSlot];
+        }
+    }
+    if (currentEffect.isEmpty()) {
+        currentEffect = "NONE";
+    }
+    p.setPen(Theme::text());
+    p.setFont(Theme::baseFont(10, QFont::DemiBold));
+    p.drawText(QRectF(editorRect.left() + 12, editorHeader.bottom() + 8,
+                      editorRect.width() - 24, 20),
+               Qt::AlignLeft | Qt::AlignVCenter, "FX: " + currentEffect.toUpper());
+
+    // Dummy parameter knobs.
+    const QRectF knobArea(editorRect.left() + 10, editorHeader.bottom() + 40,
+                          editorRect.width() - 20, 120);
+    const int knobCount = 4;
+    const float knobW = knobArea.width() / knobCount;
+    p.setPen(QPen(Theme::stroke(), 1.0));
+    for (int i = 0; i < knobCount; ++i) {
+        QRectF knob(knobArea.left() + i * knobW + 8, knobArea.top() + 10, 42, 42);
+        p.setBrush(Theme::bg2());
+        p.drawEllipse(knob);
+        p.setPen(Theme::accent());
+        p.drawLine(knob.center(), QPointF(knob.center().x(), knob.top() + 6));
+        p.setPen(Theme::textMuted());
+        p.drawText(QRectF(knob.left() - 8, knob.bottom() + 6, knob.width() + 16, 16),
+                   Qt::AlignCenter, QString("P%1").arg(i + 1));
+        p.setPen(QPen(Theme::stroke(), 1.0));
     }
 
     // Strips.

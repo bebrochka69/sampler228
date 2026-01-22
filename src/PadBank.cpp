@@ -28,6 +28,14 @@ constexpr const char *kStretchLabels[] = {
     "4 BAR",
     "8 BAR",
 };
+constexpr const char *kFxBusLabels[] = {
+    "MASTER",
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+};
 
 float clamp01(float value) {
     return qBound(0.0f, value, 1.0f);
@@ -450,6 +458,33 @@ bool PadBank::isPlaying(int index) const {
         return rt->external->state() == QProcess::Running;
     }
     return rt->player && rt->player->playbackState() == QMediaPlayer::PlayingState;
+}
+
+bool PadBank::isPadReady(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return true;
+    }
+    if (!m_engineAvailable || !m_engine) {
+        return true;
+    }
+    const PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (!rt) {
+        return true;
+    }
+    if (padPath(index).isEmpty()) {
+        return false;
+    }
+    if (!rt->rawBuffer || !rt->rawBuffer->isValid()) {
+        return false;
+    }
+    const PadParams params = m_params[static_cast<size_t>(index)];
+    if (needsProcessing(params)) {
+        const RenderSignature sig = makeSignature(padPath(index), params, m_bpm);
+        if (!rt->processedReady || !(sig == rt->processedSignature)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 durationMs,
@@ -1088,4 +1123,27 @@ QString PadBank::stretchLabel(int index) {
 int PadBank::sliceCountForIndex(int index) {
     const int idx = qBound(0, index, 3);
     return kSliceCounts[idx];
+}
+
+int PadBank::fxBus(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return 0;
+    }
+    return m_params[static_cast<size_t>(index)].fxBus;
+}
+
+void PadBank::setFxBus(int index, int bus) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    const int maxIndex = static_cast<int>(sizeof(kFxBusLabels) / sizeof(kFxBusLabels[0])) - 1;
+    const int next = qBound(0, bus, maxIndex);
+    m_params[static_cast<size_t>(index)].fxBus = next;
+    emit padParamsChanged(index);
+}
+
+QString PadBank::fxBusLabel(int index) {
+    const int maxIndex = static_cast<int>(sizeof(kFxBusLabels) / sizeof(kFxBusLabels[0])) - 1;
+    const int idx = qBound(0, index, maxIndex);
+    return QString::fromLatin1(kFxBusLabels[idx]);
 }

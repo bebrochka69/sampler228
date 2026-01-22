@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QtGlobal>
 
@@ -122,6 +123,12 @@ void EditPageWidget::keyPressEvent(QKeyEvent *event) {
         } else {
             m_pads->triggerPad(pad);
         }
+        update();
+        return;
+    }
+    if (key == Qt::Key_F) {
+        const int nextBus = (m_pads->fxBus(pad) + 1) % 6;
+        m_pads->setFxBus(pad, nextBus);
         update();
         return;
     }
@@ -261,6 +268,27 @@ void EditPageWidget::keyPressEvent(QKeyEvent *event) {
     }
 }
 
+void EditPageWidget::mousePressEvent(QMouseEvent *event) {
+    setFocus(Qt::MouseFocusReason);
+    const QPointF pos = event->position();
+
+    if (m_fxBusRect.contains(pos) && m_pads) {
+        const int pad = m_pads->activePad();
+        const int nextBus = (m_pads->fxBus(pad) + 1) % 6;
+        m_pads->setFxBus(pad, nextBus);
+        update();
+        return;
+    }
+
+    for (int i = 0; i < m_paramRects.size(); ++i) {
+        if (m_paramRects[i].contains(pos)) {
+            m_selectedParam = i;
+            update();
+            return;
+        }
+    }
+}
+
 void EditPageWidget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
@@ -370,12 +398,14 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     p.setFont(Theme::baseFont(10, QFont::DemiBold));
 
+    m_paramRects.clear();
     for (int i = 0; i < m_params.size(); ++i) {
         const int r = i / cols;
         const int c = i % cols;
         const float x = gridRect.left() + c * (cellW + 16.0f);
         const float y = gridRect.top() + r * (cellH + 16.0f);
         const QRectF cell(x, y, cellW, cellH);
+        m_paramRects.push_back(cell);
 
         const bool selected = (i == m_selectedParam);
         p.setBrush(selected ? Theme::bg2() : Theme::bg1());
@@ -477,6 +507,17 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
                           buttonsRect.width() * 0.45f, 40);
 
     p.setFont(Theme::condensedFont(12, QFont::DemiBold));
+
+    // FX bus selector.
+    const QRectF fxRect(buttonsRect.center().x() - 90, buttonsRect.top(), 180, 40);
+    m_fxBusRect = fxRect;
+    p.setBrush(Theme::bg1());
+    p.setPen(QPen(Theme::accent(), 1.2));
+    p.drawRect(fxRect);
+    const int busIndex = m_pads ? m_pads->fxBus(m_pads->activePad()) : 0;
+    const QString busText = QString("FX BUS: %1").arg(PadBank::fxBusLabel(busIndex));
+    p.setPen(Theme::accent());
+    p.drawText(fxRect, Qt::AlignCenter, busText);
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::accentAlt(), 1.2));

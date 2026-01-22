@@ -24,6 +24,20 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
     m_playTimer.setInterval(stepIntervalMs());
     connect(&m_playTimer, &QTimer::timeout, this, &SeqPageWidget::advancePlayhead);
 
+    m_readyTimer.setInterval(60);
+    connect(&m_readyTimer, &QTimer::timeout, this, [this]() {
+        if (!m_waiting) {
+            m_readyTimer.stop();
+            return;
+        }
+        if (padsReady()) {
+            m_waiting = false;
+            m_readyTimer.stop();
+            startPlayback();
+        }
+        update();
+    });
+
     if (m_pads) {
         m_activePad = m_pads->activePad();
         connect(m_pads, &PadBank::activePadChanged, this, [this](int index) {
@@ -58,17 +72,49 @@ int SeqPageWidget::stepIntervalMs() const {
     return qMax(20, ms);
 }
 
+bool SeqPageWidget::padsReady() const {
+    if (!m_pads) {
+        return true;
+    }
+    for (int pad = 0; pad < 8; ++pad) {
+        bool used = false;
+        for (int step = 0; step < 64; ++step) {
+            if (m_steps[pad][step]) {
+                used = true;
+                break;
+            }
+        }
+        if (used && !m_pads->isPadReady(pad)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void SeqPageWidget::startPlayback() {
+    m_playing = true;
+    m_playStep = 0;
+    triggerStep(m_playStep);
+    m_playTimer.setInterval(stepIntervalMs());
+    m_playTimer.start();
+    update();
+}
+
 void SeqPageWidget::togglePlayback() {
-    m_playing = !m_playing;
-    if (m_playing) {
-        m_playStep = 0;
-        triggerStep(m_playStep);
-        m_playTimer.setInterval(stepIntervalMs());
-        m_playTimer.start();
-    } else {
+    if (m_playing || m_waiting) {
+        m_playing = false;
+        m_waiting = false;
+        m_readyTimer.stop();
         m_playTimer.stop();
         if (m_pads) {
             m_pads->stopAll();
+        }
+    } else {
+        if (!padsReady()) {
+            m_waiting = true;
+            m_readyTimer.start();
+        } else {
+            startPlayback();
         }
     }
     update();
@@ -176,8 +222,9 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, "SEQ / 64 STEPS");
     p.setPen(Theme::textMuted());
     const int bpm = m_pads ? m_pads->bpm() : m_bpm;
+    const QString state = m_waiting ? "LOADING..." : (m_playing ? "PLAYING [SPACE]" : "STOPPED [SPACE]");
     p.drawText(headerRect, Qt::AlignRight | Qt::AlignVCenter,
-               QString("%1 BPM  %2").arg(bpm).arg(m_playing ? "PLAYING [SPACE]" : "STOPPED [SPACE]"));
+               QString("%1 BPM  %2").arg(bpm).arg(state));
 
     const QRectF grid = gridRect();
     const int cols = 16;

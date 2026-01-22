@@ -32,6 +32,7 @@ public:
         int sliceCountIndex = 0;
         int sliceIndex = 0;
         bool loop = false;
+        int fxBus = 0;
     };
 
     PadParams params(int index) const;
@@ -44,8 +45,11 @@ public:
     void setSliceCountIndex(int index, int sliceCountIndex);
     void setSliceIndex(int index, int sliceIndex);
     void setLoop(int index, bool loop);
+    int fxBus(int index) const;
+    void setFxBus(int index, int bus);
 
     bool isPlaying(int index) const;
+    bool isPadReady(int index) const;
     void triggerPad(int index);
     void stopPad(int index);
     void stopAll();
@@ -56,6 +60,7 @@ public:
     static int stretchCount();
     static QString stretchLabel(int index);
     static int sliceCountForIndex(int index);
+    static QString fxBusLabel(int index);
 
 signals:
     void padChanged(int index);
