@@ -108,7 +108,7 @@ void AudioEngine::stop() {
 }
 
 void AudioEngine::trigger(int padId, const std::shared_ptr<Buffer> &buffer, int startFrame,
-                          int endFrame, bool loop, float volume, float pan) {
+                          int endFrame, bool loop, float volume, float pan, float rate) {
     if (!m_available || !buffer || !buffer->isValid()) {
         return;
     }
@@ -124,6 +124,7 @@ void AudioEngine::trigger(int padId, const std::shared_ptr<Buffer> &buffer, int 
         return;
     }
 
+    rate = std::max(0.125f, std::min(4.0f, rate));
     float gainL = 1.0f;
     float gainR = 1.0f;
     computePanGains(pan, volume, gainL, gainR);
@@ -138,10 +139,11 @@ void AudioEngine::trigger(int padId, const std::shared_ptr<Buffer> &buffer, int 
     voice.buffer = buffer;
     voice.startFrame = startFrame;
     voice.endFrame = endFrame;
-    voice.position = startFrame;
+    voice.position = static_cast<double>(startFrame);
     voice.loop = loop;
     voice.gainL = gainL;
     voice.gainR = gainR;
+    voice.rate = rate;
     m_voices.push_back(std::move(voice));
 }
 
@@ -228,12 +230,12 @@ void AudioEngine::mix(float *out, int frames) {
         const int channels = voice.buffer->channels;
         const int totalFrames = voice.buffer->frames();
 
-        int pos = voice.position;
+        double pos = voice.position;
         bool done = false;
         for (int i = 0; i < frames; ++i) {
             if (pos >= voice.endFrame) {
                 if (voice.loop) {
-                    pos = voice.startFrame;
+                    pos = static_cast<double>(voice.startFrame);
                 } else {
                     done = true;
                     break;
@@ -244,13 +246,24 @@ void AudioEngine::mix(float *out, int frames) {
                 break;
             }
 
-            const int idx = pos * channels;
-            float left = data[idx];
-            float right = (channels > 1 && idx + 1 < voice.buffer->samples.size()) ? data[idx + 1]
-                                                                                   : left;
+            const int idx = static_cast<int>(pos);
+            const double frac = pos - static_cast<double>(idx);
+            const int next = std::min(idx + 1, voice.endFrame - 1);
+            const int idxA = idx * channels;
+            const int idxB = next * channels;
+            float leftA = data[idxA];
+            float rightA = (channels > 1 && idxA + 1 < voice.buffer->samples.size())
+                               ? data[idxA + 1]
+                               : leftA;
+            float leftB = data[idxB];
+            float rightB = (channels > 1 && idxB + 1 < voice.buffer->samples.size())
+                               ? data[idxB + 1]
+                               : leftB;
+            float left = leftA + static_cast<float>((leftB - leftA) * frac);
+            float right = rightA + static_cast<float>((rightB - rightA) * frac);
             out[i * m_channels] += left * voice.gainL;
             out[i * m_channels + 1] += right * voice.gainR;
-            ++pos;
+            pos += voice.rate;
         }
 
         voice.position = pos;

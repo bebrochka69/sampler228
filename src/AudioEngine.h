@@ -33,7 +33,7 @@ public:
     int channels() const { return m_channels; }
 
     void trigger(int padId, const std::shared_ptr<Buffer> &buffer, int startFrame, int endFrame,
-                 bool loop, float volume, float pan);
+                 bool loop, float volume, float pan, float rate);
     void stopPad(int padId);
     void stopAll();
     bool isPadActive(int padId) const;
@@ -44,10 +44,11 @@ private:
         std::shared_ptr<Buffer> buffer;
         int startFrame = 0;
         int endFrame = 0;
-        int position = 0;
+        double position = 0.0;
         bool loop = false;
         float gainL = 1.0f;
         float gainR = 1.0f;
+        float rate = 1.0f;
     };
 
     void start();

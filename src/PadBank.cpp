@@ -647,8 +647,27 @@ static QStringList buildFfmpegArgs(const QString &path, const QString &filter, i
     return args;
 }
 
+static QStringList buildFfmpegArgsSegment(const QString &path, const QString &filter, int sampleRate,
+                                          int channels, qint64 startMs, qint64 durationMs) {
+    QStringList args = {"-v", "error"};
+    if (startMs > 0) {
+        args << "-ss" << QString::number(static_cast<double>(startMs) / 1000.0, 'f', 3);
+    }
+    args << "-i" << path << "-vn";
+    if (durationMs > 0) {
+        args << "-t" << QString::number(static_cast<double>(durationMs) / 1000.0, 'f', 3);
+    }
+    if (!filter.isEmpty()) {
+        args << "-af" << filter;
+    }
+    args << "-ac" << QString::number(qMax(1, channels));
+    args << "-ar" << QString::number(qMax(8000, sampleRate));
+    args << "-f" << "s16le" << "-";
+    return args;
+}
+
 bool PadBank::needsProcessing(const PadParams &params) const {
-    return params.stretchIndex > 0 || !isNear(params.pitch, 0.0);
+    return params.stretchIndex > 0;
 }
 
 void PadBank::scheduleRawRender(int index) {
@@ -789,6 +808,8 @@ void PadBank::scheduleProcessedRender(int index) {
     }
 
     double tempoFactor = 1.0;
+    qint64 renderStartMs = 0;
+    qint64 renderDurationMs = 0;
     if (params.stretchIndex > 0 && rt->rawDurationMs > 0) {
         float start = clamp01(params.start);
         float end = clamp01(params.end);
@@ -800,7 +821,13 @@ void PadBank::scheduleProcessedRender(int index) {
         const float sliceLen = (end - start) / static_cast<float>(sliceCount);
         const float sliceStart = start + sliceLen * sliceIndex;
         const float sliceEnd = sliceStart + sliceLen;
-        const double segmentMs = static_cast<double>(rt->rawDurationMs) * (sliceEnd - sliceStart);
+        renderStartMs = static_cast<qint64>(static_cast<double>(rt->rawDurationMs) * sliceStart);
+        renderDurationMs =
+            static_cast<qint64>(static_cast<double>(rt->rawDurationMs) * (sliceEnd - sliceStart));
+        if (renderDurationMs <= 0) {
+            renderDurationMs = 1;
+        }
+        const double segmentMs = static_cast<double>(renderDurationMs);
         const qint64 targetMs = stretchTargetMs(m_bpm, params.stretchIndex);
         if (targetMs > 0 && segmentMs > 0.0) {
             tempoFactor = segmentMs / static_cast<double>(targetMs);
@@ -828,7 +855,8 @@ void PadBank::scheduleProcessedRender(int index) {
     QProcess *proc = new QProcess(this);
     rt->renderProcess = proc;
     proc->setProgram(m_ffmpegPath);
-    proc->setArguments(buildFfmpegArgs(path, filter, m_engineRate, 2));
+    proc->setArguments(
+        buildFfmpegArgsSegment(path, filter, m_engineRate, 2, renderStartMs, renderDurationMs));
     proc->setProcessChannelMode(QProcess::SeparateChannels);
 
     connect(proc, &QProcess::readyReadStandardOutput, this, [this, index, jobId]() {
@@ -891,6 +919,7 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
+    const double pitchRate = pitchToRate(params.pitch);
     const bool wantsProcessing = needsProcessing(params);
     if (rt->useEngine && m_engineAvailable && m_engine) {
         std::shared_ptr<AudioEngine::Buffer> buffer;
@@ -931,8 +960,13 @@ void PadBank::triggerPad(int index) {
                 endFrame = qMin(totalFrames, startFrame + 1);
             }
 
+            if (wantsProcessing) {
+                startFrame = 0;
+                endFrame = totalFrames;
+            }
+            const float rate = wantsProcessing ? 1.0f : static_cast<float>(pitchRate);
             m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, params.volume,
-                              params.pan);
+                              params.pan, rate);
             rt->pendingTrigger = false;
             return;
         }
@@ -994,7 +1028,6 @@ void PadBank::triggerPad(int index) {
     }
     tempoFactor = qBound(0.25, tempoFactor, 4.0);
 
-    const double pitchRate = pitchToRate(params.pitch);
     const double internalRate = qBound(0.25, tempoFactor * pitchRate, 4.0);
 
     const bool wantsStretch = !isNear(tempoFactor, 1.0);

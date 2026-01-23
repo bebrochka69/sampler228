@@ -111,6 +111,7 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
         if (hit.rect.contains(pos)) {
             m_selectedEffect = hit.index;
             assignEffect(hit.index);
+            m_showMenu = false;
             return;
         }
     }
@@ -160,36 +161,46 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(listHeader, Qt::AlignLeft | Qt::AlignVCenter, "PLUGINS");
 
     m_effectHits.clear();
-    const int rows = 2;
-    const int cols = 4;
-    const float gridGap = 8.0f;
-    const QRectF gridRect(pluginRect.left() + 12, listHeader.bottom() + 12,
-                          pluginRect.width() - 24, 2 * 60 + gridGap);
-    const float cellW = (gridRect.width() - (cols - 1) * gridGap) / cols;
-    const float cellH = (gridRect.height() - (rows - 1) * gridGap) / rows;
-
-    p.setFont(Theme::baseFont(9, QFont::DemiBold));
-    for (int i = 0; i < m_effects.size(); ++i) {
-        const int r = i / cols;
-        const int c = i % cols;
-        const QRectF cell(gridRect.left() + c * (cellW + gridGap),
-                          gridRect.top() + r * (cellH + gridGap), cellW, cellH);
-        const bool selected = (i == m_selectedEffect);
-        p.setBrush(selected ? Theme::bg3() : Theme::bg2());
-        p.setPen(QPen(selected ? Theme::accent() : Theme::stroke(), 1.0));
-        p.drawRect(cell);
-        p.setPen(selected ? Theme::accent() : Theme::text());
-        p.drawText(cell.adjusted(6, 0, -6, 0), Qt::AlignCenter, m_effects[i].toUpper());
-        if (m_showMenu) {
-            m_effectHits.push_back({cell, i});
-        }
-    }
-
     if (!m_showMenu) {
         p.setPen(Theme::textMuted());
-        p.drawText(QRectF(pluginRect.left() + 12, gridRect.bottom() + 12,
-                          pluginRect.width() - 24, 20),
-                   Qt::AlignLeft | Qt::AlignVCenter, "Select an INSERT to add plugins");
+        p.setFont(Theme::baseFont(10, QFont::DemiBold));
+        p.drawText(QRectF(pluginRect.left() + 12, listHeader.bottom() + 18,
+                          pluginRect.width() - 24, 40),
+                   Qt::AlignLeft | Qt::AlignTop, "Select an INSERT to open plugin menu");
+    } else {
+        const QRectF menuRect(pluginRect.left() + 10, listHeader.bottom() + 10,
+                              pluginRect.width() - 20, 170);
+        p.setBrush(Theme::bg2());
+        p.setPen(QPen(Theme::accentAlt(), 1.2));
+        p.drawRect(menuRect);
+        p.setPen(Theme::accentAlt());
+        p.setFont(Theme::condensedFont(10, QFont::DemiBold));
+        p.drawText(QRectF(menuRect.left() + 8, menuRect.top() + 6,
+                          menuRect.width() - 16, 16),
+                   Qt::AlignLeft | Qt::AlignVCenter, "PLUGIN MENU");
+
+        const int rows = 2;
+        const int cols = 4;
+        const float gridGap = 8.0f;
+        const QRectF gridRect(menuRect.left() + 8, menuRect.top() + 28,
+                              menuRect.width() - 16, menuRect.height() - 36);
+        const float cellW = (gridRect.width() - (cols - 1) * gridGap) / cols;
+        const float cellH = (gridRect.height() - (rows - 1) * gridGap) / rows;
+
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        for (int i = 0; i < m_effects.size(); ++i) {
+            const int r = i / cols;
+            const int c = i % cols;
+            const QRectF cell(gridRect.left() + c * (cellW + gridGap),
+                              gridRect.top() + r * (cellH + gridGap), cellW, cellH);
+            const bool selected = (i == m_selectedEffect);
+            p.setBrush(selected ? Theme::bg3() : Theme::bg1());
+            p.setPen(QPen(selected ? Theme::accent() : Theme::stroke(), 1.0));
+            p.drawRect(cell);
+            p.setPen(selected ? Theme::accent() : Theme::text());
+            p.drawText(cell.adjusted(6, 0, -6, 0), Qt::AlignCenter, m_effects[i].toUpper());
+            m_effectHits.push_back({cell, i});
+        }
     }
 
     // Editor panel.
