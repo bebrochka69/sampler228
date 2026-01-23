@@ -35,6 +35,13 @@ public:
         int fxBus = 0;
     };
 
+    struct BusEffect {
+        int type = 0;
+        float p1 = 0.5f;
+        float p2 = 0.5f;
+        float p3 = 0.5f;
+    };
+
     PadParams params(int index) const;
     void setVolume(int index, float value);
     void setPan(int index, float value);
@@ -61,7 +68,8 @@ public:
     static QString stretchLabel(int index);
     static int sliceCountForIndex(int index);
     static QString fxBusLabel(int index);
-    void setBusEffects(int bus, const QVector<int> &effects);
+    void setBusEffects(int bus, const QVector<BusEffect> &effects);
+    float busMeter(int bus) const;
 
 signals:
     void padChanged(int index);

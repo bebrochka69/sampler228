@@ -1145,19 +1145,31 @@ void PadBank::setBpm(int bpm) {
     emit bpmChanged(m_bpm);
 }
 
-void PadBank::setBusEffects(int bus, const QVector<int> &effects) {
+void PadBank::setBusEffects(int bus, const QVector<BusEffect> &effects) {
     if (!m_engineAvailable || !m_engine) {
         return;
     }
     if (bus < 0 || bus >= 6) {
         return;
     }
-    std::vector<int> ids;
-    ids.reserve(effects.size());
-    for (int id : effects) {
-        ids.push_back(id);
+    std::vector<AudioEngine::EffectSettings> settings;
+    settings.reserve(effects.size());
+    for (const BusEffect &fx : effects) {
+        AudioEngine::EffectSettings cfg;
+        cfg.type = fx.type;
+        cfg.p1 = fx.p1;
+        cfg.p2 = fx.p2;
+        cfg.p3 = fx.p3;
+        settings.push_back(cfg);
     }
-    m_engine->setBusEffects(bus, ids);
+    m_engine->setBusEffects(bus, settings);
+}
+
+float PadBank::busMeter(int bus) const {
+    if (!m_engineAvailable || !m_engine) {
+        return 0.0f;
+    }
+    return m_engine->busMeter(bus);
 }
 
 int PadBank::stretchCount() {

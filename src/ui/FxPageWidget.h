@@ -28,7 +28,13 @@ private:
 
     struct Track {
         QString name;
-        QVector<QString> inserts;
+        struct Slot {
+            QString effect;
+            float p1 = 0.5f;
+            float p2 = 0.5f;
+            float p3 = 0.5f;
+        };
+        QVector<Slot> slots;
     };
 
     struct SlotHit {
@@ -53,6 +59,7 @@ private:
     int m_selectedSlot = 0;
     int m_selectedEffect = 0;
     bool m_showMenu = false;
+    int m_selectedParam = 0;
 
     QVector<SlotHit> m_slotHits;
     QVector<EffectHit> m_effectHits;

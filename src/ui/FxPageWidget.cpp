@@ -13,12 +13,12 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
     setFocusPolicy(Qt::StrongFocus);
 
     m_tracks = {
-        {"MASTER", QVector<QString>(4)},
-        {"A", QVector<QString>(4)},
-        {"B", QVector<QString>(4)},
-        {"C", QVector<QString>(4)},
-        {"D", QVector<QString>(4)},
-        {"E", QVector<QString>(4)},
+        {"MASTER", QVector<Track::Slot>(4)},
+        {"A", QVector<Track::Slot>(4)},
+        {"B", QVector<Track::Slot>(4)},
+        {"C", QVector<Track::Slot>(4)},
+        {"D", QVector<Track::Slot>(4)},
+        {"E", QVector<Track::Slot>(4)},
     };
 
     m_effects = {"reverb", "comp", "dist", "lofi", "cassette", "chorus", "eq", "sidechan"};
@@ -32,10 +32,13 @@ void FxPageWidget::assignEffect(int effectIndex) {
         return;
     }
     Track &track = m_tracks[m_selectedTrack];
-    if (m_selectedSlot < 0 || m_selectedSlot >= track.inserts.size()) {
+    if (m_selectedSlot < 0 || m_selectedSlot >= track.slots.size()) {
         return;
     }
-    track.inserts[m_selectedSlot] = m_effects[effectIndex];
+    track.slots[m_selectedSlot].effect = m_effects[effectIndex];
+    track.slots[m_selectedSlot].p1 = 0.5f;
+    track.slots[m_selectedSlot].p2 = 0.5f;
+    track.slots[m_selectedSlot].p3 = 0.5f;
     syncBusEffects(m_selectedTrack);
     update();
 }
@@ -45,10 +48,10 @@ void FxPageWidget::swapSlot(int trackIndex, int a, int b) {
         return;
     }
     Track &track = m_tracks[trackIndex];
-    if (a < 0 || b < 0 || a >= track.inserts.size() || b >= track.inserts.size()) {
+    if (a < 0 || b < 0 || a >= track.slots.size() || b >= track.slots.size()) {
         return;
     }
-    track.inserts.swapItemsAt(a, b);
+    track.slots.swapItemsAt(a, b);
     syncBusEffects(trackIndex);
     update();
 }
@@ -124,7 +127,7 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         if (ctrl) {
             swapSlot(m_selectedTrack, m_selectedSlot, m_selectedSlot + 1);
         } else {
-            m_selectedSlot = qMin(m_selectedSlot + 1, m_tracks[m_selectedTrack].inserts.size() - 1);
+            m_selectedSlot = qMin(m_selectedSlot + 1, m_tracks[m_selectedTrack].slots.size() - 1);
             update();
         }
         return;
@@ -132,8 +135,46 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
 
     if (key == Qt::Key_Delete || key == Qt::Key_Backspace) {
         Track &track = m_tracks[m_selectedTrack];
-        if (m_selectedSlot >= 0 && m_selectedSlot < track.inserts.size()) {
-            track.inserts[m_selectedSlot].clear();
+        if (m_selectedSlot >= 0 && m_selectedSlot < track.slots.size()) {
+            track.slots[m_selectedSlot].effect.clear();
+            syncBusEffects(m_selectedTrack);
+            update();
+        }
+        return;
+    }
+
+    if (key == Qt::Key_1 || key == Qt::Key_2 || key == Qt::Key_3) {
+        m_selectedParam = key - Qt::Key_1;
+        update();
+        return;
+    }
+    if (key == Qt::Key_Minus || key == Qt::Key_Left) {
+        Track &track = m_tracks[m_selectedTrack];
+        if (m_selectedSlot >= 0 && m_selectedSlot < track.slots.size()) {
+            Track::Slot &slot = track.slots[m_selectedSlot];
+            if (m_selectedParam == 0) {
+                slot.p1 = qBound(0.0f, slot.p1 - 0.05f, 1.0f);
+            } else if (m_selectedParam == 1) {
+                slot.p2 = qBound(0.0f, slot.p2 - 0.05f, 1.0f);
+            } else {
+                slot.p3 = qBound(0.0f, slot.p3 - 0.05f, 1.0f);
+            }
+            syncBusEffects(m_selectedTrack);
+            update();
+        }
+        return;
+    }
+    if (key == Qt::Key_Plus || key == Qt::Key_Equal || key == Qt::Key_Right) {
+        Track &track = m_tracks[m_selectedTrack];
+        if (m_selectedSlot >= 0 && m_selectedSlot < track.slots.size()) {
+            Track::Slot &slot = track.slots[m_selectedSlot];
+            if (m_selectedParam == 0) {
+                slot.p1 = qBound(0.0f, slot.p1 + 0.05f, 1.0f);
+            } else if (m_selectedParam == 1) {
+                slot.p2 = qBound(0.0f, slot.p2 + 0.05f, 1.0f);
+            } else {
+                slot.p3 = qBound(0.0f, slot.p3 + 0.05f, 1.0f);
+            }
             syncBusEffects(m_selectedTrack);
             update();
         }
@@ -180,15 +221,20 @@ void FxPageWidget::syncBusEffects(int trackIndex) {
     if (trackIndex < 0 || trackIndex >= m_tracks.size()) {
         return;
     }
-    QVector<int> ids;
+    QVector<PadBank::BusEffect> ids;
     const Track &track = m_tracks[trackIndex];
-    for (const QString &name : track.inserts) {
-        if (name.isEmpty()) {
+    for (const Track::Slot &slot : track.slots) {
+        if (slot.effect.isEmpty()) {
             continue;
         }
-        const int idx = m_effects.indexOf(name);
+        const int idx = m_effects.indexOf(slot.effect);
         if (idx >= 0) {
-            ids.push_back(idx + 1);
+            PadBank::BusEffect fx;
+            fx.type = idx + 1;
+            fx.p1 = slot.p1;
+            fx.p2 = slot.p2;
+            fx.p3 = slot.p3;
+            ids.push_back(fx);
         }
     }
     m_pads->setBusEffects(trackIndex, ids);
@@ -290,8 +336,8 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     QString currentEffect;
     if (m_selectedTrack >= 0 && m_selectedTrack < m_tracks.size()) {
         const Track &track = m_tracks[m_selectedTrack];
-        if (m_selectedSlot >= 0 && m_selectedSlot < track.inserts.size()) {
-            currentEffect = track.inserts[m_selectedSlot];
+        if (m_selectedSlot >= 0 && m_selectedSlot < track.slots.size()) {
+            currentEffect = track.slots[m_selectedSlot].effect;
         }
     }
     if (currentEffect.isEmpty()) {
@@ -307,14 +353,24 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     const QRectF knobArea(editorRect.left() + 10, editorHeader.bottom() + 40,
                           editorRect.width() - 20, 120);
     const int knobCount = 4;
-    const float knobW = knobArea.width() / knobCount;
+    const float knobW = knobArea.width() / 3.0f;
     p.setPen(QPen(Theme::stroke(), 1.0));
-    for (int i = 0; i < knobCount; ++i) {
+    Track::Slot slot;
+    if (m_selectedTrack >= 0 && m_selectedTrack < m_tracks.size() &&
+        m_selectedSlot >= 0 && m_selectedSlot < m_tracks[m_selectedTrack].slots.size()) {
+        slot = m_tracks[m_selectedTrack].slots[m_selectedSlot];
+    }
+    const float params[3] = {slot.p1, slot.p2, slot.p3};
+    for (int i = 0; i < 3; ++i) {
         QRectF knob(knobArea.left() + i * knobW + 8, knobArea.top() + 10, 42, 42);
-        p.setBrush(Theme::bg2());
+        const bool selected = (i == m_selectedParam);
+        p.setBrush(selected ? Theme::bg3() : Theme::bg2());
         p.drawEllipse(knob);
-        p.setPen(Theme::accent());
-        p.drawLine(knob.center(), QPointF(knob.center().x(), knob.top() + 6));
+        p.setPen(selected ? Theme::accent() : Theme::accentAlt());
+        const float angle = (-140.0f + params[i] * 280.0f) * 3.14159f / 180.0f;
+        p.drawLine(knob.center(),
+                   QPointF(knob.center().x() + std::cos(angle) * 16.0f,
+                           knob.center().y() + std::sin(angle) * 16.0f));
         p.setPen(Theme::textMuted());
         p.drawText(QRectF(knob.left() - 8, knob.bottom() + 6, knob.width() + 16, 16),
                    Qt::AlignCenter, QString("P%1").arg(i + 1));
@@ -327,7 +383,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         (stripsRect.width() - (trackCount - 1) * gap) / static_cast<float>(trackCount);
     const float stripH = stripsRect.height();
     const float slotH = 24.0f;
-    const int slotCount = m_tracks.first().inserts.size();
+        const int slotCount = m_tracks.first().slots.size();
 
     m_slotHits.clear();
     p.setFont(Theme::baseFont(9, QFont::DemiBold));
@@ -345,13 +401,20 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.setPen(activeTrack ? Theme::accentAlt() : Theme::textMuted());
         p.drawText(nameRect, Qt::AlignCenter, m_tracks[i].name);
 
-        // Meter.
+        // Meter (real bus level).
         QRectF meterRect(stripRect.left() + 6, nameRect.bottom() + 8, 10, stripRect.height() - 60);
         p.setBrush(Theme::bg2());
         p.setPen(QPen(Theme::stroke(), 1.0));
         p.drawRect(meterRect);
-        QRectF meterFill(meterRect.left() + 1, meterRect.bottom() - meterRect.height() * 0.3f,
-                         meterRect.width() - 2, meterRect.height() * 0.3f - 1);
+        float level = 0.0f;
+        if (m_pads) {
+            level = m_pads->busMeter(i);
+        }
+        level = qBound(0.0f, level, 1.0f);
+        QRectF meterFill(meterRect.left() + 1,
+                         meterRect.bottom() - meterRect.height() * level,
+                         meterRect.width() - 2,
+                         meterRect.height() * level - 1);
         p.setBrush(Theme::accent());
         p.setPen(Qt::NoPen);
         p.drawRect(meterFill);
@@ -364,8 +427,9 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
             p.setBrush(slotSelected ? Theme::bg3() : Theme::bg2());
             p.setPen(QPen(slotSelected ? Theme::accent() : Theme::stroke(), 1.0));
             p.drawRect(slotRect);
-            QString label = m_tracks[i].inserts[s].isEmpty() ? QString("INSERT %1").arg(s + 1)
-                                                             : m_tracks[i].inserts[s].toUpper();
+            const QString effectName = m_tracks[i].slots[s].effect;
+            QString label = effectName.isEmpty() ? QString("INSERT %1").arg(s + 1)
+                                                 : effectName.toUpper();
             p.setPen(slotSelected ? Theme::accent() : Theme::text());
             p.drawText(slotRect.adjusted(6, 0, -6, 0), Qt::AlignVCenter | Qt::AlignLeft, label);
             m_slotHits.push_back({slotRect, i, s});

@@ -11,6 +11,13 @@
 class AudioEngine : public QObject {
     Q_OBJECT
 public:
+    struct EffectSettings {
+        int type = 0;
+        float p1 = 0.5f;
+        float p2 = 0.5f;
+        float p3 = 0.5f;
+    };
+
     struct Buffer {
         QVector<float> samples;
         int channels = 2;
@@ -38,7 +45,8 @@ public:
     void stopAll();
     bool isPadActive(int padId) const;
 
-    void setBusEffects(int bus, const std::vector<int> &effectIds);
+    void setBusEffects(int bus, const std::vector<EffectSettings> &effects);
+    float busMeter(int bus) const;
 
 private:
     struct Voice {
@@ -79,6 +87,7 @@ private:
     void mix(float *out, int frames);
     void processBus(int busIndex, float *buffer, int frames, float sidechainEnv);
     float computeEnv(const float *buffer, int frames) const;
+    float computePeak(const float *buffer, int frames) const;
 
     bool m_available = false;
     int m_sampleRate = 48000;
@@ -91,5 +100,6 @@ private:
     std::vector<Voice> m_voices;
     std::array<BusChain, 6> m_busChains;
     std::array<std::vector<float>, 6> m_busBuffers;
+    std::array<std::atomic<float>, 6> m_busMeters{};
     void *m_pcmHandle = nullptr;
 };
