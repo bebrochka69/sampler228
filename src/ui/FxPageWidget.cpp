@@ -3,6 +3,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QShowEvent>
 
 #include "Theme.h"
 
@@ -53,6 +54,49 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
     const int key = event->key();
     const bool ctrl = event->modifiers().testFlag(Qt::ControlModifier);
 
+    if (key == Qt::Key_Return || key == Qt::Key_Enter) {
+        if (!m_showMenu) {
+            m_showMenu = true;
+        } else {
+            assignEffect(m_selectedEffect);
+            m_showMenu = false;
+        }
+        update();
+        return;
+    }
+    if (key == Qt::Key_Escape) {
+        if (m_showMenu) {
+            m_showMenu = false;
+            update();
+            return;
+        }
+    }
+
+    if (m_showMenu) {
+        const int cols = 4;
+        const int rows = 2;
+        int row = m_selectedEffect / cols;
+        int col = m_selectedEffect % cols;
+        if (key == Qt::Key_Left) {
+            col = (col - 1 + cols) % cols;
+        } else if (key == Qt::Key_Right) {
+            col = (col + 1) % cols;
+        } else if (key == Qt::Key_Up) {
+            row = (row - 1 + rows) % rows;
+        } else if (key == Qt::Key_Down) {
+            row = (row + 1) % rows;
+        } else {
+            return;
+        }
+        int next = row * cols + col;
+        if (next >= m_effects.size()) {
+            next = m_effects.size() - 1;
+        }
+        m_selectedEffect = qMax(0, next);
+        update();
+        return;
+    }
+
     if (key == Qt::Key_Left) {
         m_selectedTrack = (m_selectedTrack - 1 + m_tracks.size()) % m_tracks.size();
         update();
@@ -91,6 +135,11 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         }
         return;
     }
+}
+
+void FxPageWidget::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    setFocus(Qt::OtherFocusReason);
 }
 
 void FxPageWidget::mousePressEvent(QMouseEvent *event) {
