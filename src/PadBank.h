@@ -61,6 +61,7 @@ public:
     static QString stretchLabel(int index);
     static int sliceCountForIndex(int index);
     static QString fxBusLabel(int index);
+    void setBusEffects(int bus, const QVector<int> &effects);
 
 signals:
     void padChanged(int index);

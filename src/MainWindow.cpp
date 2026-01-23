@@ -32,7 +32,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     m_stack->addWidget(new SamplePageWidget(m_sampleSession, m_padBank, m_stack));
     m_stack->addWidget(new EditPageWidget(m_sampleSession, m_padBank, m_stack));
     m_stack->addWidget(new SeqPageWidget(m_padBank, m_stack));
-    m_stack->addWidget(new FxPageWidget(m_stack));
+    m_stack->addWidget(new FxPageWidget(m_padBank, m_stack));
     m_stack->addWidget(new SimplePageWidget("ARRANGE", m_stack));
 
     layout->addWidget(m_toolbar);

@@ -5,9 +5,10 @@
 #include <QPainter>
 #include <QShowEvent>
 
+#include "PadBank.h"
 #include "Theme.h"
 
-FxPageWidget::FxPageWidget(QWidget *parent) : QWidget(parent) {
+FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_pads(pads) {
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
@@ -35,6 +36,7 @@ void FxPageWidget::assignEffect(int effectIndex) {
         return;
     }
     track.inserts[m_selectedSlot] = m_effects[effectIndex];
+    syncBusEffects(m_selectedTrack);
     update();
 }
 
@@ -47,6 +49,7 @@ void FxPageWidget::swapSlot(int trackIndex, int a, int b) {
         return;
     }
     track.inserts.swapItemsAt(a, b);
+    syncBusEffects(trackIndex);
     update();
 }
 
@@ -131,6 +134,7 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         Track &track = m_tracks[m_selectedTrack];
         if (m_selectedSlot >= 0 && m_selectedSlot < track.inserts.size()) {
             track.inserts[m_selectedSlot].clear();
+            syncBusEffects(m_selectedTrack);
             update();
         }
         return;
@@ -167,6 +171,27 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
 
     m_showMenu = false;
     update();
+}
+
+void FxPageWidget::syncBusEffects(int trackIndex) {
+    if (!m_pads) {
+        return;
+    }
+    if (trackIndex < 0 || trackIndex >= m_tracks.size()) {
+        return;
+    }
+    QVector<int> ids;
+    const Track &track = m_tracks[trackIndex];
+    for (const QString &name : track.inserts) {
+        if (name.isEmpty()) {
+            continue;
+        }
+        const int idx = m_effects.indexOf(name);
+        if (idx >= 0) {
+            ids.push_back(idx + 1);
+        }
+    }
+    m_pads->setBusEffects(trackIndex, ids);
 }
 
 void FxPageWidget::paintEvent(QPaintEvent *event) {

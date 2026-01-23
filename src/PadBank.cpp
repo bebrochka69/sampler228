@@ -966,7 +966,7 @@ void PadBank::triggerPad(int index) {
             }
             const float rate = wantsProcessing ? 1.0f : static_cast<float>(pitchRate);
             m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, params.volume,
-                              params.pan, rate);
+                              params.pan, rate, params.fxBus);
             rt->pendingTrigger = false;
             return;
         }
@@ -1143,6 +1143,21 @@ void PadBank::setBpm(int bpm) {
         }
     }
     emit bpmChanged(m_bpm);
+}
+
+void PadBank::setBusEffects(int bus, const QVector<int> &effects) {
+    if (!m_engineAvailable || !m_engine) {
+        return;
+    }
+    if (bus < 0 || bus >= 6) {
+        return;
+    }
+    std::vector<int> ids;
+    ids.reserve(effects.size());
+    for (int id : effects) {
+        ids.push_back(id);
+    }
+    m_engine->setBusEffects(bus, ids);
 }
 
 int PadBank::stretchCount() {

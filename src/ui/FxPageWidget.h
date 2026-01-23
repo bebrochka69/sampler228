@@ -6,7 +6,7 @@
 class FxPageWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit FxPageWidget(QWidget *parent = nullptr);
+    explicit FxPageWidget(PadBank *pads, QWidget *parent = nullptr);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -15,6 +15,8 @@ protected:
     void showEvent(QShowEvent *event) override;
 
 private:
+    void syncBusEffects(int trackIndex);
+
     struct Track {
         QString name;
         QVector<QString> inserts;
@@ -36,6 +38,7 @@ private:
 
     QVector<Track> m_tracks;
     QStringList m_effects;
+    PadBank *m_pads = nullptr;
 
     int m_selectedTrack = 0;
     int m_selectedSlot = 0;

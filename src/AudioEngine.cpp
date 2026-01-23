@@ -108,7 +108,7 @@ void AudioEngine::stop() {
 }
 
 void AudioEngine::trigger(int padId, const std::shared_ptr<Buffer> &buffer, int startFrame,
-                          int endFrame, bool loop, float volume, float pan, float rate) {
+                          int endFrame, bool loop, float volume, float pan, float rate, int bus) {
     if (!m_available || !buffer || !buffer->isValid()) {
         return;
     }
@@ -136,6 +136,7 @@ void AudioEngine::trigger(int padId, const std::shared_ptr<Buffer> &buffer, int 
 
     Voice voice;
     voice.padId = padId;
+    voice.bus = bus;
     voice.buffer = buffer;
     voice.startFrame = startFrame;
     voice.endFrame = endFrame;
@@ -176,6 +177,23 @@ bool AudioEngine::isPadActive(int padId) const {
         }
     }
     return false;
+}
+
+void AudioEngine::setBusEffects(int bus, const std::vector<int> &effectIds) {
+    if (bus < 0 || bus >= static_cast<int>(m_busChains.size())) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    BusChain &chain = m_busChains[static_cast<size_t>(bus)];
+    chain.effects.clear();
+    for (int type : effectIds) {
+        if (type <= 0) {
+            continue;
+        }
+        EffectState state;
+        state.type = type;
+        chain.effects.push_back(std::move(state));
+    }
 }
 
 void AudioEngine::run() {
@@ -219,6 +237,10 @@ void AudioEngine::run() {
 
 void AudioEngine::mix(float *out, int frames) {
     std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto &buffer : m_busBuffers) {
+        buffer.assign(frames * m_channels, 0.0f);
+    }
+
     for (auto it = m_voices.begin(); it != m_voices.end();) {
         Voice &voice = *it;
         if (!voice.buffer || !voice.buffer->isValid()) {
@@ -232,6 +254,9 @@ void AudioEngine::mix(float *out, int frames) {
 
         double pos = voice.position;
         bool done = false;
+        const int busIndex =
+            std::max(0, std::min(static_cast<int>(m_busBuffers.size() - 1), voice.bus));
+        float *busOut = m_busBuffers[static_cast<size_t>(busIndex)].data();
         for (int i = 0; i < frames; ++i) {
             if (pos >= voice.endFrame) {
                 if (voice.loop) {
@@ -261,8 +286,8 @@ void AudioEngine::mix(float *out, int frames) {
                                : leftB;
             float left = leftA + static_cast<float>((leftB - leftA) * frac);
             float right = rightA + static_cast<float>((rightB - rightA) * frac);
-            out[i * m_channels] += left * voice.gainL;
-            out[i * m_channels + 1] += right * voice.gainR;
+            busOut[i * m_channels] += left * voice.gainL;
+            busOut[i * m_channels + 1] += right * voice.gainR;
             pos += voice.rate;
         }
 
@@ -271,6 +296,207 @@ void AudioEngine::mix(float *out, int frames) {
             it = m_voices.erase(it);
         } else {
             ++it;
+        }
+    }
+
+    // Compute sidechain envelope from sum of all buses pre-effects.
+    std::vector<float> master(frames * m_channels, 0.0f);
+    for (const auto &buf : m_busBuffers) {
+        for (int i = 0; i < frames * m_channels; ++i) {
+            master[i] += buf[i];
+        }
+    }
+
+    const float sideEnv = computeEnv(master.data(), frames);
+
+    // Process buses 1..5 into master.
+    for (size_t bus = 1; bus < m_busBuffers.size(); ++bus) {
+        processBus(static_cast<int>(bus), m_busBuffers[bus].data(), frames, sideEnv);
+        for (int i = 0; i < frames * m_channels; ++i) {
+            master[i] += m_busBuffers[bus][i];
+        }
+    }
+
+    // Process master chain (bus 0).
+    if (!m_busBuffers.empty()) {
+        processBus(0, master.data(), frames, sideEnv);
+    }
+
+    std::copy(master.begin(), master.end(), out);
+}
+
+float AudioEngine::computeEnv(const float *buffer, int frames) const {
+    double sum = 0.0;
+    const int count = frames * m_channels;
+    for (int i = 0; i < count; ++i) {
+        const float v = buffer[i];
+        sum += static_cast<double>(v * v);
+    }
+    const double rms = (count > 0) ? std::sqrt(sum / static_cast<double>(count)) : 0.0;
+    return static_cast<float>(rms);
+}
+
+void AudioEngine::processBus(int busIndex, float *buffer, int frames, float sidechainEnv) {
+    if (busIndex < 0 || busIndex >= static_cast<int>(m_busChains.size())) {
+        return;
+    }
+    BusChain &chain = m_busChains[static_cast<size_t>(busIndex)];
+    if (chain.effects.empty()) {
+        return;
+    }
+
+    for (EffectState &fx : chain.effects) {
+        switch (fx.type) {
+            case 1: {  // reverb
+                if (fx.bufA.empty()) {
+                    const int lenA = static_cast<int>(m_sampleRate * 0.031f);
+                    const int lenB = static_cast<int>(m_sampleRate * 0.037f);
+                    fx.bufA.assign(lenA * m_channels, 0.0f);
+                    fx.bufB.assign(lenB * m_channels, 0.0f);
+                    fx.indexA = 0;
+                    fx.indexB = 0;
+                }
+                const float feedback = 0.7f;
+                const float wet = 0.28f;
+                for (int i = 0; i < frames; ++i) {
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        const int idx = i * m_channels + ch;
+                        const int ia = (fx.indexA * m_channels + ch) % fx.bufA.size();
+                        const int ib = (fx.indexB * m_channels + ch) % fx.bufB.size();
+                        const float a = fx.bufA[ia];
+                        const float b = fx.bufB[ib];
+                        fx.bufA[ia] = buffer[idx] + a * feedback;
+                        fx.bufB[ib] = buffer[idx] + b * feedback;
+                        const float mix = (a + b) * 0.5f;
+                        buffer[idx] = buffer[idx] * (1.0f - wet) + mix * wet;
+                    }
+                    fx.indexA = (fx.indexA + 1) % (fx.bufA.size() / m_channels);
+                    fx.indexB = (fx.indexB + 1) % (fx.bufB.size() / m_channels);
+                }
+                break;
+            }
+            case 2: {  // comp
+                const float threshold = 0.35f;
+                const float ratio = 4.0f;
+                const float attack = 0.05f;
+                const float release = 0.2f;
+                for (int i = 0; i < frames; ++i) {
+                    float env = 0.0f;
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        const float v = std::fabs(buffer[i * m_channels + ch]);
+                        if (v > env) {
+                            env = v;
+                        }
+                    }
+                    const float coeff = (env > fx.env) ? attack : release;
+                    fx.env = fx.env + (env - fx.env) * coeff;
+                    float gain = 1.0f;
+                    if (fx.env > threshold) {
+                        const float over = fx.env / threshold;
+                        gain = std::pow(over, -(ratio - 1.0f) / ratio);
+                    }
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        buffer[i * m_channels + ch] *= gain;
+                    }
+                }
+                break;
+            }
+            case 3: {  // dist
+                const float drive = 2.5f;
+                for (int i = 0; i < frames * m_channels; ++i) {
+                    const float v = buffer[i] * drive;
+                    buffer[i] = std::tanh(v);
+                }
+                break;
+            }
+            case 4: {  // lofi
+                const int hold = 4;
+                const float step = 1.0f / 64.0f;
+                for (int i = 0; i < frames; ++i) {
+                    if ((i % hold) == 0) {
+                        fx.p1 = buffer[i * m_channels];
+                        if (m_channels > 1) {
+                            fx.p2 = buffer[i * m_channels + 1];
+                        }
+                    }
+                    float left = std::round(fx.p1 / step) * step;
+                    float right = (m_channels > 1) ? std::round(fx.p2 / step) * step : left;
+                    buffer[i * m_channels] = left;
+                    if (m_channels > 1) {
+                        buffer[i * m_channels + 1] = right;
+                    }
+                }
+                break;
+            }
+            case 5: {  // cassette
+                const float noiseAmount = 0.01f;
+                const float lpf = 0.15f;
+                for (int i = 0; i < frames * m_channels; ++i) {
+                    const float noise = (static_cast<float>(std::rand()) / RAND_MAX - 0.5f) *
+                                        noiseAmount;
+                    fx.z1L = fx.z1L + lpf * (buffer[i] - fx.z1L);
+                    buffer[i] = std::tanh(fx.z1L + noise);
+                }
+                break;
+            }
+            case 6: {  // chorus
+                if (fx.bufA.empty()) {
+                    const int len = static_cast<int>(m_sampleRate * 0.03f);
+                    fx.bufA.assign(len * m_channels, 0.0f);
+                    fx.indexA = 0;
+                    fx.phase = 0.0f;
+                }
+                const float depth = 0.005f;
+                const float rate = 0.25f;
+                for (int i = 0; i < frames; ++i) {
+                    const float lfo = (std::sin(fx.phase) + 1.0f) * 0.5f;
+                    const int delay = static_cast<int>((0.005f + depth * lfo) * m_sampleRate);
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        const int writeIdx = (fx.indexA * m_channels + ch) % fx.bufA.size();
+                        fx.bufA[writeIdx] = buffer[i * m_channels + ch];
+                        int readIndex = fx.indexA - delay;
+                        if (readIndex < 0) {
+                            readIndex += fx.bufA.size() / m_channels;
+                        }
+                        const int readIdx = (readIndex * m_channels + ch) % fx.bufA.size();
+                        const float delayed = fx.bufA[readIdx];
+                        buffer[i * m_channels + ch] = buffer[i * m_channels + ch] * 0.7f +
+                                                      delayed * 0.3f;
+                    }
+                    fx.indexA = (fx.indexA + 1) % (fx.bufA.size() / m_channels);
+                    fx.phase += 2.0f * static_cast<float>(M_PI) * rate / m_sampleRate;
+                    if (fx.phase > 2.0f * static_cast<float>(M_PI)) {
+                        fx.phase -= 2.0f * static_cast<float>(M_PI);
+                    }
+                }
+                break;
+            }
+            case 7: {  // eq (simple tilt)
+                const float low = 0.1f;
+                const float high = 0.05f;
+                for (int i = 0; i < frames * m_channels; ++i) {
+                    fx.z1L = fx.z1L + low * (buffer[i] - fx.z1L);
+                    const float lowBand = fx.z1L;
+                    const float highBand = buffer[i] - fx.z1L;
+                    buffer[i] = buffer[i] * 0.8f + lowBand * 0.2f + highBand * high;
+                }
+                break;
+            }
+            case 8: {  // sidechain
+                const float threshold = 0.08f;
+                const float amount = 0.7f;
+                float gain = 1.0f;
+                if (sidechainEnv > threshold) {
+                    const float over = (sidechainEnv - threshold) / (1.0f - threshold);
+                    gain = 1.0f - amount * over;
+                }
+                for (int i = 0; i < frames * m_channels; ++i) {
+                    buffer[i] *= gain;
+                }
+                break;
+            }
+            default:
+                break;
         }
     }
 }

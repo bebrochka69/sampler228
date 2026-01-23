@@ -33,14 +33,17 @@ public:
     int channels() const { return m_channels; }
 
     void trigger(int padId, const std::shared_ptr<Buffer> &buffer, int startFrame, int endFrame,
-                 bool loop, float volume, float pan, float rate);
+                 bool loop, float volume, float pan, float rate, int bus);
     void stopPad(int padId);
     void stopAll();
     bool isPadActive(int padId) const;
 
+    void setBusEffects(int bus, const std::vector<int> &effectIds);
+
 private:
     struct Voice {
         int padId = -1;
+        int bus = 0;
         std::shared_ptr<Buffer> buffer;
         int startFrame = 0;
         int endFrame = 0;
@@ -51,10 +54,31 @@ private:
         float rate = 1.0f;
     };
 
+    struct EffectState {
+        int type = 0;
+        float p1 = 0.0f;
+        float p2 = 0.0f;
+        float p3 = 0.0f;
+        std::vector<float> bufA;
+        std::vector<float> bufB;
+        int indexA = 0;
+        int indexB = 0;
+        float phase = 0.0f;
+        float env = 0.0f;
+        float z1L = 0.0f;
+        float z1R = 0.0f;
+    };
+
+    struct BusChain {
+        std::vector<EffectState> effects;
+    };
+
     void start();
     void stop();
     void run();
     void mix(float *out, int frames);
+    void processBus(int busIndex, float *buffer, int frames, float sidechainEnv);
+    float computeEnv(const float *buffer, int frames) const;
 
     bool m_available = false;
     int m_sampleRate = 48000;
@@ -65,5 +89,7 @@ private:
     std::thread m_thread;
     mutable std::mutex m_mutex;
     std::vector<Voice> m_voices;
+    std::array<BusChain, 6> m_busChains;
+    std::array<std::vector<float>, 6> m_busBuffers;
     void *m_pcmHandle = nullptr;
 };
