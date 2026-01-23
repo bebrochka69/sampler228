@@ -1,7 +1,16 @@
 #pragma once
 
+#include <QRectF>
+#include <QString>
+#include <QStringList>
 #include <QVector>
 #include <QWidget>
+
+class QKeyEvent;
+class QMouseEvent;
+class QPaintEvent;
+class QShowEvent;
+class PadBank;
 
 class FxPageWidget : public QWidget {
     Q_OBJECT
