@@ -1,14 +1,18 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QRectF>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <QVector>
 #include <QWidget>
 
 class QKeyEvent;
+class QHideEvent;
 class QMouseEvent;
 class QPaintEvent;
+class QPainter;
 class QShowEvent;
 class PadBank;
 
@@ -45,11 +49,14 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     void syncBusEffects(int trackIndex);
     void assignEffect(int effectIndex);
     void swapSlot(int track, int a, int b);
+    void advanceAnimation();
+    void drawEffectPreview(QPainter &p, const QRectF &rect, const FxInsert &slot, float level);
 
     QVector<FxTrack> m_tracks;
     QStringList m_effects;
@@ -63,4 +70,9 @@ private:
 
     QVector<FxInsertHit> m_slotHits;
     QVector<FxEffectHit> m_effectHits;
+
+    QTimer m_animTimer;
+    QElapsedTimer m_clock;
+    float m_animTime = 0.0f;
+    float m_sidechainValue = 0.0f;
 };

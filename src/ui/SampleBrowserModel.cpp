@@ -24,6 +24,34 @@ void SampleBrowserModel::refresh() {
     m_dirty = true;
 
     QSet<QString> seenRoots;
+    auto addRootIfExists = [&](const QString &path, const QString &name, bool expanded,
+                               bool preScan) {
+        QDir dir(path);
+        if (!dir.exists()) {
+            return false;
+        }
+        const QString normalized = QDir::cleanPath(path);
+        if (seenRoots.contains(normalized)) {
+            return false;
+        }
+        seenRoots.insert(normalized);
+
+        auto node = std::make_unique<Node>();
+        node->path = normalized;
+        node->isDir = true;
+        node->expanded = expanded;
+        node->scanned = false;
+        node->name = name.isEmpty() ? normalized : name;
+
+        if (preScan) {
+            node->expanded = true;
+            node->scanned = false;
+            scanNode(node.get());
+        }
+
+        m_roots.push_back(std::move(node));
+        return true;
+    };
     const QList<QStorageInfo> volumes = QStorageInfo::mountedVolumes();
     for (const QStorageInfo &volume : volumes) {
         if (!isUsbMount(volume)) {
@@ -34,21 +62,22 @@ void SampleBrowserModel::refresh() {
             continue;
         }
         seenRoots.insert(root);
-
-        auto node = std::make_unique<Node>();
-        node->path = root;
-        node->isDir = true;
-        node->expanded = true;
-        node->scanned = false;
-
         QString name = volume.displayName();
         if (name.isEmpty()) {
             name = QFileInfo(root).fileName();
         }
-        node->name = name.isEmpty() ? root : name;
+        addRootIfExists(root, name, true, true);
+    }
 
-        scanNode(node.get());
-        m_roots.push_back(std::move(node));
+    if (m_roots.isEmpty()) {
+        const QString home = QDir::homePath();
+        const QString samples = home + "/samples";
+        const QString samplesCaps = home + "/Samples";
+        const QString music = home + "/Music";
+
+        addRootIfExists(samples, "LOCAL SAMPLES", false, false);
+        addRootIfExists(samplesCaps, "LOCAL SAMPLES", false, false);
+        addRootIfExists(music, "LOCAL MUSIC", false, false);
     }
 }
 

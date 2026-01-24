@@ -1,13 +1,33 @@
 #include "FxPageWidget.h"
 
+#include <QHideEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
+#include <QRadialGradient>
 #include <QShowEvent>
+#include <QtGlobal>
 #include <cmath>
 
 #include "PadBank.h"
 #include "Theme.h"
+
+namespace {
+float clamp01(float v) {
+    return std::max(0.0f, std::min(1.0f, v));
+}
+
+float lerp(float a, float b, float t) {
+    return a + (b - a) * t;
+}
+
+float hash2(int x, int y, int t) {
+    const int n = x * 374761393 + y * 668265263 + t * 69069;
+    const int nn = (n ^ (n >> 13)) * 1274126177;
+    return (nn & 0x7fffffff) / static_cast<float>(0x7fffffff);
+}
+}  // namespace
 
 FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_pads(pads) {
     setAutoFillBackground(false);
@@ -23,6 +43,10 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
     };
 
     m_effects = {"reverb", "comp", "dist", "lofi", "cassette", "chorus", "eq", "sidechan"};
+
+    m_animTimer.setInterval(33);
+    m_animTimer.setTimerType(Qt::PreciseTimer);
+    connect(&m_animTimer, &QTimer::timeout, this, &FxPageWidget::advanceAnimation);
 }
 
 void FxPageWidget::assignEffect(int effectIndex) {
@@ -185,6 +209,47 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
 void FxPageWidget::showEvent(QShowEvent *event) {
     QWidget::showEvent(event);
     setFocus(Qt::OtherFocusReason);
+    if (!m_clock.isValid()) {
+        m_clock.start();
+    }
+    if (!m_animTimer.isActive()) {
+        m_animTimer.start();
+    }
+}
+
+void FxPageWidget::hideEvent(QHideEvent *event) {
+    QWidget::hideEvent(event);
+    m_animTimer.stop();
+}
+
+void FxPageWidget::advanceAnimation() {
+    if (!m_clock.isValid()) {
+        m_clock.start();
+    }
+    m_animTime = m_clock.elapsed() / 1000.0f;
+
+    // Sidechain pulse smoothing (used by visual only).
+    FxInsert slot;
+    if (m_selectedTrack >= 0 && m_selectedTrack < m_tracks.size()) {
+        const FxTrack &track = m_tracks[m_selectedTrack];
+        if (m_selectedSlot >= 0 && m_selectedSlot < track.inserts.size()) {
+            slot = track.inserts[m_selectedSlot];
+        }
+    }
+
+    if (slot.effect.toLower() == "sidechan") {
+        const float level = m_pads ? m_pads->busMeter(m_selectedTrack) : 0.0f;
+        const float threshold = 0.08f + clamp01(slot.p1) * 0.6f;
+        const float target = (level > threshold) ? clamp01(slot.p2) : 0.0f;
+        const float attack = 0.35f;
+        const float release = 0.08f + clamp01(slot.p3) * 0.2f;
+        const float coeff = (target > m_sidechainValue) ? attack : release;
+        m_sidechainValue = m_sidechainValue + (target - m_sidechainValue) * coeff;
+    } else {
+        m_sidechainValue *= 0.85f;
+    }
+
+    update();
 }
 
 void FxPageWidget::mousePressEvent(QMouseEvent *event) {
@@ -245,6 +310,196 @@ void FxPageWidget::syncBusEffects(int trackIndex) {
     m_pads->setBusEffects(trackIndex, ids);
 }
 
+void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxInsert &slot,
+                                     float level) {
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const QRectF r = rect.adjusted(10, 10, -10, -10);
+    const QPointF c = r.center();
+    const float w = r.width();
+    const float h = r.height();
+    const float t = m_animTime;
+
+    const float p1 = clamp01(slot.p1);
+    const float p2 = clamp01(slot.p2);
+    const float p3 = clamp01(slot.p3);
+    const QString fx = slot.effect.toLower();
+
+    if (fx.isEmpty()) {
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(10, QFont::DemiBold));
+        p.drawText(r, Qt::AlignCenter, "NO EFFECT");
+        p.restore();
+        return;
+    }
+
+    p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 120), 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(r, 8, 8);
+
+    if (fx == "dist") {
+        const float baseR = qMin(w, h) * 0.28f;
+        const float jag = baseR * (0.08f + p1 * 0.35f);
+        const float jitter = baseR * (0.06f + (p2 + level) * 0.25f);
+        const float speed = 2.0f + p2 * 4.0f;
+        const float scale = 0.9f + p3 * 0.2f + std::sin(t * 1.1f) * 0.04f;
+
+        QPainterPath path;
+        const int points = 36;
+        for (int i = 0; i < points; ++i) {
+            const float ang = (static_cast<float>(i) / points) * 2.0f * static_cast<float>(M_PI);
+            const float n = std::sin(ang * 3.0f + t * speed) +
+                            std::sin(ang * 7.0f - t * speed * 0.6f);
+            const float rN = baseR * scale + jag * (n * 0.3f) +
+                             jitter * std::sin(t * speed * 1.4f + ang * 2.0f);
+            const QPointF pt(c.x() + std::cos(ang) * rN, c.y() + std::sin(ang) * rN);
+            if (i == 0) {
+                path.moveTo(pt);
+            } else {
+                path.lineTo(pt);
+            }
+        }
+        path.closeSubpath();
+
+        QRadialGradient grad(c, baseR * 1.5f);
+        grad.setColorAt(0.0, QColor(255, 140, 120, 220));
+        grad.setColorAt(0.7, QColor(220, 80, 200, 120));
+        grad.setColorAt(1.0, QColor(80, 40, 120, 40));
+        p.setBrush(grad);
+        p.setPen(QPen(QColor(255, 170, 120), 1.2));
+        p.drawPath(path);
+    } else if (fx == "comp") {
+        const float wallInset = lerp(0.14f, 0.36f, p1);
+        const float leftX = r.left() + w * wallInset;
+        const float rightX = r.right() - w * wallInset;
+        const float threshold = 0.12f + p1 * 0.6f;
+        const float over = qMax(0.0f, level - threshold);
+        const float squash = clamp01(over * 2.4f) * (0.25f + p2 * 0.7f);
+        const float objW = (rightX - leftX) * (0.7f - squash * 0.45f);
+        const float objH = h * (0.34f + p3 * 0.12f);
+
+        p.setPen(QPen(QColor(120, 220, 255, 200), 2.0));
+        p.drawLine(QPointF(leftX, r.top() + 8), QPointF(leftX, r.bottom() - 8));
+        p.drawLine(QPointF(rightX, r.top() + 8), QPointF(rightX, r.bottom() - 8));
+
+        QRectF obj(c.x() - objW * 0.5f, c.y() - objH * 0.5f, objW, objH);
+        p.setBrush(QColor(90, 200, 255, 180));
+        p.setPen(QPen(QColor(160, 230, 255, 220), 1.4));
+        p.drawRoundedRect(obj, 10, 10);
+    } else if (fx == "sidechan") {
+        const float depth = (0.18f + 0.55f * p2) * h;
+        const float drop = m_sidechainValue * depth;
+        const QRectF big(c.x() - w * 0.18f, c.y() - h * 0.22f, w * 0.36f, h * 0.26f);
+        const QRectF small(c.x() - w * 0.12f, c.y() + h * 0.08f + drop, w * 0.24f,
+                           h * 0.16f);
+        p.setBrush(QColor(255, 210, 120, 200));
+        p.setPen(QPen(QColor(255, 230, 160), 1.2));
+        p.drawRoundedRect(big, 12, 12);
+        p.setBrush(QColor(255, 140, 140, 200));
+        p.drawRoundedRect(small, 10, 10);
+    } else if (fx == "lofi") {
+        const int cols = 16;
+        const int rows = 10;
+        const float dropProb = 0.05f + p1 * 0.55f;
+        const int phase = static_cast<int>(t * (2.0f + p2 * 10.0f));
+        const float cellW = w / cols;
+        const float cellH = h / rows;
+        for (int y = 0; y < rows; ++y) {
+            for (int x = 0; x < cols; ++x) {
+                const float hsh = hash2(x, y, phase);
+                if (hsh < dropProb) {
+                    continue;
+                }
+                const float alpha = 0.3f + hsh * (0.5f + p3 * 0.4f);
+                QColor col = QColor(120, 230, 160, static_cast<int>(alpha * 255));
+                p.setBrush(col);
+                p.setPen(Qt::NoPen);
+                p.drawRect(QRectF(r.left() + x * cellW, r.top() + y * cellH,
+                                  cellW - 1.0f, cellH - 1.0f));
+            }
+        }
+    } else if (fx == "chorus") {
+        const int copies = 3 + static_cast<int>(p3 * 3.0f);
+        const float depth = w * (0.03f + p1 * 0.08f);
+        const float rate = 0.6f + p2 * 1.8f;
+        const float baseR = qMin(w, h) * 0.18f;
+        for (int i = 0; i < copies; ++i) {
+            const float phase = static_cast<float>(i) / copies * 2.0f * static_cast<float>(M_PI);
+            const float dx = std::cos(t * rate + phase) * depth;
+            const float dy = std::sin(t * rate * 1.2f + phase) * depth * 0.7f;
+            const float alpha = 0.12f + 0.25f * (static_cast<float>(i + 1) / copies);
+            p.setBrush(QColor(130, 200, 255, static_cast<int>(alpha * 255)));
+            p.setPen(QPen(QColor(180, 230, 255, 180), 1.0));
+            p.drawEllipse(QPointF(c.x() + dx, c.y() + dy), baseR, baseR * 0.7f);
+        }
+    } else if (fx == "reverb") {
+        const int copies = 2 + static_cast<int>(p2 * 6.0f);
+        const float spread = w * (0.05f + p1 * 0.18f);
+        const float baseR = qMin(w, h) * 0.12f;
+        p.setBrush(QColor(220, 190, 255, 200));
+        p.setPen(QPen(QColor(220, 220, 255, 180), 1.0));
+        p.drawEllipse(c, baseR, baseR);
+
+        for (int i = 0; i < copies; ++i) {
+            const float phase = static_cast<float>(i) / copies * 2.0f * static_cast<float>(M_PI);
+            const float drift = std::sin(t * 0.4f + phase) * spread;
+            const float dx = std::cos(phase + t * 0.2f) * spread + drift * 0.3f;
+            const float dy = std::sin(phase + t * 0.2f) * spread;
+            const float alpha = 0.18f - i * 0.02f - p3 * 0.04f;
+            QColor col = QColor(180, 150, 255, static_cast<int>(clamp01(alpha) * 255));
+            p.setBrush(col);
+            p.setPen(Qt::NoPen);
+            p.drawEllipse(QPointF(c.x() + dx, c.y() + dy), baseR * (1.0f + i * 0.15f),
+                          baseR * (1.0f + i * 0.15f));
+        }
+    } else if (fx == "eq") {
+        const float low = lerp(0.25f, 0.85f, p1);
+        const float mid = lerp(0.2f, 0.9f, p2);
+        const float high = lerp(0.25f, 0.85f, p3);
+        const float wiggle = std::sin(t * 1.2f) * 0.04f;
+        const QPointF pL(r.left(), r.bottom() - h * (low + wiggle));
+        const QPointF pM(c.x(), r.bottom() - h * (mid + wiggle * 0.6f));
+        const QPointF pH(r.right(), r.bottom() - h * (high - wiggle * 0.5f));
+        QPainterPath path(pL);
+        path.cubicTo(QPointF(r.left() + w * 0.25f, pL.y()),
+                     QPointF(c.x() - w * 0.15f, pM.y()), pM);
+        path.cubicTo(QPointF(c.x() + w * 0.15f, pM.y()),
+                     QPointF(r.right() - w * 0.25f, pH.y()), pH);
+        p.setPen(QPen(QColor(140, 255, 200, 220), 2.2));
+        p.drawPath(path);
+        p.setBrush(QColor(140, 255, 200, 200));
+        p.drawEllipse(pL, 4, 4);
+        p.drawEllipse(pM, 5, 5);
+        p.drawEllipse(pH, 4, 4);
+    } else if (fx == "cassette") {
+        const float speed = 0.6f + p2 * 2.0f;
+        const float wow = 0.2f + p1 * 0.9f;
+        const float wobble = 1.0f + p3 * 4.0f;
+        const QPointF left(c.x() - w * 0.18f, c.y());
+        const QPointF right(c.x() + w * 0.18f, c.y());
+        const float reelR = qMin(w, h) * 0.16f;
+        p.setBrush(QColor(120, 200, 255, 120));
+        p.setPen(QPen(QColor(120, 200, 255, 200), 1.4));
+        p.drawEllipse(left, reelR, reelR);
+        p.drawEllipse(right, reelR, reelR);
+
+        const float angle = t * speed * 2.0f * static_cast<float>(M_PI) +
+                            std::sin(t * 3.0f) * wow;
+        p.setPen(QPen(QColor(220, 240, 255, 220), 2.0));
+        p.drawLine(left, QPointF(left.x() + std::cos(angle) * reelR * 0.9f,
+                                 left.y() + std::sin(angle) * reelR * 0.9f));
+        p.drawLine(right, QPointF(right.x() + std::cos(-angle) * reelR * 0.9f,
+                                  right.y() + std::sin(-angle) * reelR * 0.9f));
+
+        const float lineY = c.y() + std::sin(t * 2.5f) * wobble;
+        p.setPen(QPen(QColor(220, 200, 140, 200), 2.0));
+        p.drawLine(QPointF(left.x() + reelR, lineY), QPointF(right.x() - reelR, lineY));
+    }
+
+    p.restore();
+}
+
 void FxPageWidget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
@@ -300,16 +555,22 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
                       editorRect.width() - 24, 20),
                Qt::AlignLeft | Qt::AlignVCenter, "FX: " + currentEffect.toUpper());
 
-    // Parameter knobs.
-    const QRectF knobArea(editorRect.left() + 10, editorHeader.bottom() + 36,
-                          editorRect.width() - 20, 96);
-    const float knobW = knobArea.width() / 3.0f;
-    p.setPen(QPen(Theme::stroke(), 1.0));
     FxInsert slot;
     if (m_selectedTrack >= 0 && m_selectedTrack < m_tracks.size() &&
         m_selectedSlot >= 0 && m_selectedSlot < m_tracks[m_selectedTrack].inserts.size()) {
         slot = m_tracks[m_selectedTrack].inserts[m_selectedSlot];
     }
+
+    const QRectF visualRect(editorRect.left() + 10, editorHeader.bottom() + 34,
+                            editorRect.width() - 20, 130);
+    const float level = m_pads ? m_pads->busMeter(m_selectedTrack) : 0.0f;
+    drawEffectPreview(p, visualRect, slot, level);
+
+    // Parameter knobs.
+    const QRectF knobArea(editorRect.left() + 10, visualRect.bottom() + 16,
+                          editorRect.width() - 20, 96);
+    const float knobW = knobArea.width() / 3.0f;
+    p.setPen(QPen(Theme::stroke(), 1.0));
     const float params[3] = {slot.p1, slot.p2, slot.p3};
     for (int i = 0; i < 3; ++i) {
         QRectF knob(knobArea.left() + i * knobW + 8, knobArea.top() + 8, 34, 34);
