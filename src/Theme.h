@@ -142,7 +142,7 @@ inline void paintBackground(QPainter &p, const QRectF &rect) {
         p.restore();
 
         p.setPen(QPen(withAlpha(stroke(), 18), 1.0));
-        for (int y = 0; y < rect.height(); y += 7) {
+        for (int y = 0; y < rect.height(); y += 10) {
             const qreal yy = rect.top() + y;
             p.drawLine(QPointF(rect.left(), yy), QPointF(rect.right(), yy));
         }

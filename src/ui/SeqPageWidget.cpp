@@ -13,7 +13,7 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
-    m_ambientTimer.setInterval(66);
+    m_ambientTimer.setInterval(120);
     connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
         if (isVisible()) {
             update();

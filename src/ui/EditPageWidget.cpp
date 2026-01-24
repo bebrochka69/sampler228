@@ -19,7 +19,7 @@ EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *p
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
-    m_ambientTimer.setInterval(66);
+    m_ambientTimer.setInterval(120);
     connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
         if (isVisible()) {
             update();

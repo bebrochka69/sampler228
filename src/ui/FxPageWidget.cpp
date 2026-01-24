@@ -44,7 +44,7 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
 
     m_effects = {"reverb", "comp", "dist", "lofi", "cassette", "chorus", "eq", "sidechan"};
 
-    m_animTimer.setInterval(33);
+    m_animTimer.setInterval(80);
     m_animTimer.setTimerType(Qt::PreciseTimer);
     connect(&m_animTimer, &QTimer::timeout, this, &FxPageWidget::advanceAnimation);
 }

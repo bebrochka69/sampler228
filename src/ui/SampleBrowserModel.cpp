@@ -69,6 +69,28 @@ void SampleBrowserModel::refresh() {
         addRootIfExists(root, name, true, true);
     }
 
+    // Fallback: manually scan common mount roots.
+    auto scanMountRoot = [&](const QString &root) {
+        QDir dir(root);
+        if (!dir.exists()) {
+            return;
+        }
+        const QFileInfoList entries =
+            dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+        for (const QFileInfo &info : entries) {
+            addRootIfExists(info.absoluteFilePath(), info.fileName(), true, true);
+        }
+    };
+
+    const QString user = qEnvironmentVariable("USER");
+    if (!user.isEmpty()) {
+        scanMountRoot(QString("/media/%1").arg(user));
+        scanMountRoot(QString("/run/media/%1").arg(user));
+    }
+    scanMountRoot("/media");
+    scanMountRoot("/run/media");
+    scanMountRoot("/mnt");
+
     if (m_roots.empty()) {
         const QString home = QDir::homePath();
         const QString samples = home + "/samples";
