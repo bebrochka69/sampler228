@@ -5,7 +5,6 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
-#include <QRadialGradient>
 #include <QShowEvent>
 #include <QtGlobal>
 #include <cmath>
@@ -338,163 +337,231 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
     p.setBrush(Qt::NoBrush);
     p.drawRoundedRect(r, 8, 8);
 
-    if (fx == "dist") {
-        const float baseR = qMin(w, h) * 0.28f;
-        const float jag = baseR * (0.08f + p1 * 0.35f);
-        const float jitter = baseR * (0.06f + (p2 + level) * 0.25f);
-        const float speed = 2.0f + p2 * 4.0f;
-        const float scale = 0.9f + p3 * 0.2f + std::sin(t * 1.1f) * 0.04f;
-
-        QPainterPath path;
-        const int points = 36;
-        for (int i = 0; i < points; ++i) {
-            const float ang = (static_cast<float>(i) / points) * 2.0f * static_cast<float>(M_PI);
-            const float n = std::sin(ang * 3.0f + t * speed) +
-                            std::sin(ang * 7.0f - t * speed * 0.6f);
-            const float rN = baseR * scale + jag * (n * 0.3f) +
-                             jitter * std::sin(t * speed * 1.4f + ang * 2.0f);
-            const QPointF pt(c.x() + std::cos(ang) * rN, c.y() + std::sin(ang) * rN);
-            if (i == 0) {
-                path.moveTo(pt);
-            } else {
-                path.lineTo(pt);
-            }
-        }
-        path.closeSubpath();
-
-        QRadialGradient grad(c, baseR * 1.5f);
-        grad.setColorAt(0.0, QColor(255, 140, 120, 220));
-        grad.setColorAt(0.7, QColor(220, 80, 200, 120));
-        grad.setColorAt(1.0, QColor(80, 40, 120, 40));
-        p.setBrush(grad);
-        p.setPen(QPen(QColor(255, 170, 120), 1.2));
-        p.drawPath(path);
-    } else if (fx == "comp") {
-        const float wallInset = lerp(0.14f, 0.36f, p1);
-        const float leftX = r.left() + w * wallInset;
-        const float rightX = r.right() - w * wallInset;
+    if (fx == "comp") {
+        // Accordion bellows between plates.
+        const float plateInset = lerp(0.16f, 0.34f, p1);
+        const float leftX = r.left() + w * plateInset;
+        const float rightX = r.right() - w * plateInset;
         const float threshold = 0.12f + p1 * 0.6f;
         const float over = qMax(0.0f, level - threshold);
-        const float squash = clamp01(over * 2.4f) * (0.25f + p2 * 0.7f);
-        const float objW = (rightX - leftX) * (0.7f - squash * 0.45f);
-        const float objH = h * (0.34f + p3 * 0.12f);
+        const float squeeze = clamp01(over * 2.2f) * (0.25f + p2 * 0.7f);
+        const float plateW = w * 0.08f;
+        const float height = h * (0.42f + p3 * 0.15f);
+        const QRectF plateL(leftX - plateW, c.y() - height * 0.5f, plateW, height);
+        const QRectF plateR(rightX, c.y() - height * 0.5f, plateW, height);
 
-        p.setPen(QPen(QColor(120, 220, 255, 200), 2.0));
-        p.drawLine(QPointF(leftX, r.top() + 8), QPointF(leftX, r.bottom() - 8));
-        p.drawLine(QPointF(rightX, r.top() + 8), QPointF(rightX, r.bottom() - 8));
+        p.setBrush(QColor(210, 210, 240, 160));
+        p.setPen(QPen(QColor(220, 220, 255, 200), 1.2));
+        p.drawRoundedRect(plateL, 6, 6);
+        p.drawRoundedRect(plateR, 6, 6);
 
-        QRectF obj(c.x() - objW * 0.5f, c.y() - objH * 0.5f, objW, objH);
-        p.setBrush(QColor(90, 200, 255, 180));
-        p.setPen(QPen(QColor(160, 230, 255, 220), 1.4));
-        p.drawRoundedRect(obj, 10, 10);
-    } else if (fx == "sidechan") {
-        const float depth = (0.18f + 0.55f * p2) * h;
-        const float drop = m_sidechainValue * depth;
-        const QRectF big(c.x() - w * 0.18f, c.y() - h * 0.22f, w * 0.36f, h * 0.26f);
-        const QRectF small(c.x() - w * 0.12f, c.y() + h * 0.08f + drop, w * 0.24f,
-                           h * 0.16f);
-        p.setBrush(QColor(255, 210, 120, 200));
-        p.setPen(QPen(QColor(255, 230, 160), 1.2));
-        p.drawRoundedRect(big, 12, 12);
-        p.setBrush(QColor(255, 140, 140, 200));
-        p.drawRoundedRect(small, 10, 10);
+        const int folds = 7;
+        const float innerLeft = plateL.right() + 6;
+        const float innerRight = plateR.left() - 6;
+        const float span = innerRight - innerLeft;
+        const float foldAmp = span * (0.24f - squeeze * 0.18f);
+        const float yTop = c.y() - height * 0.45f;
+        const float yBottom = c.y() + height * 0.45f;
+
+        QPainterPath bellows;
+        for (int i = 0; i <= folds; ++i) {
+            const float f = static_cast<float>(i) / folds;
+            const float x = innerLeft + f * span;
+            const float offset = ((i % 2 == 0) ? -foldAmp : foldAmp);
+            const float y = lerp(yTop, yBottom, f);
+            const QPointF pt(x + offset * 0.5f, y);
+            if (i == 0) {
+                bellows.moveTo(pt);
+            } else {
+                bellows.lineTo(pt);
+            }
+        }
+        p.setPen(QPen(QColor(180, 210, 255, 200), 2.0, Qt::SolidLine, Qt::RoundCap,
+                      Qt::RoundJoin));
+        p.drawPath(bellows);
+    } else if (fx == "dist") {
+        // Overdriven loudspeaker.
+        const float baseR = qMin(w, h) * 0.26f;
+        const float jag = baseR * (0.06f + p1 * 0.25f);
+        const float wobble = std::sin(t * (1.2f + p2 * 2.0f));
+        const float coneR = baseR * (0.55f + p2 * 0.12f);
+        const float domeR = baseR * (0.18f + p3 * 0.08f);
+
+        QPainterPath rim;
+        const int points = 28;
+        for (int i = 0; i < points; ++i) {
+            const float ang = (static_cast<float>(i) / points) * 2.0f * static_cast<float>(M_PI);
+            const float rJ = baseR + jag * std::sin(ang * 5.0f + wobble * 2.0f);
+            const QPointF pt(c.x() + std::cos(ang) * rJ, c.y() + std::sin(ang) * rJ);
+            if (i == 0) {
+                rim.moveTo(pt);
+            } else {
+                rim.lineTo(pt);
+            }
+        }
+        rim.closeSubpath();
+        p.setPen(QPen(QColor(240, 200, 180, 220), 2.0));
+        p.setBrush(QColor(120, 80, 90, 60));
+        p.drawPath(rim);
+
+        p.setPen(QPen(QColor(220, 180, 190, 200), 1.4));
+        p.setBrush(QColor(150, 100, 120, 80));
+        p.drawEllipse(c, coneR, coneR * 0.85f);
+        p.setBrush(QColor(210, 160, 170, 200));
+        p.drawEllipse(c, domeR, domeR);
+
+        const int bolts = 6;
+        for (int i = 0; i < bolts; ++i) {
+            const float ang = (static_cast<float>(i) / bolts) * 2.0f * static_cast<float>(M_PI);
+            const QPointF bolt(c.x() + std::cos(ang) * baseR * 1.05f,
+                               c.y() + std::sin(ang) * baseR * 1.05f);
+            p.setBrush(QColor(240, 210, 200, 180));
+            p.setPen(Qt::NoPen);
+            p.drawEllipse(bolt, 2.0f, 2.0f);
+        }
     } else if (fx == "lofi") {
-        const int cols = 16;
-        const int rows = 10;
-        const float dropProb = 0.05f + p1 * 0.55f;
-        const int phase = static_cast<int>(t * (2.0f + p2 * 10.0f));
-        const float cellW = w / cols;
-        const float cellH = h / rows;
+        // Broken memory screen.
+        const QRectF screen = r.adjusted(10, 14, -10, -18);
+        p.setPen(QPen(QColor(180, 200, 210, 200), 1.6));
+        p.setBrush(QColor(90, 100, 110, 40));
+        p.drawRoundedRect(screen, 8, 8);
+
+        const int cols = 12;
+        const int rows = 8;
+        const float dropProb = 0.08f + p1 * 0.55f;
+        const int phase = static_cast<int>(t * (1.5f + p2 * 6.0f));
+        const float cellW = screen.width() / cols;
+        const float cellH = screen.height() / rows;
         for (int y = 0; y < rows; ++y) {
             for (int x = 0; x < cols; ++x) {
                 const float hsh = hash2(x, y, phase);
                 if (hsh < dropProb) {
                     continue;
                 }
-                const float alpha = 0.3f + hsh * (0.5f + p3 * 0.4f);
-                QColor col = QColor(120, 230, 160, static_cast<int>(alpha * 255));
+                QColor col(170, 220, 200, static_cast<int>((0.25f + hsh * 0.5f) * 255));
                 p.setBrush(col);
                 p.setPen(Qt::NoPen);
-                p.drawRect(QRectF(r.left() + x * cellW, r.top() + y * cellH,
+                p.drawRect(QRectF(screen.left() + x * cellW, screen.top() + y * cellH,
                                   cellW - 1.0f, cellH - 1.0f));
             }
         }
-    } else if (fx == "chorus") {
-        const int copies = 3 + static_cast<int>(p3 * 3.0f);
-        const float depth = w * (0.03f + p1 * 0.08f);
-        const float rate = 0.6f + p2 * 1.8f;
-        const float baseR = qMin(w, h) * 0.18f;
-        for (int i = 0; i < copies; ++i) {
-            const float phase = static_cast<float>(i) / copies * 2.0f * static_cast<float>(M_PI);
-            const float dx = std::cos(t * rate + phase) * depth;
-            const float dy = std::sin(t * rate * 1.2f + phase) * depth * 0.7f;
-            const float alpha = 0.12f + 0.25f * (static_cast<float>(i + 1) / copies);
-            p.setBrush(QColor(130, 200, 255, static_cast<int>(alpha * 255)));
-            p.setPen(QPen(QColor(180, 230, 255, 180), 1.0));
-            p.drawEllipse(QPointF(c.x() + dx, c.y() + dy), baseR, baseR * 0.7f);
-        }
-    } else if (fx == "reverb") {
-        const int copies = 2 + static_cast<int>(p2 * 6.0f);
-        const float spread = w * (0.05f + p1 * 0.18f);
-        const float baseR = qMin(w, h) * 0.12f;
-        p.setBrush(QColor(220, 190, 255, 200));
-        p.setPen(QPen(QColor(220, 220, 255, 180), 1.0));
-        p.drawEllipse(c, baseR, baseR);
 
-        for (int i = 0; i < copies; ++i) {
-            const float phase = static_cast<float>(i) / copies * 2.0f * static_cast<float>(M_PI);
-            const float drift = std::sin(t * 0.4f + phase) * spread;
-            const float dx = std::cos(phase + t * 0.2f) * spread + drift * 0.3f;
-            const float dy = std::sin(phase + t * 0.2f) * spread;
-            const float alpha = 0.18f - i * 0.02f - p3 * 0.04f;
-            QColor col = QColor(180, 150, 255, static_cast<int>(clamp01(alpha) * 255));
-            p.setBrush(col);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(QPointF(c.x() + dx, c.y() + dy), baseR * (1.0f + i * 0.15f),
-                          baseR * (1.0f + i * 0.15f));
-        }
+        // Broken scanline.
+        p.setPen(QPen(QColor(220, 180, 190, 160), 2.0));
+        const float scanY = screen.top() + screen.height() * (0.25f + p3 * 0.4f);
+        p.drawLine(QPointF(screen.left() + 6, scanY),
+                   QPointF(screen.right() - 6, scanY));
+        p.setPen(QPen(QColor(60, 70, 80, 180), 2.0));
+        p.drawLine(QPointF(screen.left() + 14, scanY + 6),
+                   QPointF(screen.right() - 40, scanY + 6));
     } else if (fx == "eq") {
+        // Living creature line (fish/snake).
         const float low = lerp(0.25f, 0.85f, p1);
         const float mid = lerp(0.2f, 0.9f, p2);
         const float high = lerp(0.25f, 0.85f, p3);
-        const float wiggle = std::sin(t * 1.2f) * 0.04f;
-        const QPointF pL(r.left(), r.bottom() - h * (low + wiggle));
-        const QPointF pM(c.x(), r.bottom() - h * (mid + wiggle * 0.6f));
-        const QPointF pH(r.right(), r.bottom() - h * (high - wiggle * 0.5f));
-        QPainterPath path(pL);
-        path.cubicTo(QPointF(r.left() + w * 0.25f, pL.y()),
-                     QPointF(c.x() - w * 0.15f, pM.y()), pM);
-        path.cubicTo(QPointF(c.x() + w * 0.15f, pM.y()),
-                     QPointF(r.right() - w * 0.25f, pH.y()), pH);
-        p.setPen(QPen(QColor(140, 255, 200, 220), 2.2));
-        p.drawPath(path);
-        p.setBrush(QColor(140, 255, 200, 200));
-        p.drawEllipse(pL, 4, 4);
-        p.drawEllipse(pM, 5, 5);
-        p.drawEllipse(pH, 4, 4);
+        const float sway = std::sin(t * 0.6f) * 0.05f;
+        const QPointF head(r.left(), r.center().y() - h * (low * 0.3f + sway));
+        const QPointF midPt(c.x(), r.center().y() - h * (mid * 0.4f - sway));
+        const QPointF tail(r.right(), r.center().y() - h * (high * 0.3f + sway * 0.6f));
+        QPainterPath body(head);
+        body.cubicTo(QPointF(r.left() + w * 0.25f, head.y() - h * 0.2f),
+                     QPointF(c.x() - w * 0.1f, midPt.y() + h * 0.15f), midPt);
+        body.cubicTo(QPointF(c.x() + w * 0.1f, midPt.y() - h * 0.15f),
+                     QPointF(r.right() - w * 0.25f, tail.y() + h * 0.18f), tail);
+        p.setPen(QPen(QColor(140, 255, 210, 220), 2.2, Qt::SolidLine, Qt::RoundCap,
+                      Qt::RoundJoin));
+        p.drawPath(body);
+
+        p.setBrush(QColor(140, 255, 210, 200));
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(head + QPointF(6, -2), 3, 3);  // eye
+        p.drawEllipse(midPt, 4, 4);
+        p.drawEllipse(tail + QPointF(-6, 2), 3, 3);
     } else if (fx == "cassette") {
-        const float speed = 0.6f + p2 * 2.0f;
-        const float wow = 0.2f + p1 * 0.9f;
-        const float wobble = 1.0f + p3 * 4.0f;
-        const QPointF left(c.x() - w * 0.18f, c.y());
-        const QPointF right(c.x() + w * 0.18f, c.y());
-        const float reelR = qMin(w, h) * 0.16f;
-        p.setBrush(QColor(120, 200, 255, 120));
-        p.setPen(QPen(QColor(120, 200, 255, 200), 1.4));
+        // Cassette shell.
+        const QRectF shell = r.adjusted(10, 14, -10, -18);
+        p.setPen(QPen(QColor(200, 190, 210, 200), 1.5));
+        p.setBrush(QColor(110, 100, 130, 70));
+        p.drawRoundedRect(shell, 10, 10);
+
+        const float reelR = qMin(w, h) * 0.14f;
+        const QPointF left(shell.left() + shell.width() * 0.3f, shell.center().y());
+        const QPointF right(shell.right() - shell.width() * 0.3f, shell.center().y());
+        p.setPen(QPen(QColor(220, 210, 230, 200), 1.2));
+        p.setBrush(QColor(140, 130, 160, 120));
         p.drawEllipse(left, reelR, reelR);
         p.drawEllipse(right, reelR, reelR);
 
-        const float angle = t * speed * 2.0f * static_cast<float>(M_PI) +
-                            std::sin(t * 3.0f) * wow;
-        p.setPen(QPen(QColor(220, 240, 255, 220), 2.0));
+        const float angle = t * (0.4f + p2 * 1.4f) * 2.0f * static_cast<float>(M_PI);
+        p.setPen(QPen(QColor(230, 220, 240, 220), 1.6));
         p.drawLine(left, QPointF(left.x() + std::cos(angle) * reelR * 0.9f,
                                  left.y() + std::sin(angle) * reelR * 0.9f));
         p.drawLine(right, QPointF(right.x() + std::cos(-angle) * reelR * 0.9f,
                                   right.y() + std::sin(-angle) * reelR * 0.9f));
 
-        const float lineY = c.y() + std::sin(t * 2.5f) * wobble;
-        p.setPen(QPen(QColor(220, 200, 140, 200), 2.0));
-        p.drawLine(QPointF(left.x() + reelR, lineY), QPointF(right.x() - reelR, lineY));
+        const float tapeY = shell.center().y() + std::sin(t * 1.2f) * (2.0f + p1 * 3.0f);
+        p.setPen(QPen(QColor(220, 200, 180, 200), 2.0));
+        p.drawLine(QPointF(left.x() + reelR, tapeY), QPointF(right.x() - reelR, tapeY));
+
+        p.setBrush(QColor(200, 180, 200, 120));
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(QPointF(shell.left() + 14, shell.top() + 12), 2.0f, 2.0f);
+        p.drawEllipse(QPointF(shell.right() - 14, shell.top() + 12), 2.0f, 2.0f);
+    } else if (fx == "chorus") {
+        // Character with echoes.
+        const int copies = 2 + static_cast<int>(p3 * 3.0f);
+        const float depth = w * (0.04f + p1 * 0.12f);
+        const float rate = 0.4f + p2 * 1.2f;
+        auto drawDrop = [&](const QPointF &center, float alpha) {
+            QPainterPath drop;
+            drop.moveTo(center.x(), center.y() - 18);
+            drop.cubicTo(center.x() + 12, center.y() - 8, center.x() + 10, center.y() + 10,
+                         center.x(), center.y() + 16);
+            drop.cubicTo(center.x() - 10, center.y() + 10, center.x() - 12, center.y() - 8,
+                         center.x(), center.y() - 18);
+            p.setPen(QPen(QColor(220, 220, 255, static_cast<int>(alpha * 255)), 1.2));
+            p.setBrush(QColor(170, 190, 255, static_cast<int>(alpha * 120)));
+            p.drawPath(drop);
+        };
+        for (int i = copies; i >= 0; --i) {
+            const float phase = static_cast<float>(i) / (copies + 1) * 2.0f * static_cast<float>(M_PI);
+            const float dx = std::cos(t * rate + phase) * depth;
+            const float dy = std::sin(t * rate * 1.1f + phase) * depth * 0.4f;
+            const float alpha = 0.12f + 0.16f * (static_cast<float>(copies - i) / (copies + 1));
+            drawDrop(QPointF(c.x() + dx, c.y() + dy), alpha);
+        }
+    } else if (fx == "reverb") {
+        // Room/arches depth.
+        const int layers = 3 + static_cast<int>(p2 * 4.0f);
+        const float spread = w * (0.08f + p1 * 0.2f);
+        for (int i = 0; i < layers; ++i) {
+            const float f = static_cast<float>(i + 1) / (layers + 1);
+            const float inset = spread * f;
+            const QRectF arch = r.adjusted(inset, inset * 0.6f, -inset, -inset * 0.6f);
+            const int alpha = static_cast<int>((0.25f - f * 0.18f - p3 * 0.06f) * 255);
+            p.setPen(QPen(QColor(200, 180, 255, qMax(0, alpha)), 1.6));
+            p.setBrush(Qt::NoBrush);
+            p.drawRoundedRect(arch, 18, 18);
+        }
+        p.setBrush(QColor(220, 210, 255, 180));
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(c, 4, 4);
+    } else if (fx == "sidechan") {
+        // Pressed object.
+        const float depth = (0.2f + 0.6f * p2) * h;
+        const float press = m_sidechainValue * depth;
+        const QRectF floor(r.left() + 12, r.bottom() - 18, r.width() - 24, 6);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(180, 160, 200, 120));
+        p.drawRoundedRect(floor, 4, 4);
+
+        const float blobW = w * 0.22f;
+        const float blobH = h * (0.22f - press / h * 0.12f);
+        const QRectF blob(c.x() - blobW * 0.5f, r.bottom() - 26 - blobH - press,
+                          blobW, blobH);
+        p.setBrush(QColor(255, 170, 170, 200));
+        p.setPen(QPen(QColor(255, 210, 210, 200), 1.2));
+        p.drawRoundedRect(blob, 10, 10);
     }
 
     p.restore();
