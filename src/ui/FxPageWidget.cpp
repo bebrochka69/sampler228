@@ -104,17 +104,6 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
 
-    if (key == Qt::Key_Left) {
-        m_selectedTrack = (m_selectedTrack - 1 + m_tracks.size()) % m_tracks.size();
-        update();
-        return;
-    }
-    if (key == Qt::Key_Right) {
-        m_selectedTrack = (m_selectedTrack + 1) % m_tracks.size();
-        update();
-        return;
-    }
-
     if (key == Qt::Key_Up) {
         if (ctrl) {
             swapSlot(m_selectedTrack, m_selectedSlot, m_selectedSlot - 1);
@@ -150,6 +139,11 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
     if (key == Qt::Key_Minus || key == Qt::Key_Left) {
+        if (ctrl) {
+            m_selectedTrack = (m_selectedTrack - 1 + m_tracks.size()) % m_tracks.size();
+            update();
+            return;
+        }
         FxTrack &track = m_tracks[m_selectedTrack];
         if (m_selectedSlot >= 0 && m_selectedSlot < track.inserts.size()) {
             FxInsert &slot = track.inserts[m_selectedSlot];
@@ -166,6 +160,11 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
     if (key == Qt::Key_Plus || key == Qt::Key_Equal || key == Qt::Key_Right) {
+        if (ctrl) {
+            m_selectedTrack = (m_selectedTrack + 1) % m_tracks.size();
+            update();
+            return;
+        }
         FxTrack &track = m_tracks[m_selectedTrack];
         if (m_selectedSlot >= 0 && m_selectedSlot < track.inserts.size()) {
             FxInsert &slot = track.inserts[m_selectedSlot];
@@ -254,7 +253,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
     const int margin = 20;
     const int headerH = 26;
-    const int rightPanelW = 560;
+    const int rightPanelW = 420;
     const int gap = 12;
 
     const QRectF headerRect(margin, margin, width() - 2 * margin, headerH);
@@ -302,8 +301,8 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
                Qt::AlignLeft | Qt::AlignVCenter, "FX: " + currentEffect.toUpper());
 
     // Parameter knobs.
-    const QRectF knobArea(editorRect.left() + 10, editorHeader.bottom() + 40,
-                          editorRect.width() - 20, 120);
+    const QRectF knobArea(editorRect.left() + 10, editorHeader.bottom() + 36,
+                          editorRect.width() - 20, 96);
     const float knobW = knobArea.width() / 3.0f;
     p.setPen(QPen(Theme::stroke(), 1.0));
     FxInsert slot;
@@ -313,17 +312,17 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     }
     const float params[3] = {slot.p1, slot.p2, slot.p3};
     for (int i = 0; i < 3; ++i) {
-        QRectF knob(knobArea.left() + i * knobW + 8, knobArea.top() + 10, 42, 42);
+        QRectF knob(knobArea.left() + i * knobW + 8, knobArea.top() + 8, 34, 34);
         const bool selected = (i == m_selectedParam);
         p.setBrush(selected ? Theme::bg3() : Theme::bg2());
         p.drawEllipse(knob);
         p.setPen(selected ? Theme::accent() : Theme::accentAlt());
         const float angle = (-140.0f + params[i] * 280.0f) * 3.14159f / 180.0f;
         p.drawLine(knob.center(),
-                   QPointF(knob.center().x() + std::cos(angle) * 16.0f,
-                           knob.center().y() + std::sin(angle) * 16.0f));
+                   QPointF(knob.center().x() + std::cos(angle) * 12.0f,
+                           knob.center().y() + std::sin(angle) * 12.0f));
         p.setPen(Theme::textMuted());
-        p.drawText(QRectF(knob.left() - 8, knob.bottom() + 6, knob.width() + 16, 16),
+        p.drawText(QRectF(knob.left() - 8, knob.bottom() + 4, knob.width() + 16, 14),
                    Qt::AlignCenter, QString("P%1").arg(i + 1));
         p.setPen(QPen(Theme::stroke(), 1.0));
     }
@@ -405,8 +404,8 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.setPen(Qt::NoPen);
         p.drawRect(overlay);
 
-        const float menuW = 380.0f;
-        const float menuH = 220.0f;
+        const float menuW = 320.0f;
+        const float menuH = 180.0f;
         const QRectF menuRect((width() - menuW) * 0.5f, (height() - menuH) * 0.5f, menuW,
                               menuH);
         p.setBrush(Theme::bg2());

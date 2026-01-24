@@ -21,6 +21,13 @@ float clampSample(float v) {
     return v;
 }
 
+float safeParam(float v) {
+    if (!std::isfinite(v)) {
+        return 0.5f;
+    }
+    return std::max(0.0f, std::min(1.0f, v));
+}
+
 void computePanGains(float pan, float volume, float &left, float &right) {
     pan = std::max(-1.0f, std::min(1.0f, pan));
     const float l = pan <= 0.0f ? 1.0f : 1.0f - pan;
@@ -372,6 +379,9 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
     }
 
     for (EffectState &fx : chain.effects) {
+        const float p1 = safeParam(fx.p1);
+        const float p2 = safeParam(fx.p2);
+        const float p3 = safeParam(fx.p3);
         switch (fx.type) {
             case 1: {  // reverb
                 if (fx.bufA.empty()) {
@@ -382,8 +392,8 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                     fx.indexA = 0;
                     fx.indexB = 0;
                 }
-                const float wet = std::max(0.0f, std::min(1.0f, fx.p1));
-                const float feedback = 0.4f + fx.p2 * 0.5f;
+                const float wet = p1;
+                const float feedback = 0.4f + p2 * 0.5f;
                 for (int i = 0; i < frames; ++i) {
                     for (int ch = 0; ch < m_channels; ++ch) {
                         const int idx = i * m_channels + ch;
@@ -402,10 +412,10 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 break;
             }
             case 2: {  // comp
-                const float threshold = 0.15f + fx.p1 * 0.5f;
-                const float ratio = 1.5f + fx.p2 * 6.5f;
-                const float attack = 0.03f + fx.p3 * 0.1f;
-                const float release = 0.1f + fx.p3 * 0.2f;
+                const float threshold = 0.15f + p1 * 0.5f;
+                const float ratio = 1.5f + p2 * 6.5f;
+                const float attack = 0.03f + p3 * 0.1f;
+                const float release = 0.1f + p3 * 0.2f;
                 for (int i = 0; i < frames; ++i) {
                     float env = 0.0f;
                     for (int ch = 0; ch < m_channels; ++ch) {
@@ -428,8 +438,8 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 break;
             }
             case 3: {  // dist
-                const float drive = 1.0f + fx.p1 * 6.0f;
-                const float mix = fx.p2;
+                const float drive = 1.0f + p1 * 6.0f;
+                const float mix = p2;
                 for (int i = 0; i < frames * m_channels; ++i) {
                     const float v = buffer[i] * drive;
                     const float d = std::tanh(v);
@@ -438,18 +448,18 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 break;
             }
             case 4: {  // lofi
-                const int hold = 1 + static_cast<int>(fx.p2 * 7.0f);
-                const float bits = 4.0f + fx.p1 * 8.0f;
+                const int hold = std::max(1, 1 + static_cast<int>(p2 * 7.0f));
+                const float bits = 4.0f + p1 * 8.0f;
                 const float step = 1.0f / std::pow(2.0f, bits);
                 for (int i = 0; i < frames; ++i) {
                     if ((i % hold) == 0) {
-                        fx.p1 = buffer[i * m_channels];
+                        fx.z1L = buffer[i * m_channels];
                         if (m_channels > 1) {
-                            fx.p2 = buffer[i * m_channels + 1];
+                            fx.z1R = buffer[i * m_channels + 1];
                         }
                     }
-                    float left = std::round(fx.p1 / step) * step;
-                    float right = (m_channels > 1) ? std::round(fx.p2 / step) * step : left;
+                    float left = std::round(fx.z1L / step) * step;
+                    float right = (m_channels > 1) ? std::round(fx.z1R / step) * step : left;
                     buffer[i * m_channels] = left;
                     if (m_channels > 1) {
                         buffer[i * m_channels + 1] = right;
@@ -458,8 +468,8 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 break;
             }
             case 5: {  // cassette
-                const float noiseAmount = fx.p1 * 0.05f;
-                const float lpf = 0.05f + fx.p2 * 0.3f;
+                const float noiseAmount = p1 * 0.05f;
+                const float lpf = 0.05f + p2 * 0.3f;
                 for (int i = 0; i < frames * m_channels; ++i) {
                     const float noise = (static_cast<float>(std::rand()) / RAND_MAX - 0.5f) *
                                         noiseAmount;
@@ -475,9 +485,9 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                     fx.indexA = 0;
                     fx.phase = 0.0f;
                 }
-                const float depth = 0.002f + fx.p1 * 0.008f;
-                const float rate = 0.1f + fx.p2 * 0.8f;
-                const float mix = fx.p3;
+                const float depth = 0.002f + p1 * 0.008f;
+                const float rate = 0.1f + p2 * 0.8f;
+                const float mix = p3;
                 for (int i = 0; i < frames; ++i) {
                     const float lfo = (std::sin(fx.phase) + 1.0f) * 0.5f;
                     const int delay = static_cast<int>((0.005f + depth * lfo) * m_sampleRate);
@@ -502,20 +512,20 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 break;
             }
             case 7: {  // eq (simple tilt)
-                const float low = 0.02f + fx.p1 * 0.2f;
-                const float high = 0.02f + fx.p2 * 0.2f;
+                const float low = 0.02f + p1 * 0.2f;
+                const float high = 0.02f + p2 * 0.2f;
                 for (int i = 0; i < frames * m_channels; ++i) {
                     fx.z1L = fx.z1L + low * (buffer[i] - fx.z1L);
                     const float lowBand = fx.z1L;
                     const float highBand = buffer[i] - fx.z1L;
-                    buffer[i] = buffer[i] * (0.8f - fx.p3 * 0.3f) + lowBand * 0.2f +
+                    buffer[i] = buffer[i] * (0.8f - p3 * 0.3f) + lowBand * 0.2f +
                                 highBand * high;
                 }
                 break;
             }
             case 8: {  // sidechain
-                const float threshold = 0.05f + fx.p1 * 0.2f;
-                const float amount = fx.p2;
+                const float threshold = 0.05f + p1 * 0.2f;
+                const float amount = p2;
                 float gain = 1.0f;
                 if (sidechainEnv > threshold) {
                     const float over = (sidechainEnv - threshold) / (1.0f - threshold);
