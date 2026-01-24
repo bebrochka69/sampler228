@@ -12,6 +12,29 @@ class QPaintEvent;
 class QShowEvent;
 class PadBank;
 
+struct FxSlot {
+    QString effect;
+    float p1 = 0.5f;
+    float p2 = 0.5f;
+    float p3 = 0.5f;
+};
+
+struct FxTrack {
+    QString name;
+    QVector<FxSlot> slots;
+};
+
+struct FxSlotHit {
+    QRectF rect;
+    int track = 0;
+    int slot = 0;
+};
+
+struct FxEffectHit {
+    QRectF rect;
+    int index = 0;
+};
+
 class FxPageWidget : public QWidget {
     Q_OBJECT
 public:
@@ -25,33 +48,10 @@ protected:
 
 private:
     void syncBusEffects(int trackIndex);
-
-    struct Track {
-        QString name;
-        struct Slot {
-            QString effect;
-            float p1 = 0.5f;
-            float p2 = 0.5f;
-            float p3 = 0.5f;
-        };
-        QVector<Slot> slots;
-    };
-
-    struct SlotHit {
-        QRectF rect;
-        int track = 0;
-        int slot = 0;
-    };
-
-    struct EffectHit {
-        QRectF rect;
-        int index = 0;
-    };
-
     void assignEffect(int effectIndex);
     void swapSlot(int track, int a, int b);
 
-    QVector<Track> m_tracks;
+    QVector<FxTrack> m_tracks;
     QStringList m_effects;
     PadBank *m_pads = nullptr;
 
@@ -61,6 +61,6 @@ private:
     bool m_showMenu = false;
     int m_selectedParam = 0;
 
-    QVector<SlotHit> m_slotHits;
-    QVector<EffectHit> m_effectHits;
+    QVector<FxSlotHit> m_slotHits;
+    QVector<FxEffectHit> m_effectHits;
 };

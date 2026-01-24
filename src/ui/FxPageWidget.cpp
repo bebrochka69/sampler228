@@ -13,12 +13,12 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
     setFocusPolicy(Qt::StrongFocus);
 
     m_tracks = {
-        {"MASTER", QVector<Track::Slot>(4)},
-        {"A", QVector<Track::Slot>(4)},
-        {"B", QVector<Track::Slot>(4)},
-        {"C", QVector<Track::Slot>(4)},
-        {"D", QVector<Track::Slot>(4)},
-        {"E", QVector<Track::Slot>(4)},
+        {"MASTER", QVector<FxSlot>(4)},
+        {"A", QVector<FxSlot>(4)},
+        {"B", QVector<FxSlot>(4)},
+        {"C", QVector<FxSlot>(4)},
+        {"D", QVector<FxSlot>(4)},
+        {"E", QVector<FxSlot>(4)},
     };
 
     m_effects = {"reverb", "comp", "dist", "lofi", "cassette", "chorus", "eq", "sidechan"};
@@ -31,7 +31,7 @@ void FxPageWidget::assignEffect(int effectIndex) {
     if (m_selectedTrack < 0 || m_selectedTrack >= m_tracks.size()) {
         return;
     }
-    Track &track = m_tracks[m_selectedTrack];
+    FxTrack &track = m_tracks[m_selectedTrack];
     if (m_selectedSlot < 0 || m_selectedSlot >= track.slots.size()) {
         return;
     }
@@ -47,7 +47,7 @@ void FxPageWidget::swapSlot(int trackIndex, int a, int b) {
     if (trackIndex < 0 || trackIndex >= m_tracks.size()) {
         return;
     }
-    Track &track = m_tracks[trackIndex];
+    FxTrack &track = m_tracks[trackIndex];
     if (a < 0 || b < 0 || a >= track.slots.size() || b >= track.slots.size()) {
         return;
     }
@@ -134,7 +134,7 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
     }
 
     if (key == Qt::Key_Delete || key == Qt::Key_Backspace) {
-        Track &track = m_tracks[m_selectedTrack];
+        FxTrack &track = m_tracks[m_selectedTrack];
         if (m_selectedSlot >= 0 && m_selectedSlot < track.slots.size()) {
             track.slots[m_selectedSlot].effect.clear();
             syncBusEffects(m_selectedTrack);
@@ -149,9 +149,9 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
     if (key == Qt::Key_Minus || key == Qt::Key_Left) {
-        Track &track = m_tracks[m_selectedTrack];
+        FxTrack &track = m_tracks[m_selectedTrack];
         if (m_selectedSlot >= 0 && m_selectedSlot < track.slots.size()) {
-            Track::Slot &slot = track.slots[m_selectedSlot];
+            FxSlot &slot = track.slots[m_selectedSlot];
             if (m_selectedParam == 0) {
                 slot.p1 = qBound(0.0f, slot.p1 - 0.05f, 1.0f);
             } else if (m_selectedParam == 1) {
@@ -165,9 +165,9 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
     if (key == Qt::Key_Plus || key == Qt::Key_Equal || key == Qt::Key_Right) {
-        Track &track = m_tracks[m_selectedTrack];
+        FxTrack &track = m_tracks[m_selectedTrack];
         if (m_selectedSlot >= 0 && m_selectedSlot < track.slots.size()) {
-            Track::Slot &slot = track.slots[m_selectedSlot];
+            FxSlot &slot = track.slots[m_selectedSlot];
             if (m_selectedParam == 0) {
                 slot.p1 = qBound(0.0f, slot.p1 + 0.05f, 1.0f);
             } else if (m_selectedParam == 1) {
@@ -191,7 +191,7 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
     setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
 
-    for (const SlotHit &hit : m_slotHits) {
+    for (const FxSlotHit &hit : m_slotHits) {
         if (hit.rect.contains(pos)) {
             m_selectedTrack = hit.track;
             m_selectedSlot = hit.slot;
@@ -201,7 +201,7 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
         }
     }
 
-    for (const EffectHit &hit : m_effectHits) {
+    for (const FxEffectHit &hit : m_effectHits) {
         if (hit.rect.contains(pos)) {
             m_selectedEffect = hit.index;
             assignEffect(hit.index);
@@ -222,8 +222,8 @@ void FxPageWidget::syncBusEffects(int trackIndex) {
         return;
     }
     QVector<PadBank::BusEffect> ids;
-    const Track &track = m_tracks[trackIndex];
-    for (const Track::Slot &slot : track.slots) {
+    const FxTrack &track = m_tracks[trackIndex];
+    for (const FxSlot &slot : track.slots) {
         if (slot.effect.isEmpty()) {
             continue;
         }
@@ -335,7 +335,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
     QString currentEffect;
     if (m_selectedTrack >= 0 && m_selectedTrack < m_tracks.size()) {
-        const Track &track = m_tracks[m_selectedTrack];
+        const FxTrack &track = m_tracks[m_selectedTrack];
         if (m_selectedSlot >= 0 && m_selectedSlot < track.slots.size()) {
             currentEffect = track.slots[m_selectedSlot].effect;
         }
@@ -355,7 +355,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     const int knobCount = 4;
     const float knobW = knobArea.width() / 3.0f;
     p.setPen(QPen(Theme::stroke(), 1.0));
-    Track::Slot slot;
+    FxSlot slot;
     if (m_selectedTrack >= 0 && m_selectedTrack < m_tracks.size() &&
         m_selectedSlot >= 0 && m_selectedSlot < m_tracks[m_selectedTrack].slots.size()) {
         slot = m_tracks[m_selectedTrack].slots[m_selectedSlot];
