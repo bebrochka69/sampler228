@@ -505,6 +505,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
+    p.setRenderHint(QPainter::Antialiasing, true);
 
     const int margin = 20;
     const int headerH = 26;
@@ -529,10 +530,17 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
     m_effectHits.clear();
 
+    // FX atmosphere layer (VIDEO_03).
+    p.save();
+    p.setCompositionMode(QPainter::CompositionMode_Screen);
+    Theme::drawFog(p, rect(), QColor(200, 190, 240, 22), 0.12f, 0.05f, 1.0f);
+    Theme::drawFog(p, rect(), QColor(180, 210, 230, 20), 0.10f, 0.04f, 0.9f);
+    p.restore();
+
     // Editor panel.
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::stroke(), 1.2));
-    p.drawRect(editorRect);
+    p.drawRoundedRect(editorRect, 12, 12);
 
     QRectF editorHeader(editorRect.left() + 12, editorRect.top() + 8, editorRect.width() - 24, 20);
     p.setFont(Theme::condensedFont(11, QFont::DemiBold));
@@ -606,7 +614,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
         p.setBrush(Theme::bg1());
         p.setPen(QPen(activeTrack ? Theme::accentAlt() : Theme::stroke(), 1.2));
-        p.drawRect(stripRect);
+        p.drawRoundedRect(stripRect, 10, 10);
 
         QRectF nameRect(stripRect.left(), stripRect.top(), stripRect.width(), 20);
         p.setPen(activeTrack ? Theme::accentAlt() : Theme::textMuted());
@@ -616,7 +624,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         QRectF meterRect(stripRect.left() + 6, nameRect.bottom() + 8, 10, stripRect.height() - 60);
         p.setBrush(Theme::bg2());
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRect(meterRect);
+        p.drawRoundedRect(meterRect, 4, 4);
         float level = 0.0f;
         if (m_pads) {
             level = m_pads->busMeter(i);
@@ -637,7 +645,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
             const bool slotSelected = (activeTrack && s == m_selectedSlot);
             p.setBrush(slotSelected ? Theme::bg3() : Theme::bg2());
             p.setPen(QPen(slotSelected ? Theme::accent() : Theme::stroke(), 1.0));
-            p.drawRect(slotRect);
+            p.drawRoundedRect(slotRect, 6, 6);
             const QString effectName = m_tracks[i].inserts[s].effect;
             QString label = effectName.isEmpty() ? QString("INSERT %1").arg(s + 1)
                                                  : effectName.toUpper();
@@ -652,11 +660,11 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
                          stripRect.bottom() - 120, 12, 90);
         p.setBrush(Theme::bg2());
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRect(faderRect);
+        p.drawRoundedRect(faderRect, 4, 4);
         QRectF knob(faderRect.left() - 6, faderRect.bottom() - 30, 24, 12);
         p.setBrush(Theme::accentAlt());
         p.setPen(Qt::NoPen);
-        p.drawRect(knob);
+        p.drawRoundedRect(knob, 3, 3);
     }
 
     if (m_showMenu) {
@@ -671,7 +679,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
                               menuH);
         p.setBrush(Theme::bg2());
         p.setPen(QPen(Theme::accentAlt(), 1.4));
-        p.drawRect(menuRect);
+        p.drawRoundedRect(menuRect, 12, 12);
 
         p.setPen(Theme::accentAlt());
         p.setFont(Theme::condensedFont(12, QFont::DemiBold));
@@ -695,7 +703,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
             const bool selected = (i == m_selectedEffect);
             p.setBrush(selected ? Theme::bg3() : Theme::bg1());
             p.setPen(QPen(selected ? Theme::accent() : Theme::stroke(), 1.0));
-            p.drawRect(cell);
+            p.drawRoundedRect(cell, 8, 8);
             p.setPen(selected ? Theme::accent() : Theme::text());
             p.drawText(cell.adjusted(6, 0, -6, 0), Qt::AlignCenter, m_effects[i].toUpper());
             m_effectHits.push_back({cell, i});

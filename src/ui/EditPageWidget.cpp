@@ -5,7 +5,9 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QtGlobal>
+#include <cmath>
 
 #include "PadBank.h"
 #include "SampleSession.h"
@@ -16,6 +18,14 @@ EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *p
     : QWidget(parent), m_session(session), m_pads(pads) {
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
+
+    m_ambientTimer.setInterval(66);
+    connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
+        if (isVisible()) {
+            update();
+        }
+    });
+    m_ambientTimer.start();
 
     m_params = {
         {"VOLUME", Param::Volume},
@@ -294,6 +304,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
+    p.setRenderHint(QPainter::Antialiasing, true);
 
     if (m_pads && m_session) {
         const QString padPath = m_pads->padPath(m_pads->activePad());
@@ -319,9 +330,29 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::stroke(), 1.2));
-    p.drawRect(waveRect);
+    p.drawRoundedRect(waveRect, 12, 12);
 
     const QRectF waveInner = waveRect.adjusted(12, 12, -12, -12);
+    // Living texture beneath waveform (VIDEO_05).
+    p.save();
+    p.setClipRect(waveInner);
+    p.setCompositionMode(QPainter::CompositionMode_SoftLight);
+    const float t = Theme::timeSeconds();
+    p.setPen(QPen(Theme::withAlpha(Theme::accentAlt(), 60), 1.2));
+    for (int i = 0; i < 5; ++i) {
+        QPainterPath path;
+        const float yBase = waveInner.top() + (i + 1) * (waveInner.height() / 6.0f);
+        path.moveTo(waveInner.left(), yBase);
+        for (int x = 0; x <= 32; ++x) {
+            const float px = waveInner.left() + waveInner.width() * (x / 32.0f);
+            const float phase = t * 0.6f + i * 1.3f;
+            const float amp = 6.0f + i * 1.4f;
+            const float py = yBase + std::sin(px * 0.012f + phase) * amp;
+            path.lineTo(px, py);
+        }
+        p.drawPath(path);
+    }
+    p.restore();
     QVector<float> wave;
     if (m_session && m_session->hasWaveform()) {
         wave = m_session->waveform();
@@ -410,7 +441,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         const bool selected = (i == m_selectedParam);
         p.setBrush(selected ? Theme::bg2() : Theme::bg1());
         p.setPen(QPen(selected ? Theme::accentAlt() : Theme::stroke(), selected ? 1.6 : 1.0));
-        p.drawRect(cell);
+        p.drawRoundedRect(cell, 10, 10);
 
         const QRectF iconRect = cell.adjusted(14, 12, -14, -28);
         const QPixmap icon = iconForType(m_params[i].type);
@@ -425,7 +456,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         } else {
             p.setPen(Qt::NoPen);
             p.setBrush(selected ? Theme::accent() : Theme::accentAlt());
-            p.drawRect(iconRect.adjusted(6, 6, -6, -6));
+            p.drawRoundedRect(iconRect.adjusted(6, 6, -6, -6), 6, 6);
         }
 
         p.setPen(selected ? Theme::accentAlt() : Theme::text());
@@ -513,7 +544,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     m_fxBusRect = fxRect;
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::accent(), 1.2));
-    p.drawRect(fxRect);
+    p.drawRoundedRect(fxRect, 8, 8);
     const int busIndex = m_pads ? m_pads->fxBus(m_pads->activePad()) : 0;
     const QString busText = QString("FX BUS: %1").arg(PadBank::fxBusLabel(busIndex));
     p.setPen(Theme::accent());
@@ -521,13 +552,18 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::accentAlt(), 1.2));
-    p.drawRect(deleteRect);
+    p.drawRoundedRect(deleteRect, 10, 10);
     p.setPen(Theme::accentAlt());
     p.drawText(deleteRect, Qt::AlignCenter, "DELETE PAD");
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::accent(), 1.2));
-    p.drawRect(copyRect);
+    p.drawRoundedRect(copyRect, 10, 10);
     p.setPen(Theme::accent());
     p.drawText(copyRect, Qt::AlignCenter, "COPY PAD");
+
+    // Idle ambience (VIDEO_06).
+    if (!m_pads || !m_pads->isPlaying(m_pads->activePad())) {
+        Theme::drawIdleDust(p, rect(), 0.05f);
+    }
 }

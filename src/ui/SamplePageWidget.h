@@ -2,6 +2,7 @@
 
 #include <QRectF>
 #include <QStringList>
+#include <QTimer>
 #include <QVector>
 #include <QWidget>
 
@@ -44,4 +45,6 @@ private:
     QRectF m_playRect;
     QRectF m_stopRect;
     QRectF m_rescanRect;
+
+    QTimer m_ambientTimer;
 };

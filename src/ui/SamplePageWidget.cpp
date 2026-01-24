@@ -17,6 +17,14 @@ SamplePageWidget::SamplePageWidget(SampleSession *session, PadBank *pads, QWidge
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
+    m_ambientTimer.setInterval(66);
+    connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
+        if (isVisible()) {
+            update();
+        }
+    });
+    m_ambientTimer.start();
+
     refreshBrowser();
     rebuildProjects();
 
@@ -271,12 +279,13 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
+    p.setRenderHint(QPainter::Antialiasing, true);
 
     const int headerHeight = 28;
     const QRectF headerRect(0, 0, width(), headerHeight);
     p.setPen(Qt::NoPen);
     p.setBrush(Theme::bg3());
-    p.drawRect(headerRect);
+    p.drawRoundedRect(headerRect.adjusted(4, 2, -4, -2), 10, 10);
     p.setPen(QPen(Theme::stroke(), 1.2));
     p.drawLine(QPointF(0, headerRect.bottom()), QPointF(width(), headerRect.bottom()));
 
@@ -297,12 +306,12 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     // Left panel.
     p.setPen(QPen(Theme::stroke(), 1.2));
     p.setBrush(Theme::bg1());
-    p.drawRect(leftRect);
+    p.drawRoundedRect(leftRect, 12, 12);
 
     const QRectF dirRect(leftRect.left() + 8, leftRect.top() + 6, leftRect.width() - 16, 26);
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRect(dirRect);
+    p.drawRoundedRect(dirRect, 8, 8);
 
     QFont dirFont = Theme::baseFont(9, QFont::DemiBold);
     p.setFont(dirFont);
@@ -314,7 +323,7 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     m_rescanRect = QRectF(dirRect.right() - 22, dirRect.top() + 4, 16, 16);
     p.setPen(QPen(Theme::accent(), 1.0));
     p.setBrush(Theme::bg1());
-    p.drawRect(m_rescanRect);
+    p.drawRoundedRect(m_rescanRect, 4, 4);
     p.setFont(Theme::baseFont(9, QFont::Bold));
     p.drawText(m_rescanRect, Qt::AlignCenter, "R");
 
@@ -323,7 +332,16 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
                           leftRect.bottom() - dirRect.bottom() - 14);
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRect(listRect);
+    p.drawRoundedRect(listRect, 10, 10);
+
+    // Memory layer behind list (VIDEO_04).
+    p.save();
+    p.setClipRect(listRect.adjusted(2, 2, -2, -2));
+    p.setCompositionMode(QPainter::CompositionMode_SoftLight);
+    Theme::drawFog(p, listRect, QColor(220, 200, 220, 26), 0.10f, 0.05f, 0.9f);
+    Theme::drawFog(p, listRect, QColor(170, 200, 220, 24), 0.08f, 0.06f, 0.8f);
+    Theme::drawGrain(p, listRect, 0.06f);
+    p.restore();
 
     p.save();
     p.setClipRect(listRect.adjusted(2, 2, -2, -2));
@@ -351,7 +369,7 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
             const QColor rowColor = (i % 2 == 0) ? Theme::bg2() : Theme::bg1();
             p.setPen(QPen(Theme::stroke(), 1.0));
             p.setBrush(selected ? Theme::accentAlt() : rowColor);
-            p.drawRect(row);
+            p.drawRoundedRect(row, 6, 6);
 
             if (selected) {
                 p.setBrush(Theme::accent());
@@ -380,12 +398,12 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     // Right panels.
     p.setPen(QPen(Theme::stroke(), 1.2));
     p.setBrush(Theme::bg1());
-    p.drawRect(rightRect);
+    p.drawRoundedRect(rightRect, 12, 12);
 
     const QRectF projectsRect(rightRect.left() + 8, rightRect.top() + 6, rightRect.width() - 16, 130);
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRect(projectsRect);
+    p.drawRoundedRect(projectsRect, 10, 10);
 
     p.setPen(Theme::accent());
     p.setFont(Theme::condensedFont(11, QFont::Bold));
@@ -413,7 +431,7 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
                              rightRect.width() - 16, rightRect.bottom() - projectsRect.bottom() - 16);
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRect(previewRect);
+    p.drawRoundedRect(previewRect, 10, 10);
 
     p.setPen(Theme::accent());
     p.setFont(Theme::condensedFont(11, QFont::Bold));
@@ -430,14 +448,14 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
 
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg1());
-    p.drawRect(infoRect);
+    p.drawRoundedRect(infoRect, 10, 10);
 
     // Transport buttons.
     const QRectF transportRect(infoRight.left() + 6, infoRight.top() + 6,
                                infoRight.width() - 12, 20);
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRect(transportRect);
+    p.drawRoundedRect(transportRect, 6, 6);
 
     m_playRect = QRectF(transportRect.left() + 6, transportRect.top() + 4, 12, 12);
     m_stopRect = QRectF(transportRect.left() + 26, transportRect.top() + 4, 12, 12);
@@ -452,7 +470,7 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     p.drawPolygon(playTri);
 
     p.setBrush(Theme::accent());
-    p.drawRect(m_stopRect);
+    p.drawRoundedRect(m_stopRect, 2, 2);
 
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(8, QFont::DemiBold));
@@ -540,5 +558,10 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
         p.drawText(QRectF(infoRight.left() + 8, infoRight.bottom() - 16,
                           infoRight.width() - 16, 14),
                    Qt::AlignLeft | Qt::AlignVCenter, m_session->errorText());
+    }
+
+    // Idle ambience (VIDEO_06).
+    if (!m_session || !m_session->isPlaying()) {
+        Theme::drawIdleDust(p, rect(), 0.06f);
     }
 }
