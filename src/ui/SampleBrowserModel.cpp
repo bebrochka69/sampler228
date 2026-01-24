@@ -69,7 +69,7 @@ void SampleBrowserModel::refresh() {
         addRootIfExists(root, name, true, true);
     }
 
-    if (m_roots.isEmpty()) {
+    if (m_roots.empty()) {
         const QString home = QDir::homePath();
         const QString samples = home + "/samples";
         const QString samplesCaps = home + "/Samples";
