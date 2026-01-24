@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 
 #ifdef GROOVEBOX_WITH_ALSA
 #include <alsa/asoundlib.h>

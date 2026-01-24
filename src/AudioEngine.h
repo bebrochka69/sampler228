@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QVector>
+#include <array>
 #include <atomic>
 #include <memory>
 #include <mutex>

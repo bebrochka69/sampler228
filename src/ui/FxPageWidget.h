@@ -12,7 +12,7 @@ class QPaintEvent;
 class QShowEvent;
 class PadBank;
 
-struct FxSlot {
+struct FxInsert {
     QString effect;
     float p1 = 0.5f;
     float p2 = 0.5f;
@@ -21,10 +21,10 @@ struct FxSlot {
 
 struct FxTrack {
     QString name;
-    QVector<FxSlot> slots;
+    QVector<FxInsert> inserts;
 };
 
-struct FxSlotHit {
+struct FxInsertHit {
     QRectF rect;
     int track = 0;
     int slot = 0;
@@ -61,6 +61,6 @@ private:
     bool m_showMenu = false;
     int m_selectedParam = 0;
 
-    QVector<FxSlotHit> m_slotHits;
+    QVector<FxInsertHit> m_slotHits;
     QVector<FxEffectHit> m_effectHits;
 };
