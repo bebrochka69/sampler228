@@ -1,7 +1,10 @@
 #pragma once
 
 #include <QColor>
+#include <QCoreApplication>
+#include <QDir>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QFont>
 #include <QFontInfo>
 #include <QGuiApplication>
@@ -36,8 +39,10 @@ inline QFont baseFont(int pt, QFont::Weight weight = QFont::Normal) {
     if (!QFontInfo(f).exactMatch()) {
         f = QFont("DejaVu Sans");
     }
-    f.setPointSizeF(pt * uiScale());
+    const int px = qMax(8, static_cast<int>(std::lround(pt * uiScale())));
+    f.setPixelSize(px);
     f.setWeight(weight);
+    f.setHintingPreference(QFont::PreferFullHinting);
     return f;
 }
 
@@ -46,8 +51,10 @@ inline QFont condensedFont(int pt, QFont::Weight weight = QFont::DemiBold) {
     if (!QFontInfo(f).exactMatch()) {
         f = QFont("DejaVu Sans");
     }
-    f.setPointSizeF(pt * uiScale());
+    const int px = qMax(8, static_cast<int>(std::lround(pt * uiScale())));
+    f.setPixelSize(px);
     f.setWeight(weight);
+    f.setHintingPreference(QFont::PreferFullHinting);
     return f;
 }
 
@@ -69,7 +76,11 @@ inline float uiScale() {
     }
     const float sx = static_cast<float>(size.width()) / 1280.0f;
     const float sy = static_cast<float>(size.height()) / 720.0f;
-    scale = qBound(0.5f, qMin(sx, sy), 1.0f);
+    float base = qMin(sx, sy);
+    if (size.width() <= 1024 || size.height() <= 600) {
+        base = qMax(base, 0.82f);
+    }
+    scale = qBound(0.6f, base, 1.0f);
     return scale;
 }
 
@@ -113,6 +124,37 @@ inline const QImage &grainImage() {
         return out;
     }();
     return img;
+}
+
+inline const QPixmap &leftBgPixmap() {
+    static QPixmap pix;
+    static bool loaded = false;
+    if (loaded) {
+        return pix;
+    }
+    loaded = true;
+    QString path = qEnvironmentVariable("GROOVEBOX_BG_LEFT");
+    if (path.isEmpty()) {
+        const QString base = QCoreApplication::applicationDirPath();
+        const QStringList candidates = {
+            base + "/assets/bg_left.png",
+            base + "/assets/backgrounds/left.png",
+            base + "/assets/backgrounds/bg_left.png",
+            QDir(base).absoluteFilePath("../assets/bg_left.png"),
+            QDir(base).absoluteFilePath("../assets/backgrounds/left.png"),
+            QDir(base).absoluteFilePath("../assets/backgrounds/bg_left.png"),
+        };
+        for (const QString &cand : candidates) {
+            if (QFileInfo::exists(cand)) {
+                path = cand;
+                break;
+            }
+        }
+    }
+    if (!path.isEmpty()) {
+        pix.load(path);
+    }
+    return pix;
 }
 
 inline void drawFog(QPainter &p, const QRectF &rect, const QColor &color, float opacity,
@@ -169,6 +211,18 @@ inline void paintBackground(QPainter &p, const QRectF &rect) {
     grad.setColorAt(0.6, QColor(30, 26, 40));
     grad.setColorAt(1.0, QColor(20, 18, 28));
     p.fillRect(rect, grad);
+
+    const QPixmap &bg = leftBgPixmap();
+    if (!bg.isNull()) {
+        const qreal targetH = rect.height();
+        const qreal ratio = targetH / bg.height();
+        const qreal targetW = bg.width() * ratio;
+        const QRectF target(rect.left(), rect.top(), targetW, targetH);
+        p.save();
+        p.setOpacity(0.22);
+        p.drawPixmap(target, bg, QRectF(0, 0, bg.width(), bg.height()));
+        p.restore();
+    }
 
     if (!liteMode()) {
         p.save();

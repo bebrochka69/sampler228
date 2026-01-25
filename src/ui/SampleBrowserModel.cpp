@@ -1,9 +1,12 @@
 #include "SampleBrowserModel.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSet>
 #include <QStorageInfo>
+#include <QTextStream>
+#include <functional>
 
 namespace {
 bool isUsbMount(const QStorageInfo &info) {
@@ -16,6 +19,35 @@ bool isUsbMount(const QStorageInfo &info) {
     }
     return root.startsWith("/media/") || root.startsWith("/run/media/") || root.startsWith("/mnt/");
 }
+
+void scanProcMounts(QSet<QString> &seenRoots,
+                    const std::function<bool(const QString &, const QString &, bool, bool)> &addRoot) {
+    QFile file("/proc/mounts");
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return;
+    }
+    QTextStream in(&file);
+    while (!in.atEnd()) {
+        const QString line = in.readLine();
+        const QStringList parts = line.split(' ');
+        if (parts.size() < 2) {
+            continue;
+        }
+        const QString device = parts[0];
+        const QString mountPoint = parts[1];
+        if (!device.startsWith("/dev/sd") && !device.startsWith("/dev/usb")) {
+            continue;
+        }
+        if (!mountPoint.startsWith("/media/") && !mountPoint.startsWith("/run/media/") &&
+            !mountPoint.startsWith("/mnt/")) {
+            continue;
+        }
+        if (seenRoots.contains(mountPoint)) {
+            continue;
+        }
+        addRoot(mountPoint, QFileInfo(mountPoint).fileName(), true, true);
+    }
+}
 }  // namespace
 
 void SampleBrowserModel::refresh() {
@@ -25,7 +57,7 @@ void SampleBrowserModel::refresh() {
 
     QSet<QString> seenRoots;
     auto addRootIfExists = [&](const QString &path, const QString &name, bool expanded,
-                               bool preScan) {
+                               bool preScan) -> bool {
         QDir dir(path);
         if (!dir.exists()) {
             return false;
@@ -68,6 +100,8 @@ void SampleBrowserModel::refresh() {
         }
         addRootIfExists(root, name, true, true);
     }
+
+    scanProcMounts(seenRoots, addRootIfExists);
 
     // Fallback: manually scan common mount roots.
     auto scanMountRoot = [&](const QString &root) {

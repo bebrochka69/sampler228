@@ -329,7 +329,7 @@ void FxPageWidget::syncBusEffects(int trackIndex) {
 void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxInsert &slot,
                                      float level) {
     p.save();
-    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::Antialiasing, !Theme::liteMode());
 
     const QRectF r = rect.adjusted(10, 10, -10, -10);
     const QPointF c = r.center();
@@ -660,7 +660,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
-    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::Antialiasing, !Theme::liteMode());
 
     const int margin = Theme::px(20);
     const int headerH = Theme::px(26);

@@ -392,67 +392,36 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.setPen(QPen(Theme::accent(), 2.0));
     p.drawLine(QPointF(endX, waveInner.top()), QPointF(endX, waveInner.bottom()));
 
-    // Parameters grid.
-    const QRectF gridRect(margin, waveRect.bottom() + Theme::px(16),
+    // Parameters list (large text, no boxes).
+    const QRectF listRect(margin, waveRect.bottom() + Theme::px(18),
                           width() - 2 * margin, height() - waveRect.bottom() - Theme::px(96));
-    const int cols = 4;
-    const int rows = 2;
-    const float cellW =
-        (gridRect.width() - (cols - 1) * Theme::pxF(16.0f)) / cols;
-    const float cellH =
-        (gridRect.height() - (rows - 1) * Theme::pxF(16.0f)) / rows;
-
-    p.setFont(Theme::baseFont(10, QFont::DemiBold));
+    const int rows = 4;
+    const int cols = 2;
+    const float colGap = Theme::pxF(24.0f);
+    const float colW = (listRect.width() - colGap) / cols;
+    const float rowH = listRect.height() / rows;
 
     m_paramRects.clear();
+    p.setFont(Theme::condensedFont(16, QFont::Bold));
+
     for (int i = 0; i < m_params.size(); ++i) {
-        const int r = i / cols;
-        const int c = i % cols;
-        const float x = gridRect.left() + c * (cellW + Theme::pxF(16.0f));
-        const float y = gridRect.top() + r * (cellH + Theme::pxF(16.0f));
-        const QRectF cell(x, y, cellW, cellH);
-        m_paramRects.push_back(cell);
+        const int c = i / rows;
+        const int r = i % rows;
+        const float x = listRect.left() + c * (colW + colGap);
+        const float y = listRect.top() + r * rowH;
+        const QRectF rowRect(x, y, colW, rowH);
+        m_paramRects.push_back(rowRect);
 
         const bool selected = (i == m_selectedParam);
-        p.setBrush(selected ? Theme::bg2() : Theme::bg1());
-        p.setPen(QPen(selected ? Theme::accentAlt() : Theme::stroke(), selected ? 1.6 : 1.0));
-        p.drawRoundedRect(cell, Theme::px(10), Theme::px(10));
+        const QColor labelColor = selected ? Theme::accent() : Theme::text();
+        const QColor valueColor = selected ? Theme::accentAlt() : Theme::textMuted();
 
-        const QRectF iconRect = cell.adjusted(Theme::px(14), Theme::px(12),
-                                              -Theme::px(14), -Theme::px(28));
-        const QPixmap icon = iconForType(m_params[i].type);
-        if (!icon.isNull()) {
-            const QRectF drawRect = iconRect.adjusted(Theme::px(6), Theme::px(6),
-                                                      -Theme::px(6), -Theme::px(6));
-            const QPixmap scaled = icon.scaled(drawRect.size().toSize(), Qt::KeepAspectRatio,
-                                              Qt::SmoothTransformation);
-            const QPointF center = drawRect.center();
-            const QRectF target(center.x() - scaled.width() / 2.0, center.y() - scaled.height() / 2.0,
-                                scaled.width(), scaled.height());
-            p.drawPixmap(target, scaled, scaled.rect());
-        } else {
-            p.setPen(Qt::NoPen);
-            p.setBrush(selected ? Theme::accent() : Theme::accentAlt());
-            p.drawRoundedRect(iconRect.adjusted(Theme::px(6), Theme::px(6),
-                                                -Theme::px(6), -Theme::px(6)),
-                              Theme::px(6), Theme::px(6));
-        }
-
-        p.setPen(selected ? Theme::accentAlt() : Theme::text());
-        p.drawText(QRectF(cell.left(), cell.bottom() - Theme::px(26), cell.width(),
-                          Theme::px(16)),
-                   Qt::AlignCenter, m_params[i].label);
-
-        float valueNorm = 0.0f;
         QString valueText;
-
         switch (m_params[i].type) {
             case Param::Volume:
-                valueNorm = params.volume;
                 valueText = QString("%1%").arg(static_cast<int>(params.volume * 100));
                 break;
             case Param::Pan: {
-                valueNorm = (params.pan + 1.0f) * 0.5f;
                 const int panVal = static_cast<int>(qAbs(params.pan) * 100);
                 valueText = params.pan < 0.0f ? QString("L%1").arg(panVal)
                                               : QString("R%1").arg(panVal);
@@ -462,27 +431,21 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
                 break;
             }
             case Param::Pitch: {
-                valueNorm = (params.pitch + 12.0f) / 24.0f;
                 const int pitchVal = static_cast<int>(params.pitch);
                 valueText = QString("%1%2 st").arg(pitchVal >= 0 ? "+" : "").arg(pitchVal);
                 break;
             }
             case Param::Stretch:
-                valueNorm = static_cast<float>(params.stretchIndex) /
-                            static_cast<float>(qMax(1, PadBank::stretchCount() - 1));
                 valueText = PadBank::stretchLabel(params.stretchIndex);
                 break;
             case Param::Start:
-                valueNorm = params.start;
                 valueText = QString("%1%").arg(static_cast<int>(params.start * 100));
                 break;
             case Param::End:
-                valueNorm = params.end;
                 valueText = QString("%1%").arg(static_cast<int>(params.end * 100));
                 break;
             case Param::Slice: {
                 const int count = PadBank::sliceCountForIndex(params.sliceCountIndex);
-                valueNorm = static_cast<float>(params.sliceIndex) / static_cast<float>(qMax(1, count - 1));
                 if (count <= 1) {
                     valueText = "OFF";
                 } else {
@@ -491,26 +454,30 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
                 break;
             }
             case Param::Mode:
-                valueNorm = params.loop ? 1.0f : 0.0f;
                 valueText = params.loop ? "LOOP" : "ONESHOT";
                 break;
         }
 
-        const QRectF valueLine(cell.left() + Theme::px(18), cell.bottom() - Theme::px(10),
-                               cell.width() - Theme::px(36), Theme::px(3));
-        p.setPen(Qt::NoPen);
-        p.setBrush(Theme::withAlpha(Theme::stroke(), 160));
-        p.drawRect(valueLine);
-        p.setBrush(selected ? Theme::accent() : Theme::accentAlt());
-        p.drawRect(QRectF(valueLine.left(), valueLine.top(), valueLine.width() * valueNorm,
-                          valueLine.height()));
+        p.setPen(labelColor);
+        p.drawText(QRectF(rowRect.left(), rowRect.top(), rowRect.width(), rowRect.height()),
+                   Qt::AlignLeft | Qt::AlignVCenter, m_params[i].label);
 
-        p.setPen(Theme::textMuted());
-        p.setFont(Theme::baseFont(8));
-        p.drawText(QRectF(cell.left(), cell.top() + Theme::px(6), cell.width(),
-                          Theme::px(12)),
-                   Qt::AlignCenter, valueText);
-        p.setFont(Theme::baseFont(10, QFont::DemiBold));
+        p.setPen(valueColor);
+        p.setFont(Theme::condensedFont(14, QFont::DemiBold));
+        p.drawText(QRectF(rowRect.left(), rowRect.top(), rowRect.width(), rowRect.height()),
+                   Qt::AlignRight | Qt::AlignVCenter, valueText);
+        p.setFont(Theme::condensedFont(16, QFont::Bold));
+
+        // underline for selected row
+        if (selected) {
+            p.setPen(QPen(Theme::accentAlt(), Theme::pxF(2.0f)));
+            p.drawLine(QPointF(rowRect.left(), rowRect.bottom() - Theme::px(6)),
+                       QPointF(rowRect.right(), rowRect.bottom() - Theme::px(6)));
+        } else {
+            p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 80), Theme::pxF(1.0f)));
+            p.drawLine(QPointF(rowRect.left(), rowRect.bottom() - Theme::px(6)),
+                       QPointF(rowRect.right(), rowRect.bottom() - Theme::px(6)));
+        }
     }
 
     // Action buttons.
