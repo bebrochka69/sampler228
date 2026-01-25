@@ -236,7 +236,8 @@ void FxPageWidget::advanceAnimation() {
         }
     }
 
-    if (slot.effect.toLower() == "sidechan") {
+    const QString effectName = slot.effect.toLower();
+    if (effectName == "sidechan") {
         const float level = m_pads ? m_pads->busMeter(m_selectedTrack) : 0.0f;
         const float threshold = 0.08f + clamp01(slot.p1) * 0.6f;
         const float target = (level > threshold) ? clamp01(slot.p2) : 0.0f;
@@ -246,6 +247,22 @@ void FxPageWidget::advanceAnimation() {
         m_sidechainValue = m_sidechainValue + (target - m_sidechainValue) * coeff;
     } else {
         m_sidechainValue *= 0.85f;
+    }
+
+    if (effectName == "comp") {
+        const float level = m_pads ? m_pads->busMeter(m_selectedTrack) : 0.0f;
+        const float threshold = 0.08f + clamp01(slot.p1) * 0.6f;
+        float amount = 0.0f;
+        if (level > threshold) {
+            amount = (level - threshold) / qMax(0.001f, (1.0f - threshold));
+        }
+        const float target = clamp01(amount) * (0.4f + clamp01(slot.p2) * 0.6f);
+        const float attack = 0.18f;
+        const float release = 0.04f + clamp01(slot.p3) * 0.08f;
+        const float coeff = (target > m_compValue) ? attack : release;
+        m_compValue = m_compValue + (target - m_compValue) * coeff;
+    } else {
+        m_compValue *= 0.9f;
     }
 
     update();
@@ -333,52 +350,79 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         return;
     }
 
-    p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 120), 1.0));
-    p.setBrush(Qt::NoBrush);
-    p.drawRoundedRect(r, 8, 8);
+    if (fx != "comp") {
+        p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 120), 1.0));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(r, 8, 8);
+    }
 
     if (fx == "comp") {
-        // Accordion bellows between plates.
-        const float plateInset = lerp(0.16f, 0.34f, p1);
-        const float leftX = r.left() + w * plateInset;
-        const float rightX = r.right() - w * plateInset;
-        const float threshold = 0.12f + p1 * 0.6f;
-        const float over = qMax(0.0f, level - threshold);
-        const float squeeze = clamp01(over * 2.2f) * (0.25f + p2 * 0.7f);
-        const float plateW = w * 0.08f;
-        const float height = h * (0.42f + p3 * 0.15f);
-        const QRectF plateL(leftX - plateW, c.y() - height * 0.5f, plateW, height);
-        const QRectF plateR(rightX, c.y() - height * 0.5f, plateW, height);
+        // OP-1 style compressor: rubber air bag between plates.
+        p.fillRect(rect, QColor(0, 0, 0, 255));
 
-        p.setBrush(QColor(210, 210, 240, 160));
-        p.setPen(QPen(QColor(220, 220, 255, 200), 1.2));
-        p.drawRoundedRect(plateL, 6, 6);
-        p.drawRoundedRect(plateR, 6, 6);
+        const QColor lineColor(230, 230, 245, 220);
+        p.setPen(QPen(lineColor, 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.setBrush(Qt::NoBrush);
 
-        const int folds = 7;
-        const float innerLeft = plateL.right() + 6;
-        const float innerRight = plateR.left() - 6;
-        const float span = innerRight - innerLeft;
-        const float foldAmp = span * (0.24f - squeeze * 0.18f);
-        const float yTop = c.y() - height * 0.45f;
-        const float yBottom = c.y() + height * 0.45f;
+        const float breathe = 0.02f * std::sin(t * 0.25f);
+        const float squeeze = clamp01(m_compValue);
+        const float bagW = w * 0.62f;
+        const float baseH = h * (0.28f + p3 * 0.1f);
+        const float bagH = baseH * (1.0f - squeeze * 0.6f) * (1.0f + breathe);
+        const float bagX = c.x() - bagW * 0.5f;
+        const float bagY = c.y() - bagH * 0.5f;
 
-        QPainterPath bellows;
-        for (int i = 0; i <= folds; ++i) {
-            const float f = static_cast<float>(i) / folds;
-            const float x = innerLeft + f * span;
-            const float offset = ((i % 2 == 0) ? -foldAmp : foldAmp);
-            const float y = lerp(yTop, yBottom, f);
-            const QPointF pt(x + offset * 0.5f, y);
+        // Plates.
+        const float gap = 8.0f - squeeze * 5.0f;
+        const float plateW = bagW * 1.15f;
+        const float plateX = c.x() - plateW * 0.5f;
+        const float topY = bagY - gap;
+        const float bottomY = bagY + bagH + gap;
+        p.drawLine(QPointF(plateX, topY), QPointF(plateX + plateW, topY));
+        p.drawLine(QPointF(plateX, bottomY), QPointF(plateX + plateW, bottomY));
+
+        // Side limiters.
+        const float limiterH = bagH * 0.35f;
+        p.drawLine(QPointF(plateX + 4, c.y() - limiterH), QPointF(plateX + 4, c.y() + limiterH));
+        p.drawLine(QPointF(plateX + plateW - 4, c.y() - limiterH),
+                   QPointF(plateX + plateW - 4, c.y() + limiterH));
+
+        // Bag outline with slight irregularity.
+        QPainterPath bag;
+        const int points = 24;
+        for (int i = 0; i < points; ++i) {
+            const float ang = (static_cast<float>(i) / points) * 2.0f * static_cast<float>(M_PI);
+            const float irregular = 1.0f + 0.04f * std::sin(ang * 3.0f + t * 0.6f);
+            const float rx = (bagW * 0.5f) * irregular;
+            const float ry = (bagH * 0.5f) * (1.0f + 0.03f * std::cos(ang * 2.0f + t * 0.4f));
+            const QPointF pt(c.x() + std::cos(ang) * rx, c.y() + std::sin(ang) * ry);
             if (i == 0) {
-                bellows.moveTo(pt);
+                bag.moveTo(pt);
             } else {
-                bellows.lineTo(pt);
+                bag.lineTo(pt);
             }
         }
-        p.setPen(QPen(QColor(180, 210, 255, 200), 2.0, Qt::SolidLine, Qt::RoundCap,
-                      Qt::RoundJoin));
-        p.drawPath(bellows);
+        bag.closeSubpath();
+        p.drawPath(bag);
+
+        // Airflow lines inside.
+        p.save();
+        p.setClipPath(bag);
+        const int lines = 3 + static_cast<int>(squeeze * 4.0f);
+        for (int i = 0; i < lines; ++i) {
+            const float y = lerp(bagY + bagH * 0.2f, bagY + bagH * 0.8f,
+                                 static_cast<float>(i) / qMax(1, lines - 1));
+            QPainterPath flow;
+            flow.moveTo(bagX + bagW * 0.12f, y);
+            for (int k = 1; k <= 4; ++k) {
+                const float x = bagX + bagW * (0.12f + k * 0.2f);
+                const float amp = 3.0f + squeeze * 4.0f;
+                const float dy = std::sin(t * 0.8f + k * 1.2f + i) * amp;
+                flow.lineTo(x, y + dy);
+            }
+            p.drawPath(flow);
+        }
+        p.restore();
     } else if (fx == "dist") {
         // Overdriven loudspeaker.
         const float baseR = qMin(w, h) * 0.26f;
