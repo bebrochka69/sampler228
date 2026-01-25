@@ -306,8 +306,8 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         }
     }
 
-    const int margin = 24;
-    const int headerHeight = 24;
+    const int margin = Theme::px(24);
+    const int headerHeight = Theme::px(24);
     const QRectF headerRect(margin, margin, width() - 2 * margin, headerHeight);
     p.setPen(Theme::accent());
     p.setFont(Theme::condensedFont(12, QFont::Bold));
@@ -317,13 +317,15 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(QRectF(headerRect.left(), headerRect.top(), headerRect.width(), headerRect.height()),
                Qt::AlignRight | Qt::AlignVCenter, "UP/DOWN select  LEFT/RIGHT adjust  SHIFT=Slice");
 
-    const QRectF waveRect(margin, headerRect.bottom() + 10, width() - 2 * margin, height() * 0.42f);
+    const QRectF waveRect(margin, headerRect.bottom() + Theme::px(10),
+                          width() - 2 * margin, height() * 0.42f);
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::stroke(), 1.2));
-    p.drawRoundedRect(waveRect, 12, 12);
+    p.drawRoundedRect(waveRect, Theme::px(12), Theme::px(12));
 
-    const QRectF waveInner = waveRect.adjusted(12, 12, -12, -12);
+    const QRectF waveInner = waveRect.adjusted(Theme::px(12), Theme::px(12),
+                                               -Theme::px(12), -Theme::px(12));
     QVector<float> wave;
     if (m_session && m_session->hasWaveform()) {
         wave = m_session->waveform();
@@ -391,12 +393,14 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.drawLine(QPointF(endX, waveInner.top()), QPointF(endX, waveInner.bottom()));
 
     // Parameters grid.
-    const QRectF gridRect(margin, waveRect.bottom() + 16, width() - 2 * margin,
-                          height() - waveRect.bottom() - 96);
+    const QRectF gridRect(margin, waveRect.bottom() + Theme::px(16),
+                          width() - 2 * margin, height() - waveRect.bottom() - Theme::px(96));
     const int cols = 4;
     const int rows = 2;
-    const float cellW = (gridRect.width() - (cols - 1) * 16.0f) / cols;
-    const float cellH = (gridRect.height() - (rows - 1) * 16.0f) / rows;
+    const float cellW =
+        (gridRect.width() - (cols - 1) * Theme::pxF(16.0f)) / cols;
+    const float cellH =
+        (gridRect.height() - (rows - 1) * Theme::pxF(16.0f)) / rows;
 
     p.setFont(Theme::baseFont(10, QFont::DemiBold));
 
@@ -404,20 +408,22 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     for (int i = 0; i < m_params.size(); ++i) {
         const int r = i / cols;
         const int c = i % cols;
-        const float x = gridRect.left() + c * (cellW + 16.0f);
-        const float y = gridRect.top() + r * (cellH + 16.0f);
+        const float x = gridRect.left() + c * (cellW + Theme::pxF(16.0f));
+        const float y = gridRect.top() + r * (cellH + Theme::pxF(16.0f));
         const QRectF cell(x, y, cellW, cellH);
         m_paramRects.push_back(cell);
 
         const bool selected = (i == m_selectedParam);
         p.setBrush(selected ? Theme::bg2() : Theme::bg1());
         p.setPen(QPen(selected ? Theme::accentAlt() : Theme::stroke(), selected ? 1.6 : 1.0));
-        p.drawRoundedRect(cell, 10, 10);
+        p.drawRoundedRect(cell, Theme::px(10), Theme::px(10));
 
-        const QRectF iconRect = cell.adjusted(14, 12, -14, -28);
+        const QRectF iconRect = cell.adjusted(Theme::px(14), Theme::px(12),
+                                              -Theme::px(14), -Theme::px(28));
         const QPixmap icon = iconForType(m_params[i].type);
         if (!icon.isNull()) {
-            const QRectF drawRect = iconRect.adjusted(6, 6, -6, -6);
+            const QRectF drawRect = iconRect.adjusted(Theme::px(6), Theme::px(6),
+                                                      -Theme::px(6), -Theme::px(6));
             const QPixmap scaled = icon.scaled(drawRect.size().toSize(), Qt::KeepAspectRatio,
                                               Qt::SmoothTransformation);
             const QPointF center = drawRect.center();
@@ -427,11 +433,14 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         } else {
             p.setPen(Qt::NoPen);
             p.setBrush(selected ? Theme::accent() : Theme::accentAlt());
-            p.drawRoundedRect(iconRect.adjusted(6, 6, -6, -6), 6, 6);
+            p.drawRoundedRect(iconRect.adjusted(Theme::px(6), Theme::px(6),
+                                                -Theme::px(6), -Theme::px(6)),
+                              Theme::px(6), Theme::px(6));
         }
 
         p.setPen(selected ? Theme::accentAlt() : Theme::text());
-        p.drawText(QRectF(cell.left(), cell.bottom() - 26, cell.width(), 16),
+        p.drawText(QRectF(cell.left(), cell.bottom() - Theme::px(26), cell.width(),
+                          Theme::px(16)),
                    Qt::AlignCenter, m_params[i].label);
 
         float valueNorm = 0.0f;
@@ -487,7 +496,8 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
                 break;
         }
 
-        const QRectF valueLine(cell.left() + 18, cell.bottom() - 10, cell.width() - 36, 3);
+        const QRectF valueLine(cell.left() + Theme::px(18), cell.bottom() - Theme::px(10),
+                               cell.width() - Theme::px(36), Theme::px(3));
         p.setPen(Qt::NoPen);
         p.setBrush(Theme::withAlpha(Theme::stroke(), 160));
         p.drawRect(valueLine);
@@ -497,25 +507,29 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
         p.setPen(Theme::textMuted());
         p.setFont(Theme::baseFont(8));
-        p.drawText(QRectF(cell.left(), cell.top() + 6, cell.width(), 12),
+        p.drawText(QRectF(cell.left(), cell.top() + Theme::px(6), cell.width(),
+                          Theme::px(12)),
                    Qt::AlignCenter, valueText);
         p.setFont(Theme::baseFont(10, QFont::DemiBold));
     }
 
     // Action buttons.
-    const QRectF buttonsRect(margin, height() - 58, width() - 2 * margin, 40);
-    const QRectF deleteRect(buttonsRect.left(), buttonsRect.top(), buttonsRect.width() * 0.45f, 40);
-    const QRectF copyRect(buttonsRect.right() - buttonsRect.width() * 0.45f, buttonsRect.top(),
-                          buttonsRect.width() * 0.45f, 40);
+    const QRectF buttonsRect(margin, height() - Theme::px(58),
+                             width() - 2 * margin, Theme::px(40));
+    const QRectF deleteRect(buttonsRect.left(), buttonsRect.top(),
+                            buttonsRect.width() * 0.45f, Theme::px(40));
+    const QRectF copyRect(buttonsRect.right() - buttonsRect.width() * 0.45f,
+                          buttonsRect.top(), buttonsRect.width() * 0.45f, Theme::px(40));
 
     p.setFont(Theme::condensedFont(12, QFont::DemiBold));
 
     // FX bus selector.
-    const QRectF fxRect(buttonsRect.center().x() - 90, buttonsRect.top(), 180, 40);
+    const QRectF fxRect(buttonsRect.center().x() - Theme::px(90),
+                        buttonsRect.top(), Theme::px(180), Theme::px(40));
     m_fxBusRect = fxRect;
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::accent(), 1.2));
-    p.drawRoundedRect(fxRect, 8, 8);
+    p.drawRoundedRect(fxRect, Theme::px(8), Theme::px(8));
     const int busIndex = m_pads ? m_pads->fxBus(m_pads->activePad()) : 0;
     const QString busText = QString("FX BUS: %1").arg(PadBank::fxBusLabel(busIndex));
     p.setPen(Theme::accent());
@@ -523,13 +537,13 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::accentAlt(), 1.2));
-    p.drawRoundedRect(deleteRect, 10, 10);
+    p.drawRoundedRect(deleteRect, Theme::px(10), Theme::px(10));
     p.setPen(Theme::accentAlt());
     p.drawText(deleteRect, Qt::AlignCenter, "DELETE PAD");
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::accent(), 1.2));
-    p.drawRoundedRect(copyRect, 10, 10);
+    p.drawRoundedRect(copyRect, Theme::px(10), Theme::px(10));
     p.setPen(Theme::accent());
     p.drawText(copyRect, Qt::AlignCenter, "COPY PAD");
 

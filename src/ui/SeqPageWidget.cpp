@@ -55,16 +55,16 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
 }
 
 QRectF SeqPageWidget::gridRect() const {
-    const int margin = 24;
-    const int headerHeight = 24;
+    const int margin = Theme::px(24);
+    const int headerHeight = Theme::px(24);
     const float heightRatio = 0.54f;
-    const int top = margin + headerHeight + 6;
+    const int top = margin + headerHeight + Theme::px(6);
     return QRectF(margin, top, width() - 2 * margin, height() * heightRatio);
 }
 
 QRectF SeqPageWidget::padsRect() const {
     const QRectF grid = gridRect();
-    return QRectF(grid.left(), grid.bottom() + 28, grid.width(), 110);
+    return QRectF(grid.left(), grid.bottom() + Theme::px(28), grid.width(), Theme::px(110));
 }
 
 int SeqPageWidget::stepIntervalMs() const {
@@ -218,7 +218,8 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     p.setRenderHint(QPainter::Antialiasing, true);
     const bool lite = Theme::liteMode();
 
-    const QRectF headerRect(24, 18, width() - 48, 22);
+    const QRectF headerRect(Theme::px(24), Theme::px(18), width() - Theme::px(48),
+                            Theme::px(22));
     p.setPen(Theme::accent());
     p.setFont(Theme::condensedFont(12, QFont::Bold));
     p.drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, "SEQ / 64 STEPS");
@@ -254,12 +255,13 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < cols; ++col) {
             const QRectF cell(grid.left() + col * cellW, grid.top() + row * cellH, cellW, cellH);
-            const QRectF box = cell.adjusted(6, 6, -6, -6);
+            const QRectF box = cell.adjusted(Theme::px(6), Theme::px(6),
+                                             -Theme::px(6), -Theme::px(6));
             const int step = row * cols + col;
 
             p.setPen(QPen(Theme::stroke(), 1.0));
             p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(box, 6, 6);
+            p.drawRoundedRect(box, Theme::px(6), Theme::px(6));
 
             if (!lite) {
                 for (int pad = 0; pad < 8; ++pad) {
@@ -271,23 +273,28 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
                     }
                     QColor ghost = m_padColors[pad];
                     ghost.setAlpha(70);
-                    const QRectF ghostBox = box.adjusted(6, 6, -6, -6);
+                    const QRectF ghostBox = box.adjusted(Theme::px(6), Theme::px(6),
+                                                         -Theme::px(6), -Theme::px(6));
                     p.setBrush(ghost);
                     p.setPen(Qt::NoPen);
-                    p.drawRoundedRect(ghostBox, 5, 5);
+                    p.drawRoundedRect(ghostBox, Theme::px(5), Theme::px(5));
                 }
             }
 
             if (m_steps[m_activePad][step]) {
                 p.setBrush(m_padColors[m_activePad]);
                 p.setPen(Qt::NoPen);
-                p.drawRoundedRect(box.adjusted(3, 3, -3, -3), 5, 5);
+                p.drawRoundedRect(box.adjusted(Theme::px(3), Theme::px(3),
+                                               -Theme::px(3), -Theme::px(3)),
+                                  Theme::px(5), Theme::px(5));
             }
 
             if (step == m_playStep) {
                 p.setPen(QPen(Theme::accentAlt(), 2.0));
                 p.setBrush(Qt::NoBrush);
-                p.drawRoundedRect(cell.adjusted(2, 2, -2, -2), 6, 6);
+                p.drawRoundedRect(cell.adjusted(Theme::px(2), Theme::px(2),
+                                                -Theme::px(2), -Theme::px(2)),
+                                  Theme::px(6), Theme::px(6));
             }
         }
     }
@@ -295,15 +302,17 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     // Pad input row.
     const QRectF pads = padsRect();
     const float padW = pads.width() / 8.0f;
-    const float padH = 64.0f;
+    const float padH = Theme::pxF(64.0f);
     p.setFont(Theme::baseFont(10, QFont::DemiBold));
 
     for (int i = 0; i < 8; ++i) {
-        const QRectF padRect(pads.left() + i * padW + 6, pads.top() + 8, padW - 12, padH);
+        const QRectF padRect(pads.left() + i * padW + Theme::px(6),
+                             pads.top() + Theme::px(8),
+                             padW - Theme::px(12), padH);
         const bool active = (i == m_activePad);
         p.setBrush(active ? m_padColors[i] : Theme::bg1());
         p.setPen(QPen(active ? Theme::accentAlt() : Theme::stroke(), 1.2));
-        p.drawRoundedRect(padRect, 10, 10);
+        p.drawRoundedRect(padRect, Theme::px(10), Theme::px(10));
 
         p.setPen(active ? Theme::bg0() : Theme::textMuted());
         p.drawText(padRect, Qt::AlignCenter, QString("PAD %1").arg(i + 1));

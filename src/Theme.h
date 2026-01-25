@@ -4,11 +4,13 @@
 #include <QElapsedTimer>
 #include <QFont>
 #include <QFontInfo>
+#include <QGuiApplication>
 #include <QImage>
 #include <QLinearGradient>
 #include <QPainter>
 #include <QPixmap>
 #include <QRandomGenerator>
+#include <QScreen>
 #include <QtGlobal>
 #include <cmath>
 
@@ -25,12 +27,16 @@ inline QColor textMuted() { return QColor(186, 178, 204); }
 inline QColor warn() { return QColor(255, 210, 160); }
 inline QColor danger() { return QColor(255, 160, 170); }
 
+inline float uiScale();
+inline int px(int value);
+inline float pxF(float value);
+
 inline QFont baseFont(int pt, QFont::Weight weight = QFont::Normal) {
     QFont f("DejaVu Serif");
     if (!QFontInfo(f).exactMatch()) {
         f = QFont("DejaVu Sans");
     }
-    f.setPointSize(pt);
+    f.setPointSizeF(pt * uiScale());
     f.setWeight(weight);
     return f;
 }
@@ -40,9 +46,39 @@ inline QFont condensedFont(int pt, QFont::Weight weight = QFont::DemiBold) {
     if (!QFontInfo(f).exactMatch()) {
         f = QFont("DejaVu Sans");
     }
-    f.setPointSize(pt);
+    f.setPointSizeF(pt * uiScale());
     f.setWeight(weight);
     return f;
+}
+
+inline float uiScale() {
+    static float scale = -1.0f;
+    if (scale > 0.0f) {
+        return scale;
+    }
+    bool ok = false;
+    const QByteArray env = qgetenv("GROOVEBOX_SCALE");
+    const float envScale = env.toFloat(&ok);
+    if (ok && envScale > 0.1f) {
+        scale = envScale;
+        return scale;
+    }
+    QSize size(1280, 720);
+    if (QGuiApplication::primaryScreen()) {
+        size = QGuiApplication::primaryScreen()->geometry().size();
+    }
+    const float sx = static_cast<float>(size.width()) / 1280.0f;
+    const float sy = static_cast<float>(size.height()) / 720.0f;
+    scale = qBound(0.5f, qMin(sx, sy), 1.0f);
+    return scale;
+}
+
+inline int px(int value) {
+    return qMax(1, static_cast<int>(std::lround(value * uiScale())));
+}
+
+inline float pxF(float value) {
+    return value * uiScale();
 }
 
 inline QColor withAlpha(const QColor &c, int alpha) {

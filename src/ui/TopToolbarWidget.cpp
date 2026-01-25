@@ -10,7 +10,7 @@
 
 TopToolbarWidget::TopToolbarWidget(PadBank *pads, QWidget *parent)
     : QWidget(parent), m_stats(this), m_pads(pads) {
-    setFixedHeight(72);
+    setFixedHeight(Theme::px(72));
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     m_tabs << "SAMPLES" << "EDIT" << "SEQ" << "FX" << "ARRANGE";
@@ -53,16 +53,16 @@ void TopToolbarWidget::rebuildTabs() {
     QFont tabFont = Theme::condensedFont(12, QFont::Bold);
     QFontMetrics fm(tabFont);
 
-    const int top = 8;
-    const int bottom = top + 30;
-    const int slant = 12;
-    const int gap = 14;
-    const int leftMargin = 14;
+    const int top = Theme::px(8);
+    const int bottom = top + Theme::px(30);
+    const int slant = Theme::px(12);
+    const int gap = Theme::px(14);
+    const int leftMargin = Theme::px(14);
 
     int x = leftMargin;
     for (int i = 0; i < m_tabs.size(); ++i) {
         const int textWidth = fm.horizontalAdvance(m_tabs[i]);
-        const int tabWidth = qMax(78, textWidth + 28);
+        const int tabWidth = qMax(Theme::px(78), textWidth + Theme::px(28));
 
         QPolygonF poly;
         poly << QPointF(x + slant, top)
@@ -171,31 +171,33 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     }
 
     const int h = height();
-    const int rightMargin = 14;
-    const int bpmWidth = 124;
-    const int bpmHeight = 34;
+    const int rightMargin = Theme::px(14);
+    const int bpmWidth = Theme::px(124);
+    const int bpmHeight = Theme::px(34);
     m_bpmRect = QRectF(width() - rightMargin - bpmWidth, (h - bpmHeight) / 2.0, bpmWidth, bpmHeight);
 
-    const int padSize = 14;
-    const int padGap = 6;
+    const int padSize = Theme::px(14);
+    const int padGap = Theme::px(6);
     const int padCount = 8;
     const int padsWidth = padCount * padSize + (padCount - 1) * padGap;
-    const QRectF padsRect(m_bpmRect.left() - padsWidth - 18, 14, padsWidth, 34);
+    const QRectF padsRect(m_bpmRect.left() - padsWidth - Theme::px(18),
+                          Theme::px(14), padsWidth, Theme::px(34));
 
-    const int centerLeft = m_tabsWidth + 20;
-    const int centerRight = static_cast<int>(padsRect.left()) - 16;
+    const int centerLeft = m_tabsWidth + Theme::px(20);
+    const int centerRight = static_cast<int>(padsRect.left()) - Theme::px(16);
     const int centerWidth = qMax(0, centerRight - centerLeft);
-    const QRectF centerRect(centerLeft, 8, centerWidth, h - 16);
+    const QRectF centerRect(centerLeft, Theme::px(8), centerWidth, h - Theme::px(16));
 
     // CPU/RAM/LOAD indicators (always visible).
-    const float statsWidth = 220.0f;
+    const float statsWidth = Theme::pxF(220.0f);
     QRectF statsRect;
     if (centerRect.width() > 90.0f) {
         const float width = qMin(statsWidth, centerRect.width());
         statsRect = QRectF(centerRect.left(), centerRect.top(), width, centerRect.height());
     } else {
-        const qreal fallbackWidth = qMax<qreal>(0.0, width() - 28.0);
-        statsRect = QRectF(14, height() - 24, qMin(statsWidth, fallbackWidth), 18);
+        const qreal fallbackWidth = qMax<qreal>(0.0, width() - Theme::pxF(28.0f));
+        statsRect = QRectF(Theme::px(14), height() - Theme::px(24),
+                           qMin(statsWidth, fallbackWidth), Theme::px(18));
     }
 
     if (statsRect.width() > 60.0f) {
@@ -216,20 +218,27 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     }
 
     // Stereo meter outline (no simulated audio).
-    if (centerRect.width() > statsWidth + 140.0f) {
-        const float meterLeft = statsRect.isNull() ? centerRect.left() : statsRect.right() + 16.0f;
-        const QRectF meterRect(meterLeft, centerRect.top(), 120, centerRect.height());
+    if (centerRect.width() > statsWidth + Theme::pxF(140.0f)) {
+        const float meterLeft =
+            statsRect.isNull() ? centerRect.left() : statsRect.right() + Theme::pxF(16.0f);
+        const QRectF meterRect(meterLeft, centerRect.top(), Theme::px(120), centerRect.height());
         p.setPen(QPen(Theme::stroke(), 1.0));
         p.setBrush(Theme::bg1());
-        p.drawRect(meterRect.adjusted(0, 2, 0, -2));
+        p.drawRect(meterRect.adjusted(0, Theme::px(2), 0, -Theme::px(2)));
 
         p.setFont(Theme::baseFont(9, QFont::DemiBold));
         p.setPen(Theme::text());
-        p.drawText(QRectF(meterRect.left() + 6, meterRect.top() + 6, 20, 12), Qt::AlignLeft, "L");
-        p.drawText(QRectF(meterRect.left() + 60, meterRect.top() + 6, 20, 12), Qt::AlignLeft, "R");
+        p.drawText(QRectF(meterRect.left() + Theme::px(6), meterRect.top() + Theme::px(6),
+                          Theme::px(20), Theme::px(12)),
+                   Qt::AlignLeft, "L");
+        p.drawText(QRectF(meterRect.left() + Theme::px(60), meterRect.top() + Theme::px(6),
+                          Theme::px(20), Theme::px(12)),
+                   Qt::AlignLeft, "R");
 
-        const QRectF lBar(meterRect.left() + 16, meterRect.bottom() - 12, 40, 6);
-        const QRectF rBar(meterRect.left() + 62, meterRect.bottom() - 12, 40, 6);
+        const QRectF lBar(meterRect.left() + Theme::px(16),
+                          meterRect.bottom() - Theme::px(12), Theme::px(40), Theme::px(6));
+        const QRectF rBar(meterRect.left() + Theme::px(62),
+                          meterRect.bottom() - Theme::px(12), Theme::px(40), Theme::px(6));
         p.setPen(QPen(Theme::stroke(), 1.0));
         p.setBrush(Theme::bg2());
         p.drawRect(lBar);
@@ -240,7 +249,9 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
     m_padRects.clear();
     p.setFont(Theme::baseFont(8, QFont::DemiBold));
     p.setPen(Theme::text());
-    p.drawText(QRectF(padsRect.left(), padsRect.top() - 10, padsRect.width(), 10), Qt::AlignCenter,
+    p.drawText(QRectF(padsRect.left(), padsRect.top() - Theme::px(10), padsRect.width(),
+                      Theme::px(10)),
+               Qt::AlignCenter,
                "PADS");
 
     for (int i = 0; i < padCount; ++i) {

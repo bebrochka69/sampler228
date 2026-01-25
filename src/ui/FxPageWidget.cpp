@@ -43,7 +43,7 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
 
     m_effects = {"reverb", "comp", "dist", "lofi", "cassette", "chorus", "eq", "sidechan"};
 
-    m_animTimer.setInterval(80);
+    m_animTimer.setInterval(16);
     m_animTimer.setTimerType(Qt::PreciseTimer);
     connect(&m_animTimer, &QTimer::timeout, this, &FxPageWidget::advanceAnimation);
 }
@@ -351,15 +351,15 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
     }
 
     if (fx != "comp") {
-        p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 120), 1.0));
-        p.setBrush(Qt::NoBrush);
-        p.drawRoundedRect(r, 8, 8);
+    // Preview canvas (black, OP-1 style).
+    p.fillRect(rect, QColor(0, 0, 0, 255));
+    p.setPen(QPen(QColor(40, 40, 60, 200), 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(r, 10, 10);
     }
 
     if (fx == "comp") {
         // OP-1 style compressor: rubber air bag between plates.
-        p.fillRect(rect, QColor(0, 0, 0, 255));
-
         const QColor lineColor(230, 230, 245, 220);
         p.setPen(QPen(lineColor, 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         p.setBrush(Qt::NoBrush);
@@ -444,14 +444,14 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
             }
         }
         rim.closeSubpath();
-        p.setPen(QPen(QColor(240, 200, 180, 220), 2.0));
-        p.setBrush(QColor(120, 80, 90, 60));
+        p.setPen(QPen(QColor(255, 140, 180, 220), 1.8));
+        p.setBrush(Qt::NoBrush);
         p.drawPath(rim);
 
-        p.setPen(QPen(QColor(220, 180, 190, 200), 1.4));
-        p.setBrush(QColor(150, 100, 120, 80));
+        p.setPen(QPen(QColor(255, 170, 210, 200), 1.2));
+        p.setBrush(Qt::NoBrush);
         p.drawEllipse(c, coneR, coneR * 0.85f);
-        p.setBrush(QColor(210, 160, 170, 200));
+        p.setBrush(Qt::NoBrush);
         p.drawEllipse(c, domeR, domeR);
 
         const int bolts = 6;
@@ -459,19 +459,19 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
             const float ang = (static_cast<float>(i) / bolts) * 2.0f * static_cast<float>(M_PI);
             const QPointF bolt(c.x() + std::cos(ang) * baseR * 1.05f,
                                c.y() + std::sin(ang) * baseR * 1.05f);
-            p.setBrush(QColor(240, 210, 200, 180));
+            p.setBrush(QColor(255, 200, 210, 200));
             p.setPen(Qt::NoPen);
-            p.drawEllipse(bolt, 2.0f, 2.0f);
+            p.drawEllipse(bolt, 1.6f, 1.6f);
         }
     } else if (fx == "lofi") {
         // Broken memory screen.
         const QRectF screen = r.adjusted(10, 14, -10, -18);
-        p.setPen(QPen(QColor(180, 200, 210, 200), 1.6));
-        p.setBrush(QColor(90, 100, 110, 40));
+        p.setPen(QPen(QColor(140, 255, 210, 200), 1.4));
+        p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(screen, 8, 8);
 
-        const int cols = 12;
-        const int rows = 8;
+        const int cols = 10;
+        const int rows = 6;
         const float dropProb = 0.08f + p1 * 0.55f;
         const int phase = static_cast<int>(t * (1.5f + p2 * 6.0f));
         const float cellW = screen.width() / cols;
@@ -482,20 +482,20 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
                 if (hsh < dropProb) {
                     continue;
                 }
-                QColor col(170, 220, 200, static_cast<int>((0.25f + hsh * 0.5f) * 255));
-                p.setBrush(col);
-                p.setPen(Qt::NoPen);
+                QColor col(140, 255, 210, static_cast<int>((0.12f + hsh * 0.4f) * 255));
+                p.setPen(QPen(col, 1.0));
+                p.setBrush(Qt::NoBrush);
                 p.drawRect(QRectF(screen.left() + x * cellW, screen.top() + y * cellH,
-                                  cellW - 1.0f, cellH - 1.0f));
+                                  cellW - 2.0f, cellH - 2.0f));
             }
         }
 
         // Broken scanline.
-        p.setPen(QPen(QColor(220, 180, 190, 160), 2.0));
+        p.setPen(QPen(QColor(255, 160, 190, 160), 1.6));
         const float scanY = screen.top() + screen.height() * (0.25f + p3 * 0.4f);
         p.drawLine(QPointF(screen.left() + 6, scanY),
                    QPointF(screen.right() - 6, scanY));
-        p.setPen(QPen(QColor(60, 70, 80, 180), 2.0));
+        p.setPen(QPen(QColor(90, 110, 140, 180), 1.2));
         p.drawLine(QPointF(screen.left() + 14, scanY + 6),
                    QPointF(screen.right() - 40, scanY + 6));
     } else if (fx == "eq") {
@@ -512,7 +512,7 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
                      QPointF(c.x() - w * 0.1f, midPt.y() + h * 0.15f), midPt);
         body.cubicTo(QPointF(c.x() + w * 0.1f, midPt.y() - h * 0.15f),
                      QPointF(r.right() - w * 0.25f, tail.y() + h * 0.18f), tail);
-        p.setPen(QPen(QColor(140, 255, 210, 220), 2.2, Qt::SolidLine, Qt::RoundCap,
+        p.setPen(QPen(QColor(140, 255, 210, 220), 2.0, Qt::SolidLine, Qt::RoundCap,
                       Qt::RoundJoin));
         p.drawPath(body);
 
@@ -524,30 +524,30 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
     } else if (fx == "cassette") {
         // Cassette shell.
         const QRectF shell = r.adjusted(10, 14, -10, -18);
-        p.setPen(QPen(QColor(200, 190, 210, 200), 1.5));
-        p.setBrush(QColor(110, 100, 130, 70));
+        p.setPen(QPen(QColor(200, 180, 255, 200), 1.4));
+        p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(shell, 10, 10);
 
         const float reelR = qMin(w, h) * 0.14f;
         const QPointF left(shell.left() + shell.width() * 0.3f, shell.center().y());
         const QPointF right(shell.right() - shell.width() * 0.3f, shell.center().y());
-        p.setPen(QPen(QColor(220, 210, 230, 200), 1.2));
-        p.setBrush(QColor(140, 130, 160, 120));
+        p.setPen(QPen(QColor(210, 200, 255, 200), 1.2));
+        p.setBrush(Qt::NoBrush);
         p.drawEllipse(left, reelR, reelR);
         p.drawEllipse(right, reelR, reelR);
 
         const float angle = t * (0.4f + p2 * 1.4f) * 2.0f * static_cast<float>(M_PI);
-        p.setPen(QPen(QColor(230, 220, 240, 220), 1.6));
+        p.setPen(QPen(QColor(220, 210, 255, 220), 1.4));
         p.drawLine(left, QPointF(left.x() + std::cos(angle) * reelR * 0.9f,
                                  left.y() + std::sin(angle) * reelR * 0.9f));
         p.drawLine(right, QPointF(right.x() + std::cos(-angle) * reelR * 0.9f,
                                   right.y() + std::sin(-angle) * reelR * 0.9f));
 
         const float tapeY = shell.center().y() + std::sin(t * 1.2f) * (2.0f + p1 * 3.0f);
-        p.setPen(QPen(QColor(220, 200, 180, 200), 2.0));
+        p.setPen(QPen(QColor(255, 200, 180, 200), 1.6));
         p.drawLine(QPointF(left.x() + reelR, tapeY), QPointF(right.x() - reelR, tapeY));
 
-        p.setBrush(QColor(200, 180, 200, 120));
+        p.setBrush(QColor(200, 180, 255, 140));
         p.setPen(Qt::NoPen);
         p.drawEllipse(QPointF(shell.left() + 14, shell.top() + 12), 2.0f, 2.0f);
         p.drawEllipse(QPointF(shell.right() - 14, shell.top() + 12), 2.0f, 2.0f);
@@ -563,8 +563,8 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
                          center.x(), center.y() + 16);
             drop.cubicTo(center.x() - 10, center.y() + 10, center.x() - 12, center.y() - 8,
                          center.x(), center.y() - 18);
-            p.setPen(QPen(QColor(220, 220, 255, static_cast<int>(alpha * 255)), 1.2));
-            p.setBrush(QColor(170, 190, 255, static_cast<int>(alpha * 120)));
+            p.setPen(QPen(QColor(140, 220, 255, static_cast<int>(alpha * 255)), 1.2));
+            p.setBrush(Qt::NoBrush);
             p.drawPath(drop);
         };
         for (int i = copies; i >= 0; --i) {
@@ -583,28 +583,28 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
             const float inset = spread * f;
             const QRectF arch = r.adjusted(inset, inset * 0.6f, -inset, -inset * 0.6f);
             const int alpha = static_cast<int>((0.25f - f * 0.18f - p3 * 0.06f) * 255);
-            p.setPen(QPen(QColor(200, 180, 255, qMax(0, alpha)), 1.6));
+            p.setPen(QPen(QColor(200, 180, 255, qMax(0, alpha)), 1.4));
             p.setBrush(Qt::NoBrush);
             p.drawRoundedRect(arch, 18, 18);
         }
-        p.setBrush(QColor(220, 210, 255, 180));
-        p.setPen(Qt::NoPen);
+        p.setPen(QPen(QColor(220, 210, 255, 200), 1.2));
+        p.setBrush(Qt::NoBrush);
         p.drawEllipse(c, 4, 4);
     } else if (fx == "sidechan") {
         // Pressed object.
         const float depth = (0.2f + 0.6f * p2) * h;
         const float press = m_sidechainValue * depth;
         const QRectF floor(r.left() + 12, r.bottom() - 18, r.width() - 24, 6);
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(180, 160, 200, 120));
+        p.setPen(QPen(QColor(255, 120, 120, 200), 1.2));
+        p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(floor, 4, 4);
 
         const float blobW = w * 0.22f;
         const float blobH = h * (0.22f - press / h * 0.12f);
         const QRectF blob(c.x() - blobW * 0.5f, r.bottom() - 26 - blobH - press,
                           blobW, blobH);
-        p.setBrush(QColor(255, 170, 170, 200));
-        p.setPen(QPen(QColor(255, 210, 210, 200), 1.2));
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(QColor(255, 160, 160, 200), 1.4));
         p.drawRoundedRect(blob, 10, 10);
     }
 
@@ -618,10 +618,10 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     Theme::paintBackground(p, rect());
     p.setRenderHint(QPainter::Antialiasing, true);
 
-    const int margin = 20;
-    const int headerH = 26;
-    const int rightPanelW = 420;
-    const int gap = 12;
+    const int margin = Theme::px(20);
+    const int headerH = Theme::px(26);
+    const int rightPanelW = Theme::px(420);
+    const int gap = Theme::px(12);
 
     const QRectF headerRect(margin, margin, width() - 2 * margin, headerH);
     p.setFont(Theme::condensedFont(12, QFont::Bold));
@@ -641,19 +641,15 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
     m_effectHits.clear();
 
-    // FX atmosphere layer (VIDEO_03).
-    p.save();
-    p.setCompositionMode(QPainter::CompositionMode_Screen);
-    Theme::drawFog(p, rect(), QColor(200, 190, 240, 22), 0.12f, 0.05f, 1.0f);
-    Theme::drawFog(p, rect(), QColor(180, 210, 230, 20), 0.10f, 0.04f, 0.9f);
-    p.restore();
+    // FX atmosphere layer removed for performance.
 
     // Editor panel.
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::stroke(), 1.2));
     p.drawRoundedRect(editorRect, 12, 12);
 
-    QRectF editorHeader(editorRect.left() + 12, editorRect.top() + 8, editorRect.width() - 24, 20);
+    QRectF editorHeader(editorRect.left() + Theme::px(12), editorRect.top() + Theme::px(8),
+                        editorRect.width() - Theme::px(24), Theme::px(20));
     p.setFont(Theme::condensedFont(11, QFont::DemiBold));
     p.setPen(Theme::accentAlt());
     p.drawText(editorHeader, Qt::AlignLeft | Qt::AlignVCenter, "EDITOR");
@@ -670,8 +666,8 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     }
     p.setPen(Theme::text());
     p.setFont(Theme::baseFont(10, QFont::DemiBold));
-    p.drawText(QRectF(editorRect.left() + 12, editorHeader.bottom() + 8,
-                      editorRect.width() - 24, 20),
+    p.drawText(QRectF(editorRect.left() + Theme::px(12), editorHeader.bottom() + Theme::px(8),
+                      editorRect.width() - Theme::px(24), Theme::px(20)),
                Qt::AlignLeft | Qt::AlignVCenter, "FX: " + currentEffect.toUpper());
 
     FxInsert slot;
@@ -680,39 +676,19 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         slot = m_tracks[m_selectedTrack].inserts[m_selectedSlot];
     }
 
-    const QRectF visualRect(editorRect.left() + 10, editorHeader.bottom() + 34,
-                            editorRect.width() - 20, 130);
+    const float visualTop = editorHeader.bottom() + 34;
+    const float visualBottom = editorRect.bottom() - 14;
+    const QRectF visualRect(editorRect.left() + Theme::px(10), visualTop,
+                            editorRect.width() - Theme::px(20), visualBottom - visualTop);
     const float level = m_pads ? m_pads->busMeter(m_selectedTrack) : 0.0f;
     drawEffectPreview(p, visualRect, slot, level);
-
-    // Parameter knobs.
-    const QRectF knobArea(editorRect.left() + 10, visualRect.bottom() + 16,
-                          editorRect.width() - 20, 96);
-    const float knobW = knobArea.width() / 3.0f;
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    const float params[3] = {slot.p1, slot.p2, slot.p3};
-    for (int i = 0; i < 3; ++i) {
-        QRectF knob(knobArea.left() + i * knobW + 8, knobArea.top() + 8, 34, 34);
-        const bool selected = (i == m_selectedParam);
-        p.setBrush(selected ? Theme::bg3() : Theme::bg2());
-        p.drawEllipse(knob);
-        p.setPen(selected ? Theme::accent() : Theme::accentAlt());
-        const float angle = (-140.0f + params[i] * 280.0f) * 3.14159f / 180.0f;
-        p.drawLine(knob.center(),
-                   QPointF(knob.center().x() + std::cos(angle) * 12.0f,
-                           knob.center().y() + std::sin(angle) * 12.0f));
-        p.setPen(Theme::textMuted());
-        p.drawText(QRectF(knob.left() - 8, knob.bottom() + 4, knob.width() + 16, 14),
-                   Qt::AlignCenter, QString("P%1").arg(i + 1));
-        p.setPen(QPen(Theme::stroke(), 1.0));
-    }
 
     // Strips.
     const int trackCount = m_tracks.size();
     const float stripW =
         (stripsRect.width() - (trackCount - 1) * gap) / static_cast<float>(trackCount);
     const float stripH = stripsRect.height();
-    const float slotH = 24.0f;
+    const float slotH = Theme::pxF(24.0f);
     const int slotCount = m_tracks.first().inserts.size();
 
     m_slotHits.clear();
@@ -732,7 +708,8 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.drawText(nameRect, Qt::AlignCenter, m_tracks[i].name);
 
         // Meter (real bus level).
-        QRectF meterRect(stripRect.left() + 6, nameRect.bottom() + 8, 10, stripRect.height() - 60);
+        QRectF meterRect(stripRect.left() + Theme::px(6), nameRect.bottom() + Theme::px(8),
+                         Theme::px(10), stripRect.height() - Theme::px(60));
         p.setBrush(Theme::bg2());
         p.setPen(QPen(Theme::stroke(), 1.0));
         p.drawRoundedRect(meterRect, 4, 4);
@@ -741,41 +718,44 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
             level = m_pads->busMeter(i);
         }
         level = qBound(0.0f, level, 1.0f);
-        QRectF meterFill(meterRect.left() + 1,
+        QRectF meterFill(meterRect.left() + Theme::px(1),
                          meterRect.bottom() - meterRect.height() * level,
-                         meterRect.width() - 2,
-                         meterRect.height() * level - 1);
+                         meterRect.width() - Theme::px(2),
+                         meterRect.height() * level - Theme::px(1));
         p.setBrush(Theme::accent());
         p.setPen(Qt::NoPen);
         p.drawRect(meterFill);
 
         // Insert slots.
-        float slotTop = nameRect.bottom() + 6;
+        float slotTop = nameRect.bottom() + Theme::px(6);
         for (int s = 0; s < slotCount; ++s) {
-            QRectF slotRect(stripRect.left() + 22, slotTop, stripRect.width() - 30, slotH);
+            QRectF slotRect(stripRect.left() + Theme::px(22), slotTop,
+                            stripRect.width() - Theme::px(30), slotH);
             const bool slotSelected = (activeTrack && s == m_selectedSlot);
             p.setBrush(slotSelected ? Theme::bg3() : Theme::bg2());
             p.setPen(QPen(slotSelected ? Theme::accent() : Theme::stroke(), 1.0));
-            p.drawRoundedRect(slotRect, 6, 6);
+            p.drawRoundedRect(slotRect, Theme::px(6), Theme::px(6));
             const QString effectName = m_tracks[i].inserts[s].effect;
             QString label = effectName.isEmpty() ? QString("INSERT %1").arg(s + 1)
                                                  : effectName.toUpper();
             p.setPen(slotSelected ? Theme::accent() : Theme::text());
-            p.drawText(slotRect.adjusted(6, 0, -6, 0), Qt::AlignVCenter | Qt::AlignLeft, label);
+            p.drawText(slotRect.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+                       Qt::AlignVCenter | Qt::AlignLeft, label);
             m_slotHits.push_back({slotRect, i, s});
-            slotTop += slotH + 6;
+            slotTop += slotH + Theme::px(6);
         }
 
         // Fader.
-        QRectF faderRect(stripRect.left() + stripRect.width() / 2.0f - 6,
-                         stripRect.bottom() - 120, 12, 90);
+        QRectF faderRect(stripRect.left() + stripRect.width() / 2.0f - Theme::px(6),
+                         stripRect.bottom() - Theme::px(120), Theme::px(12), Theme::px(90));
         p.setBrush(Theme::bg2());
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(faderRect, 4, 4);
-        QRectF knob(faderRect.left() - 6, faderRect.bottom() - 30, 24, 12);
+        p.drawRoundedRect(faderRect, Theme::px(4), Theme::px(4));
+        QRectF knob(faderRect.left() - Theme::px(6),
+                    faderRect.bottom() - Theme::px(30), Theme::px(24), Theme::px(12));
         p.setBrush(Theme::accentAlt());
         p.setPen(Qt::NoPen);
-        p.drawRoundedRect(knob, 3, 3);
+        p.drawRoundedRect(knob, Theme::px(3), Theme::px(3));
     }
 
     if (m_showMenu) {
@@ -784,8 +764,8 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.setPen(Qt::NoPen);
         p.drawRect(overlay);
 
-        const float menuW = 320.0f;
-        const float menuH = 180.0f;
+        const float menuW = Theme::pxF(320.0f);
+        const float menuH = Theme::pxF(180.0f);
         const QRectF menuRect((width() - menuW) * 0.5f, (height() - menuH) * 0.5f, menuW,
                               menuH);
         p.setBrush(Theme::bg2());
@@ -794,14 +774,15 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
         p.setPen(Theme::accentAlt());
         p.setFont(Theme::condensedFont(12, QFont::DemiBold));
-        p.drawText(QRectF(menuRect.left() + 12, menuRect.top() + 8, menuRect.width() - 24, 20),
+        p.drawText(QRectF(menuRect.left() + Theme::px(12), menuRect.top() + Theme::px(8),
+                          menuRect.width() - Theme::px(24), Theme::px(20)),
                    Qt::AlignLeft | Qt::AlignVCenter, "PLUGIN MENU");
 
         const int rows = 2;
         const int cols = 4;
-        const float gridGap = 8.0f;
-        const QRectF gridRect(menuRect.left() + 12, menuRect.top() + 34,
-                              menuRect.width() - 24, menuRect.height() - 46);
+        const float gridGap = Theme::pxF(8.0f);
+        const QRectF gridRect(menuRect.left() + Theme::px(12), menuRect.top() + Theme::px(34),
+                              menuRect.width() - Theme::px(24), menuRect.height() - Theme::px(46));
         const float cellW = (gridRect.width() - (cols - 1) * gridGap) / cols;
         const float cellH = (gridRect.height() - (rows - 1) * gridGap) / rows;
 
@@ -814,9 +795,10 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
             const bool selected = (i == m_selectedEffect);
             p.setBrush(selected ? Theme::bg3() : Theme::bg1());
             p.setPen(QPen(selected ? Theme::accent() : Theme::stroke(), 1.0));
-            p.drawRoundedRect(cell, 8, 8);
+            p.drawRoundedRect(cell, Theme::px(8), Theme::px(8));
             p.setPen(selected ? Theme::accent() : Theme::text());
-            p.drawText(cell.adjusted(6, 0, -6, 0), Qt::AlignCenter, m_effects[i].toUpper());
+            p.drawText(cell.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+                       Qt::AlignCenter, m_effects[i].toUpper());
             m_effectHits.push_back({cell, i});
         }
     }

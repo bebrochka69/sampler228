@@ -70,13 +70,14 @@ void SamplePageWidget::rebuildProjects() {
 }
 
 void SamplePageWidget::clampScroll() {
-    const int rowHeight = 26;
-    const int headerHeight = 28;
-    const int contentTop = headerHeight + 8;
+    const int rowHeight = Theme::px(26);
+    const int headerHeight = Theme::px(28);
+    const int contentTop = headerHeight + Theme::px(8);
     const int leftWidth = static_cast<int>(width() * 0.62f);
-    const QRectF leftRect(12, contentTop, leftWidth - 18, height() - contentTop - 12);
-    const QRectF listRect(leftRect.left(), leftRect.top() + 36, leftRect.width(),
-                          leftRect.height() - 36);
+    const QRectF leftRect(Theme::px(12), contentTop, leftWidth - Theme::px(18),
+                          height() - contentTop - Theme::px(12));
+    const QRectF listRect(leftRect.left(), leftRect.top() + Theme::px(36),
+                          leftRect.width(), leftRect.height() - Theme::px(36));
     const int totalHeight = m_entries.size() * rowHeight;
     const int viewHeight = static_cast<int>(listRect.height());
     const int maxScroll = qMax(0, totalHeight - viewHeight);
@@ -98,13 +99,14 @@ void SamplePageWidget::selectIndex(int index) {
         m_session->setSource(node->path, SampleSession::DecodeMode::None);
     }
 
-    const int rowHeight = 26;
-    const int headerHeight = 28;
-    const int contentTop = headerHeight + 8;
+    const int rowHeight = Theme::px(26);
+    const int headerHeight = Theme::px(28);
+    const int contentTop = headerHeight + Theme::px(8);
     const int leftWidth = static_cast<int>(width() * 0.62f);
-    const QRectF leftRect(12, contentTop, leftWidth - 18, height() - contentTop - 12);
-    const QRectF listRect(leftRect.left(), leftRect.top() + 36, leftRect.width(),
-                          leftRect.height() - 36);
+    const QRectF leftRect(Theme::px(12), contentTop, leftWidth - Theme::px(18),
+                          height() - contentTop - Theme::px(12));
+    const QRectF listRect(leftRect.left(), leftRect.top() + Theme::px(36),
+                          leftRect.width(), leftRect.height() - Theme::px(36));
     const int viewHeight = static_cast<int>(listRect.height());
     const int posY = clamped * rowHeight;
     if (posY < m_scrollOffset) {
@@ -237,17 +239,18 @@ void SamplePageWidget::mousePressEvent(QMouseEvent *event) {
         return;
     }
 
-    const int headerHeight = 28;
-    const int contentTop = headerHeight + 8;
+    const int headerHeight = Theme::px(28);
+    const int contentTop = headerHeight + Theme::px(8);
     const int leftWidth = static_cast<int>(width() * 0.62f);
-    const QRectF leftRect(12, contentTop, leftWidth - 18, height() - contentTop - 12);
-    const QRectF listRect(leftRect.left(), leftRect.top() + 36, leftRect.width(),
-                          leftRect.height() - 36);
+    const QRectF leftRect(Theme::px(12), contentTop, leftWidth - Theme::px(18),
+                          height() - contentTop - Theme::px(12));
+    const QRectF listRect(leftRect.left(), leftRect.top() + Theme::px(36),
+                          leftRect.width(), leftRect.height() - Theme::px(36));
     if (!listRect.contains(pos)) {
         return;
     }
 
-    const int rowHeight = 26;
+    const int rowHeight = Theme::px(26);
     const int index = static_cast<int>((m_scrollOffset + (pos.y() - listRect.top())) / rowHeight);
     if (index < 0 || index >= m_entries.size()) {
         return;
@@ -280,12 +283,15 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     QPainter p(this);
     Theme::paintBackground(p, rect());
     p.setRenderHint(QPainter::Antialiasing, true);
+    const bool lite = Theme::liteMode();
 
-    const int headerHeight = 28;
+    const int headerHeight = Theme::px(28);
     const QRectF headerRect(0, 0, width(), headerHeight);
     p.setPen(Qt::NoPen);
     p.setBrush(Theme::bg3());
-    p.drawRoundedRect(headerRect.adjusted(4, 2, -4, -2), 10, 10);
+    p.drawRoundedRect(headerRect.adjusted(Theme::px(4), Theme::px(2),
+                                          -Theme::px(4), -Theme::px(2)),
+                      Theme::px(10), Theme::px(10));
     p.setPen(QPen(Theme::stroke(), 1.2));
     p.drawLine(QPointF(0, headerRect.bottom()), QPointF(width(), headerRect.bottom()));
 
@@ -297,56 +303,67 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(QRectF(width() * 0.5, 0, width() * 0.5 - 12, headerHeight),
                Qt::AlignRight | Qt::AlignVCenter, "USB BROWSER");
 
-    const int contentTop = headerHeight + 8;
+    const int contentTop = headerHeight + Theme::px(8);
     const int leftWidth = static_cast<int>(width() * 0.62f);
-    const QRectF leftRect(12, contentTop, leftWidth - 18, height() - contentTop - 12);
-    const QRectF rightRect(leftRect.right() + 10, contentTop,
-                           width() - leftRect.right() - 22, height() - contentTop - 12);
+    const QRectF leftRect(Theme::px(12), contentTop, leftWidth - Theme::px(18),
+                          height() - contentTop - Theme::px(12));
+    const QRectF rightRect(leftRect.right() + Theme::px(10), contentTop,
+                           width() - leftRect.right() - Theme::px(22),
+                           height() - contentTop - Theme::px(12));
 
     // Left panel.
     p.setPen(QPen(Theme::stroke(), 1.2));
     p.setBrush(Theme::bg1());
-    p.drawRoundedRect(leftRect, 12, 12);
+    p.drawRoundedRect(leftRect, Theme::px(12), Theme::px(12));
 
-    const QRectF dirRect(leftRect.left() + 8, leftRect.top() + 6, leftRect.width() - 16, 26);
+    const QRectF dirRect(leftRect.left() + Theme::px(8), leftRect.top() + Theme::px(6),
+                         leftRect.width() - Theme::px(16), Theme::px(26));
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRoundedRect(dirRect, 8, 8);
+    p.drawRoundedRect(dirRect, Theme::px(8), Theme::px(8));
 
     QFont dirFont = Theme::baseFont(9, QFont::DemiBold);
     p.setFont(dirFont);
     p.setPen(Theme::text());
     QFontMetrics dirFm(dirFont);
-    const QString dirText = dirFm.elidedText(currentDirLabel(), Qt::ElideRight, dirRect.width() - 32);
-    p.drawText(dirRect.adjusted(8, 0, -30, 0), Qt::AlignLeft | Qt::AlignVCenter, dirText);
+    const QString dirText =
+        dirFm.elidedText(currentDirLabel(), Qt::ElideRight, dirRect.width() - Theme::px(32));
+    p.drawText(dirRect.adjusted(Theme::px(8), 0, -Theme::px(30), 0),
+               Qt::AlignLeft | Qt::AlignVCenter, dirText);
 
-    m_rescanRect = QRectF(dirRect.right() - 22, dirRect.top() + 4, 16, 16);
+    m_rescanRect = QRectF(dirRect.right() - Theme::px(22), dirRect.top() + Theme::px(4),
+                          Theme::px(16), Theme::px(16));
     p.setPen(QPen(Theme::accent(), 1.0));
     p.setBrush(Theme::bg1());
-    p.drawRoundedRect(m_rescanRect, 4, 4);
+    p.drawRoundedRect(m_rescanRect, Theme::px(4), Theme::px(4));
     p.setFont(Theme::baseFont(9, QFont::Bold));
     p.drawText(m_rescanRect, Qt::AlignCenter, "R");
 
     // Browser list.
-    const QRectF listRect(leftRect.left() + 8, dirRect.bottom() + 8, leftRect.width() - 16,
-                          leftRect.bottom() - dirRect.bottom() - 14);
+    const QRectF listRect(leftRect.left() + Theme::px(8), dirRect.bottom() + Theme::px(8),
+                          leftRect.width() - Theme::px(16),
+                          leftRect.bottom() - dirRect.bottom() - Theme::px(14));
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRoundedRect(listRect, 10, 10);
+    p.drawRoundedRect(listRect, Theme::px(10), Theme::px(10));
 
     // Memory layer behind list (VIDEO_04).
-    p.save();
-    p.setClipRect(listRect.adjusted(2, 2, -2, -2));
-    p.setCompositionMode(QPainter::CompositionMode_SoftLight);
-    Theme::drawFog(p, listRect, QColor(220, 200, 220, 26), 0.10f, 0.05f, 0.9f);
-    Theme::drawFog(p, listRect, QColor(170, 200, 220, 24), 0.08f, 0.06f, 0.8f);
-    Theme::drawGrain(p, listRect, 0.06f);
-    p.restore();
+    if (!lite) {
+        p.save();
+        p.setClipRect(listRect.adjusted(Theme::px(2), Theme::px(2),
+                                        -Theme::px(2), -Theme::px(2)));
+        p.setCompositionMode(QPainter::CompositionMode_SoftLight);
+        Theme::drawFog(p, listRect, QColor(220, 200, 220, 26), 0.10f, 0.05f, 0.9f);
+        Theme::drawFog(p, listRect, QColor(170, 200, 220, 24), 0.08f, 0.06f, 0.8f);
+        Theme::drawGrain(p, listRect, 0.06f);
+        p.restore();
+    }
 
     p.save();
-    p.setClipRect(listRect.adjusted(2, 2, -2, -2));
+    p.setClipRect(listRect.adjusted(Theme::px(2), Theme::px(2),
+                                    -Theme::px(2), -Theme::px(2)));
 
-    const int rowHeight = 26;
+    const int rowHeight = Theme::px(26);
     int y = static_cast<int>(listRect.top()) - (m_scrollOffset % rowHeight);
     const int startIndex = qMax(0, m_scrollOffset / rowHeight);
 
@@ -363,21 +380,23 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
             }
 
             const SampleBrowserModel::Entry &entry = m_entries[i];
-            const QRectF row(listRect.left() + 4, y, listRect.width() - 8, rowHeight - 2);
+            const QRectF row(listRect.left() + Theme::px(4), y,
+                             listRect.width() - Theme::px(8), rowHeight - Theme::px(2));
 
             const bool selected = (i == m_selectedIndex);
             const QColor rowColor = (i % 2 == 0) ? Theme::bg2() : Theme::bg1();
             p.setPen(QPen(Theme::stroke(), 1.0));
             p.setBrush(selected ? Theme::accentAlt() : rowColor);
-            p.drawRoundedRect(row, 6, 6);
+            p.drawRoundedRect(row, Theme::px(6), Theme::px(6));
 
             if (selected) {
                 p.setBrush(Theme::accent());
                 p.setPen(Qt::NoPen);
-                p.drawRect(QRectF(row.left() + 2, row.top() + 2, 4, row.height() - 4));
+                p.drawRect(QRectF(row.left() + Theme::px(2), row.top() + Theme::px(2),
+                                  Theme::px(4), row.height() - Theme::px(4)));
             }
 
-            const float indent = entry.depth * 12.0f;
+            const float indent = entry.depth * Theme::pxF(12.0f);
             QString label;
             if (entry.node && entry.node->isDir) {
                 label = QString("[DIR] %1").arg(entry.node->name);
@@ -386,7 +405,8 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
             }
 
             p.setPen(selected ? Theme::bg0() : Theme::text());
-            p.drawText(QRectF(row.left() + 10 + indent, row.top(), row.width() - 12, row.height()),
+            p.drawText(QRectF(row.left() + Theme::px(10) + indent, row.top(),
+                              row.width() - Theme::px(12), row.height()),
                        Qt::AlignLeft | Qt::AlignVCenter, label);
 
             y += rowHeight;
@@ -398,48 +418,58 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     // Right panels.
     p.setPen(QPen(Theme::stroke(), 1.2));
     p.setBrush(Theme::bg1());
-    p.drawRoundedRect(rightRect, 12, 12);
+    p.drawRoundedRect(rightRect, Theme::px(12), Theme::px(12));
 
-    const QRectF projectsRect(rightRect.left() + 8, rightRect.top() + 6, rightRect.width() - 16, 130);
+    const QRectF projectsRect(rightRect.left() + Theme::px(8), rightRect.top() + Theme::px(6),
+                              rightRect.width() - Theme::px(16), Theme::px(130));
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRoundedRect(projectsRect, 10, 10);
+    p.drawRoundedRect(projectsRect, Theme::px(10), Theme::px(10));
 
     p.setPen(Theme::accent());
     p.setFont(Theme::condensedFont(11, QFont::Bold));
-    p.drawText(projectsRect.adjusted(8, 4, -8, -4), Qt::AlignLeft | Qt::AlignTop, "PROJECT BANK");
+    p.drawText(projectsRect.adjusted(Theme::px(8), Theme::px(4),
+                                     -Theme::px(8), -Theme::px(4)),
+               Qt::AlignLeft | Qt::AlignTop, "PROJECT BANK");
 
     p.setFont(Theme::baseFont(9));
     p.setPen(Theme::text());
-    int py = static_cast<int>(projectsRect.top() + 24);
+    int py = static_cast<int>(projectsRect.top() + Theme::px(24));
     if (m_projects.isEmpty()) {
         p.setPen(Theme::textMuted());
-        p.drawText(QRectF(projectsRect.left() + 8, py, projectsRect.width() - 16, 16),
+        p.drawText(QRectF(projectsRect.left() + Theme::px(8), py,
+                          projectsRect.width() - Theme::px(16), Theme::px(16)),
                    Qt::AlignLeft | Qt::AlignVCenter, "No projects");
     } else {
         for (int i = 0; i < m_projects.size(); ++i) {
-            QRectF row(projectsRect.left() + 8, py, projectsRect.width() - 16, 16);
+            QRectF row(projectsRect.left() + Theme::px(8), py,
+                       projectsRect.width() - Theme::px(16), Theme::px(16));
             p.drawText(row, Qt::AlignLeft | Qt::AlignVCenter, m_projects[i]);
-            py += 18;
-            if (py > projectsRect.bottom() - 10) {
+            py += Theme::px(18);
+            if (py > projectsRect.bottom() - Theme::px(10)) {
                 break;
             }
         }
     }
 
-    const QRectF previewRect(rightRect.left() + 8, projectsRect.bottom() + 10,
-                             rightRect.width() - 16, rightRect.bottom() - projectsRect.bottom() - 16);
+    const QRectF previewRect(rightRect.left() + Theme::px(8),
+                             projectsRect.bottom() + Theme::px(10),
+                             rightRect.width() - Theme::px(16),
+                             rightRect.bottom() - projectsRect.bottom() - Theme::px(16));
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRoundedRect(previewRect, 10, 10);
+    p.drawRoundedRect(previewRect, Theme::px(10), Theme::px(10));
 
     p.setPen(Theme::accent());
     p.setFont(Theme::condensedFont(11, QFont::Bold));
-    p.drawText(QRectF(previewRect.left() + 8, previewRect.top() + 4, previewRect.width() - 16, 16),
+    p.drawText(QRectF(previewRect.left() + Theme::px(8), previewRect.top() + Theme::px(4),
+                      previewRect.width() - Theme::px(16), Theme::px(16)),
                Qt::AlignLeft | Qt::AlignVCenter, "PREVIEW");
 
-    const QRectF infoRect(previewRect.left() + 10, previewRect.top() + 26,
-                          previewRect.width() - 20, previewRect.height() - 36);
+    const QRectF infoRect(previewRect.left() + Theme::px(10),
+                          previewRect.top() + Theme::px(26),
+                          previewRect.width() - Theme::px(20),
+                          previewRect.height() - Theme::px(36));
     const float infoSplit = 0.62f;
     const QRectF infoLeft(infoRect.left(), infoRect.top(), infoRect.width() * infoSplit - 6,
                           infoRect.height());
@@ -448,43 +478,49 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
 
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg1());
-    p.drawRoundedRect(infoRect, 10, 10);
+    p.drawRoundedRect(infoRect, Theme::px(10), Theme::px(10));
 
     // Transport buttons.
-    const QRectF transportRect(infoRight.left() + 6, infoRight.top() + 6,
-                               infoRight.width() - 12, 20);
+    const QRectF transportRect(infoRight.left() + Theme::px(6), infoRight.top() + Theme::px(6),
+                               infoRight.width() - Theme::px(12), Theme::px(20));
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.setBrush(Theme::bg2());
-    p.drawRoundedRect(transportRect, 6, 6);
+    p.drawRoundedRect(transportRect, Theme::px(6), Theme::px(6));
 
-    m_playRect = QRectF(transportRect.left() + 6, transportRect.top() + 4, 12, 12);
-    m_stopRect = QRectF(transportRect.left() + 26, transportRect.top() + 4, 12, 12);
+    m_playRect = QRectF(transportRect.left() + Theme::px(6),
+                        transportRect.top() + Theme::px(4),
+                        Theme::px(12), Theme::px(12));
+    m_stopRect = QRectF(transportRect.left() + Theme::px(26),
+                        transportRect.top() + Theme::px(4),
+                        Theme::px(12), Theme::px(12));
 
     const QPointF playCenter(m_playRect.center());
     QPolygonF playTri;
-    playTri << QPointF(playCenter.x() - 4, playCenter.y() - 5)
-            << QPointF(playCenter.x() + 6, playCenter.y())
-            << QPointF(playCenter.x() - 4, playCenter.y() + 5);
+    playTri << QPointF(playCenter.x() - Theme::px(4), playCenter.y() - Theme::px(5))
+            << QPointF(playCenter.x() + Theme::px(6), playCenter.y())
+            << QPointF(playCenter.x() - Theme::px(4), playCenter.y() + Theme::px(5));
     p.setBrush(m_session && m_session->isPlaying() ? Theme::accent() : Theme::accentAlt());
     p.setPen(Qt::NoPen);
     p.drawPolygon(playTri);
 
     p.setBrush(Theme::accent());
-    p.drawRoundedRect(m_stopRect, 2, 2);
+    p.drawRoundedRect(m_stopRect, Theme::px(2), Theme::px(2));
 
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(8, QFont::DemiBold));
-    p.drawText(QRectF(transportRect.left() + 44, transportRect.top(), transportRect.width() - 44, 20),
+    p.drawText(QRectF(transportRect.left() + Theme::px(44), transportRect.top(),
+                      transportRect.width() - Theme::px(44), Theme::px(20)),
                Qt::AlignLeft | Qt::AlignVCenter, "PLAY/STOP");
 
     // Info left column.
     p.setPen(Theme::text());
     p.setFont(Theme::baseFont(9, QFont::Bold));
-    int infoY = static_cast<int>(infoLeft.top() + 6);
-    const int lineH = 16;
+    int infoY = static_cast<int>(infoLeft.top() + Theme::px(6));
+    const int lineH = Theme::px(16);
     const int padIndex = m_pads ? m_pads->activePad() : 0;
 
-    p.drawText(QRectF(infoLeft.left() + 8, infoY, infoLeft.width() - 16, lineH),
+    p.drawText(QRectF(infoLeft.left() + Theme::px(8), infoY,
+                      infoLeft.width() - Theme::px(16), lineH),
                Qt::AlignLeft | Qt::AlignVCenter, QString("ACTIVE PAD: %1").arg(padIndex + 1));
     infoY += lineH + 2;
 
@@ -496,45 +532,51 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     QFontMetrics infoFm(Theme::baseFont(9, QFont::Bold));
     const QString highlightText = infoFm.elidedText(highlightName, Qt::ElideRight, infoLeft.width() - 16);
     p.setPen(Theme::accentAlt());
-    p.drawText(QRectF(infoLeft.left() + 8, infoY, infoLeft.width() - 16, lineH),
+    p.drawText(QRectF(infoLeft.left() + Theme::px(8), infoY,
+                      infoLeft.width() - Theme::px(16), lineH),
                Qt::AlignLeft | Qt::AlignVCenter, QString("HIGHLIGHT: %1").arg(highlightText));
     infoY += lineH + 2;
 
     const QString padFile = m_pads ? m_pads->padName(padIndex) : QString();
     p.setPen(Theme::text());
     p.setFont(Theme::baseFont(9, QFont::Bold));
-    p.drawText(QRectF(infoLeft.left() + 8, infoY, infoLeft.width() - 16, lineH),
+    p.drawText(QRectF(infoLeft.left() + Theme::px(8), infoY,
+                      infoLeft.width() - Theme::px(16), lineH),
                Qt::AlignLeft | Qt::AlignVCenter, "PAD FILE");
     infoY += lineH;
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(8));
     const QString padText = padFile.isEmpty() ? "(empty)" : padFile;
-    p.drawText(QRectF(infoLeft.left() + 8, infoY, infoLeft.width() - 16, lineH),
+    p.drawText(QRectF(infoLeft.left() + Theme::px(8), infoY,
+                      infoLeft.width() - Theme::px(16), lineH),
                Qt::AlignLeft | Qt::AlignVCenter, padText);
     infoY += lineH + 2;
 
     p.setPen(Theme::text());
     p.setFont(Theme::baseFont(9, QFont::Bold));
-    p.drawText(QRectF(infoLeft.left() + 8, infoY, infoLeft.width() - 16, lineH),
+    p.drawText(QRectF(infoLeft.left() + Theme::px(8), infoY,
+                      infoLeft.width() - Theme::px(16), lineH),
                Qt::AlignLeft | Qt::AlignVCenter, "STATUS");
     infoY += lineH;
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(8));
-    p.drawText(QRectF(infoLeft.left() + 8, infoY, infoLeft.width() - 16, lineH),
+    p.drawText(QRectF(infoLeft.left() + Theme::px(8), infoY,
+                      infoLeft.width() - Theme::px(16), lineH),
                Qt::AlignLeft | Qt::AlignVCenter, currentDirLabel());
     infoY += lineH + 2;
 
     if (m_session && !m_session->infoText().isEmpty()) {
         p.setPen(Theme::textMuted());
         p.setFont(Theme::baseFont(8));
-        p.drawText(QRectF(infoLeft.left() + 8, infoY, infoLeft.width() - 16, lineH),
+        p.drawText(QRectF(infoLeft.left() + Theme::px(8), infoY,
+                          infoLeft.width() - Theme::px(16), lineH),
                    Qt::AlignLeft | Qt::AlignVCenter, m_session->infoText());
     }
 
     // Controls list.
     p.setFont(Theme::baseFont(8));
     p.setPen(Theme::textMuted());
-    int controlsY = static_cast<int>(infoRight.top() + 30);
+    int controlsY = static_cast<int>(infoRight.top() + Theme::px(30));
     const QStringList controls = {
         "UP/DOWN = move",
         "ENTER = open folder",
@@ -544,10 +586,11 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
         "SPACE = play/stop",
     };
     for (const QString &line : controls) {
-        p.drawText(QRectF(infoRight.left() + 8, controlsY, infoRight.width() - 16, lineH - 2),
+        p.drawText(QRectF(infoRight.left() + Theme::px(8), controlsY,
+                          infoRight.width() - Theme::px(16), lineH - Theme::px(2)),
                    Qt::AlignLeft | Qt::AlignVCenter, line);
-        controlsY += lineH - 2;
-        if (controlsY > infoRight.bottom() - 18) {
+        controlsY += lineH - Theme::px(2);
+        if (controlsY > infoRight.bottom() - Theme::px(18)) {
             break;
         }
     }
@@ -555,13 +598,14 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
     if (m_session && !m_session->errorText().isEmpty()) {
         p.setPen(Theme::danger());
         p.setFont(Theme::baseFont(8, QFont::DemiBold));
-        p.drawText(QRectF(infoRight.left() + 8, infoRight.bottom() - 16,
-                          infoRight.width() - 16, 14),
+        p.drawText(QRectF(infoRight.left() + Theme::px(8),
+                          infoRight.bottom() - Theme::px(16),
+                          infoRight.width() - Theme::px(16), Theme::px(14)),
                    Qt::AlignLeft | Qt::AlignVCenter, m_session->errorText());
     }
 
     // Idle ambience (VIDEO_06).
-    if (!m_session || !m_session->isPlaying()) {
+    if (!lite && (!m_session || !m_session->isPlaying())) {
         Theme::drawIdleDust(p, rect(), 0.06f);
     }
 }
