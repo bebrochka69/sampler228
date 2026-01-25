@@ -17,13 +17,15 @@ SamplePageWidget::SamplePageWidget(SampleSession *session, PadBank *pads, QWidge
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
-    m_ambientTimer.setInterval(120);
-    connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
-        if (isVisible()) {
-            update();
-        }
-    });
-    m_ambientTimer.start();
+    if (!Theme::liteMode()) {
+        m_ambientTimer.setInterval(120);
+        connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
+            if (isVisible()) {
+                update();
+            }
+        });
+        m_ambientTimer.start();
+    }
 
     refreshBrowser();
     rebuildProjects();
@@ -282,8 +284,8 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
-    p.setRenderHint(QPainter::Antialiasing, true);
     const bool lite = Theme::liteMode();
+    p.setRenderHint(QPainter::Antialiasing, !lite);
 
     const int headerHeight = Theme::px(28);
     const QRectF headerRect(0, 0, width(), headerHeight);

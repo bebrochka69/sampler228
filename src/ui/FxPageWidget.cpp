@@ -422,6 +422,13 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
             }
             p.drawPath(flow);
         }
+        // Subtle pleat lines.
+        p.setPen(QPen(QColor(210, 210, 235, 140), 1.0));
+        for (int i = 0; i < 5; ++i) {
+            const float y = bagY + bagH * (0.15f + i * 0.17f);
+            p.drawLine(QPointF(bagX + bagW * 0.18f, y),
+                       QPointF(bagX + bagW * 0.82f, y));
+        }
         p.restore();
     } else if (fx == "dist") {
         // Overdriven loudspeaker.
@@ -463,6 +470,14 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
             p.setPen(Qt::NoPen);
             p.drawEllipse(bolt, 1.6f, 1.6f);
         }
+
+        // Cone ribs.
+        p.setPen(QPen(QColor(255, 150, 190, 120), 1.0));
+        for (int i = 0; i < 4; ++i) {
+            const float ang = static_cast<float>(i) / 4.0f * static_cast<float>(M_PI);
+            p.drawLine(QPointF(c.x() - std::cos(ang) * coneR, c.y() - std::sin(ang) * coneR * 0.85f),
+                       QPointF(c.x() + std::cos(ang) * coneR, c.y() + std::sin(ang) * coneR * 0.85f));
+        }
     } else if (fx == "lofi") {
         // Broken memory screen.
         const QRectF screen = r.adjusted(10, 14, -10, -18);
@@ -498,6 +513,13 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.setPen(QPen(QColor(90, 110, 140, 180), 1.2));
         p.drawLine(QPointF(screen.left() + 14, scanY + 6),
                    QPointF(screen.right() - 40, scanY + 6));
+
+        // Bit rot blocks.
+        p.setPen(QPen(QColor(255, 140, 180, 140), 1.0));
+        p.drawLine(QPointF(screen.left() + 10, screen.top() + 10),
+                   QPointF(screen.left() + 28, screen.top() + 10));
+        p.drawLine(QPointF(screen.right() - 40, screen.bottom() - 14),
+                   QPointF(screen.right() - 18, screen.bottom() - 14));
     } else if (fx == "eq") {
         // Living creature line (fish/snake).
         const float low = lerp(0.25f, 0.85f, p1);
@@ -521,6 +543,11 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.drawEllipse(head + QPointF(6, -2), 3, 3);  // eye
         p.drawEllipse(midPt, 4, 4);
         p.drawEllipse(tail + QPointF(-6, 2), 3, 3);
+
+        // Fin / ripple accents.
+        p.setPen(QPen(QColor(140, 255, 210, 120), 1.0));
+        p.drawLine(midPt + QPointF(-10, 6), midPt + QPointF(-2, 14));
+        p.drawLine(midPt + QPointF(8, -6), midPt + QPointF(16, -14));
     } else if (fx == "cassette") {
         // Cassette shell.
         const QRectF shell = r.adjusted(10, 14, -10, -18);
@@ -551,6 +578,13 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.setPen(Qt::NoPen);
         p.drawEllipse(QPointF(shell.left() + 14, shell.top() + 12), 2.0f, 2.0f);
         p.drawEllipse(QPointF(shell.right() - 14, shell.top() + 12), 2.0f, 2.0f);
+
+        // Window and label.
+        p.setPen(QPen(QColor(140, 220, 255, 160), 1.0));
+        p.setBrush(Qt::NoBrush);
+        const QRectF window(shell.left() + shell.width() * 0.22f, shell.bottom() - 22,
+                            shell.width() * 0.56f, 10);
+        p.drawRoundedRect(window, 4, 4);
     } else if (fx == "chorus") {
         // Character with echoes.
         const int copies = 2 + static_cast<int>(p3 * 3.0f);
@@ -590,6 +624,11 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.setPen(QPen(QColor(220, 210, 255, 200), 1.2));
         p.setBrush(Qt::NoBrush);
         p.drawEllipse(c, 4, 4);
+
+        // Perspective floor line.
+        p.setPen(QPen(QColor(200, 180, 255, 120), 1.0));
+        p.drawLine(QPointF(r.left() + 8, r.bottom() - 12),
+                   QPointF(r.right() - 8, r.bottom() - 12));
     } else if (fx == "sidechan") {
         // Pressed object.
         const float depth = (0.2f + 0.6f * p2) * h;
@@ -606,6 +645,11 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.setBrush(Qt::NoBrush);
         p.setPen(QPen(QColor(255, 160, 160, 200), 1.4));
         p.drawRoundedRect(blob, 10, 10);
+
+        // Top press plate.
+        p.setPen(QPen(QColor(255, 120, 120, 160), 1.2));
+        const QRectF pressPlate(r.left() + 18, r.top() + 12, r.width() - 36, 6);
+        p.drawRoundedRect(pressPlate, 3, 3);
     }
 
     p.restore();

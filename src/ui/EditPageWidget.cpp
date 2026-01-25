@@ -295,7 +295,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
-    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::Antialiasing, !Theme::liteMode());
 
     if (m_pads && m_session) {
         const QString padPath = m_pads->padPath(m_pads->activePad());

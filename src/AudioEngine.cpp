@@ -5,6 +5,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <QString>
+#include <QStringList>
+#include <QtGlobal>
 
 #ifdef GROOVEBOX_WITH_ALSA
 #include <alsa/asoundlib.h>
@@ -53,8 +56,43 @@ void AudioEngine::start() {
         return;
     }
 
+    auto deviceList = []() {
+        QStringList list;
+        const QString envSingle = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
+        const QString envList = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICES");
+        if (!envSingle.isEmpty()) {
+            list << envSingle;
+        }
+        if (!envList.isEmpty()) {
+            for (const QString &item : envList.split(',', Qt::SkipEmptyParts)) {
+                const QString trimmed = item.trimmed();
+                if (!trimmed.isEmpty()) {
+                    list << trimmed;
+                }
+            }
+        }
+        if (list.isEmpty()) {
+            list << "default"
+                 << "plughw:0,0"
+                 << "hw:0,0"
+                 << "sysdefault"
+                 << "plughw:1,0";
+        }
+        list.removeDuplicates();
+        return list;
+    };
+
     snd_pcm_t *pcm = nullptr;
-    if (snd_pcm_open(&pcm, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
+    const QStringList devices = deviceList();
+    for (const QString &dev : devices) {
+        if (snd_pcm_open(&pcm, dev.toLocal8Bit().constData(),
+                         SND_PCM_STREAM_PLAYBACK, 0) >= 0) {
+            break;
+        }
+        pcm = nullptr;
+    }
+
+    if (!pcm) {
         m_available = false;
         return;
     }

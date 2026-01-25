@@ -495,6 +495,7 @@ static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 dur
 #ifdef Q_OS_LINUX
     const QFileInfo info(path);
     const QString ext = info.suffix().toLower();
+    const QString alsaDevice = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
 
     const QString ffplay = QStandardPaths::findExecutable("ffplay");
     if (!ffplay.isEmpty() && (preferFfplay || !filter.isEmpty())) {
@@ -523,6 +524,9 @@ static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 dur
             return false;
         }
         args = {"-q"};
+        if (!alsaDevice.isEmpty()) {
+            args << "-D" << alsaDevice;
+        }
         if (durationMs > 0) {
             const int seconds = static_cast<int>(qCeil(durationMs / 1000.0));
             args << "-d" << QString::number(qMax(1, seconds));
@@ -534,7 +538,11 @@ static bool buildExternalCommand(const QString &path, qint64 startMs, qint64 dur
     if (ext == "mp3") {
         program = QStandardPaths::findExecutable("mpg123");
         if (!program.isEmpty()) {
-            args = {"-q", path};
+            args = {"-q"};
+            if (!alsaDevice.isEmpty()) {
+                args << "-a" << alsaDevice;
+            }
+            args << path;
             return true;
         }
     }

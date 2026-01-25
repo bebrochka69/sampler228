@@ -268,19 +268,28 @@ bool SampleSession::buildExternalCommand(QString &program, QStringList &args) co
 #ifdef Q_OS_LINUX
     const QFileInfo info(m_sourcePath);
     const QString ext = info.suffix().toLower();
+    const QString alsaDevice = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
     if (ext == "wav") {
         program = QStandardPaths::findExecutable("aplay");
         if (program.isEmpty()) {
             return false;
         }
-        args = {"-q", m_sourcePath};
+        args = {"-q"};
+        if (!alsaDevice.isEmpty()) {
+            args << "-D" << alsaDevice;
+        }
+        args << m_sourcePath;
         return true;
     }
 
     if (ext == "mp3") {
         program = QStandardPaths::findExecutable("mpg123");
         if (!program.isEmpty()) {
-            args = {"-q", m_sourcePath};
+            args = {"-q"};
+            if (!alsaDevice.isEmpty()) {
+                args << "-a" << alsaDevice;
+            }
+            args << m_sourcePath;
             return true;
         }
     }
