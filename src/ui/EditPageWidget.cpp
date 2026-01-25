@@ -295,7 +295,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
-    p.setRenderHint(QPainter::Antialiasing, !Theme::liteMode());
+    Theme::applyRenderHints(p);
 
     if (m_pads && m_session) {
         const QString padPath = m_pads->padPath(m_pads->activePad());
@@ -402,7 +402,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     const float rowH = listRect.height() / rows;
 
     m_paramRects.clear();
-    p.setFont(Theme::condensedFont(16, QFont::Bold));
+    p.setFont(Theme::condensedFont(20, QFont::Bold));
 
     for (int i = 0; i < m_params.size(); ++i) {
         const int c = i / rows;
@@ -463,10 +463,10 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
                    Qt::AlignLeft | Qt::AlignVCenter, m_params[i].label);
 
         p.setPen(valueColor);
-        p.setFont(Theme::condensedFont(14, QFont::DemiBold));
+        p.setFont(Theme::condensedFont(18, QFont::DemiBold));
         p.drawText(QRectF(rowRect.left(), rowRect.top(), rowRect.width(), rowRect.height()),
                    Qt::AlignRight | Qt::AlignVCenter, valueText);
-        p.setFont(Theme::condensedFont(16, QFont::Bold));
+        p.setFont(Theme::condensedFont(20, QFont::Bold));
 
         // underline for selected row
         if (selected) {

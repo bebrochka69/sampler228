@@ -18,17 +18,17 @@
 #include <cmath>
 
 namespace Theme {
-inline QColor bg0() { return QColor(18, 16, 24); }
-inline QColor bg1() { return QColor(34, 30, 44); }
-inline QColor bg2() { return QColor(26, 22, 34); }
-inline QColor bg3() { return QColor(46, 40, 60); }
-inline QColor stroke() { return QColor(170, 160, 200); }
-inline QColor accent() { return QColor(210, 214, 255); }
-inline QColor accentAlt() { return QColor(244, 198, 204); }
-inline QColor text() { return QColor(244, 240, 255); }
-inline QColor textMuted() { return QColor(186, 178, 204); }
+inline QColor bg0() { return QColor(26, 14, 24); }
+inline QColor bg1() { return QColor(42, 26, 40); }
+inline QColor bg2() { return QColor(30, 18, 28); }
+inline QColor bg3() { return QColor(58, 32, 52); }
+inline QColor stroke() { return QColor(120, 160, 200); }
+inline QColor accent() { return QColor(18, 202, 255); }   // cyan
+inline QColor accentAlt() { return QColor(255, 56, 118); } // magenta
+inline QColor text() { return QColor(245, 245, 255); }
+inline QColor textMuted() { return QColor(190, 200, 220); }
 inline QColor warn() { return QColor(255, 210, 160); }
-inline QColor danger() { return QColor(255, 160, 170); }
+inline QColor danger() { return QColor(255, 80, 120); }
 
 inline float uiScale();
 inline int px(int value);
@@ -77,10 +77,12 @@ inline float uiScale() {
     const float sx = static_cast<float>(size.width()) / 1280.0f;
     const float sy = static_cast<float>(size.height()) / 720.0f;
     float base = qMin(sx, sy);
-    if (size.width() <= 1024 || size.height() <= 600) {
-        base = qMax(base, 0.82f);
+    if (size.width() <= 800 || size.height() <= 480) {
+        base = qMax(base, 1.0f);
+    } else if (size.width() <= 1024 || size.height() <= 600) {
+        base = qMax(base, 0.9f);
     }
-    scale = qBound(0.6f, base, 1.0f);
+    scale = qBound(0.7f, base, 1.1f);
     return scale;
 }
 
@@ -90,6 +92,13 @@ inline int px(int value) {
 
 inline float pxF(float value) {
     return value * uiScale();
+}
+
+inline void applyRenderHints(QPainter &p) {
+    const bool lite = liteMode();
+    p.setRenderHint(QPainter::Antialiasing, !lite);
+    p.setRenderHint(QPainter::TextAntialiasing, !lite);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, !lite);
 }
 
 inline QColor withAlpha(const QColor &c, int alpha) {
