@@ -5,9 +5,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QPainterPath>
 #include <QtGlobal>
-#include <cmath>
 
 #include "PadBank.h"
 #include "SampleSession.h"
@@ -19,13 +17,6 @@ EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *p
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
-    m_ambientTimer.setInterval(120);
-    connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
-        if (isVisible()) {
-            update();
-        }
-    });
-    m_ambientTimer.start();
 
     m_params = {
         {"VOLUME", Param::Volume},
@@ -333,26 +324,6 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.drawRoundedRect(waveRect, 12, 12);
 
     const QRectF waveInner = waveRect.adjusted(12, 12, -12, -12);
-    // Living texture beneath waveform (VIDEO_05).
-    p.save();
-    p.setClipRect(waveInner);
-    p.setCompositionMode(QPainter::CompositionMode_SoftLight);
-    const float t = Theme::timeSeconds();
-    p.setPen(QPen(Theme::withAlpha(Theme::accentAlt(), 60), 1.2));
-    for (int i = 0; i < 5; ++i) {
-        QPainterPath path;
-        const float yBase = waveInner.top() + (i + 1) * (waveInner.height() / 6.0f);
-        path.moveTo(waveInner.left(), yBase);
-        for (int x = 0; x <= 32; ++x) {
-            const float px = waveInner.left() + waveInner.width() * (x / 32.0f);
-            const float phase = t * 0.6f + i * 1.3f;
-            const float amp = 6.0f + i * 1.4f;
-            const float py = yBase + std::sin(px * 0.012f + phase) * amp;
-            path.lineTo(px, py);
-        }
-        p.drawPath(path);
-    }
-    p.restore();
     QVector<float> wave;
     if (m_session && m_session->hasWaveform()) {
         wave = m_session->waveform();
@@ -562,8 +533,4 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.setPen(Theme::accent());
     p.drawText(copyRect, Qt::AlignCenter, "COPY PAD");
 
-    // Idle ambience (VIDEO_06).
-    if (!m_pads || !m_pads->isPlaying(m_pads->activePad())) {
-        Theme::drawIdleDust(p, rect(), 0.05f);
-    }
 }

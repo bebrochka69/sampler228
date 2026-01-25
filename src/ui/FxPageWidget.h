@@ -75,4 +75,5 @@ private:
     QElapsedTimer m_clock;
     float m_animTime = 0.0f;
     float m_sidechainValue = 0.0f;
+    float m_compValue = 0.0f;
 };

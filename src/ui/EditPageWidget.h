@@ -3,7 +3,6 @@
 #include <QHash>
 #include <QPixmap>
 #include <QString>
-#include <QTimer>
 #include <QVector>
 #include <QWidget>
 
@@ -46,7 +45,6 @@ private:
     QHash<int, QPixmap> m_iconCache;
     QRectF m_fxBusRect;
     QVector<QRectF> m_paramRects;
-    QTimer m_ambientTimer;
 
     QString iconFileFor(Param::Type type) const;
     QPixmap iconForType(Param::Type type);

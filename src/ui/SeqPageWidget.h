@@ -35,7 +35,6 @@ private:
     int m_activePad = 0;
     QTimer m_playTimer;
     QTimer m_readyTimer;
-    QTimer m_ambientTimer;
     bool m_playing = false;
     bool m_waiting = false;
     int m_playStep = 0;

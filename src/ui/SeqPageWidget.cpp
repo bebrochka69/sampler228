@@ -3,9 +3,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QRadialGradient>
 #include <QtGlobal>
-#include <cmath>
 #include "PadBank.h"
 #include "Theme.h"
 
@@ -13,13 +11,6 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
-    m_ambientTimer.setInterval(120);
-    connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
-        if (isVisible()) {
-            update();
-        }
-    });
-    m_ambientTimer.start();
 
     m_padColors = {Theme::accent(), Theme::accentAlt(), QColor(110, 170, 255), QColor(255, 188, 64),
                    QColor(210, 120, 255), QColor(90, 220, 120), QColor(255, 90, 110), QColor(120, 200, 210)};
@@ -258,27 +249,6 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
         p.fillRect(grid, Theme::bg1());
     }
 
-    // Sequencer pulse layer (VIDEO_02).
-    p.save();
-    p.setClipRect(grid.adjusted(2, 2, -2, -2));
-    p.setCompositionMode(QPainter::CompositionMode_SoftLight);
-    const float t = Theme::timeSeconds();
-    const float bpmFloat = static_cast<float>(bpm);
-    const float phase = std::fmod(t * bpmFloat / 60.0f, 1.0f);
-    const float pulse = 0.3f + 0.7f * std::sin(phase * 2.0f * static_cast<float>(M_PI));
-    QColor pulseColor(230, 210, 255, static_cast<int>(pulse * 50));
-    for (int i = 0; i < 3; ++i) {
-        const float x = grid.left() + grid.width() * (0.2f + i * 0.3f + std::sin(t * 0.2f + i) * 0.05f);
-        const float y = grid.center().y() + std::sin(t * 0.3f + i * 1.3f) * grid.height() * 0.1f;
-        const float radius = grid.width() * (0.2f + 0.1f * pulse);
-        QRadialGradient grad(QPointF(x, y), radius);
-        grad.setColorAt(0.0, pulseColor);
-        grad.setColorAt(1.0, QColor(230, 210, 255, 0));
-        p.setBrush(grad);
-        p.setPen(Qt::NoPen);
-        p.drawEllipse(QPointF(x, y), radius, radius * 0.6f);
-    }
-    p.restore();
 
     // Grid and notes.
     for (int row = 0; row < rows; ++row) {
@@ -337,11 +307,6 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
 
         p.setPen(active ? Theme::bg0() : Theme::textMuted());
         p.drawText(padRect, Qt::AlignCenter, QString("PAD %1").arg(i + 1));
-    }
-
-    // Idle ambience (VIDEO_06).
-    if (!m_playing) {
-        Theme::drawIdleDust(p, rect(), 0.05f);
     }
 
 }
