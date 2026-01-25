@@ -94,13 +94,6 @@ inline float pxF(float value) {
     return value * uiScale();
 }
 
-inline void applyRenderHints(QPainter &p) {
-    const bool lite = liteMode();
-    p.setRenderHint(QPainter::Antialiasing, !lite);
-    p.setRenderHint(QPainter::TextAntialiasing, !lite);
-    p.setRenderHint(QPainter::SmoothPixmapTransform, !lite);
-}
-
 inline QColor withAlpha(const QColor &c, int alpha) {
     QColor out = c;
     out.setAlpha(alpha);
@@ -109,6 +102,13 @@ inline QColor withAlpha(const QColor &c, int alpha) {
 
 inline bool liteMode() {
     return qEnvironmentVariableIsSet("GROOVEBOX_LITE");
+}
+
+inline void applyRenderHints(QPainter &p) {
+    const bool lite = liteMode();
+    p.setRenderHint(QPainter::Antialiasing, !lite);
+    p.setRenderHint(QPainter::TextAntialiasing, !lite);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, !lite);
 }
 
 inline float timeSeconds() {

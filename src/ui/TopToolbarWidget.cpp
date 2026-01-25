@@ -140,6 +140,7 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
+    Theme::applyRenderHints(p);
     p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 160), 1.4));
     p.drawRect(rect().adjusted(1, 1, -2, -2));
     p.setPen(QPen(Theme::withAlpha(Theme::accent(), 140), 1.0));

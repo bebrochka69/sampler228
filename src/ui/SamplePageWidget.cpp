@@ -284,8 +284,8 @@ void SamplePageWidget::paintEvent(QPaintEvent *event) {
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
+    Theme::applyRenderHints(p);
     const bool lite = Theme::liteMode();
-    p.setRenderHint(QPainter::Antialiasing, !lite);
 
     const int headerHeight = Theme::px(28);
     const QRectF headerRect(0, 0, width(), headerHeight);

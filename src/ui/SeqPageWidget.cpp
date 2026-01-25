@@ -215,8 +215,8 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     QPainter p(this);
 
     Theme::paintBackground(p, rect());
+    Theme::applyRenderHints(p);
     const bool lite = Theme::liteMode();
-    p.setRenderHint(QPainter::Antialiasing, !lite);
 
     const QRectF headerRect(Theme::px(24), Theme::px(18), width() - Theme::px(48),
                             Theme::px(22));
