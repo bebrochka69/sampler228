@@ -63,6 +63,7 @@ void FxPageWidget::assignEffect(int effectIndex) {
     track.inserts[m_selectedSlot].p1 = 0.5f;
     track.inserts[m_selectedSlot].p2 = 0.5f;
     track.inserts[m_selectedSlot].p3 = 0.5f;
+    track.inserts[m_selectedSlot].p4 = 0.5f;
     syncBusEffects(m_selectedTrack);
     update();
 }
@@ -161,6 +162,11 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
         update();
         return;
     }
+    if (key == Qt::Key_4) {
+        m_selectedParam = 3;
+        update();
+        return;
+    }
     if (key == Qt::Key_Minus || key == Qt::Key_Left) {
         if (ctrl) {
             m_selectedTrack = (m_selectedTrack - 1 + m_tracks.size()) % m_tracks.size();
@@ -175,7 +181,11 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
             } else if (m_selectedParam == 1) {
                 slot.p2 = qBound(0.0f, slot.p2 - 0.05f, 1.0f);
             } else {
-                slot.p3 = qBound(0.0f, slot.p3 - 0.05f, 1.0f);
+                if (m_selectedParam == 2) {
+                    slot.p3 = qBound(0.0f, slot.p3 - 0.05f, 1.0f);
+                } else {
+                    slot.p4 = qBound(0.0f, slot.p4 - 0.05f, 1.0f);
+                }
             }
             syncBusEffects(m_selectedTrack);
             update();
@@ -196,7 +206,11 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
             } else if (m_selectedParam == 1) {
                 slot.p2 = qBound(0.0f, slot.p2 + 0.05f, 1.0f);
             } else {
-                slot.p3 = qBound(0.0f, slot.p3 + 0.05f, 1.0f);
+                if (m_selectedParam == 2) {
+                    slot.p3 = qBound(0.0f, slot.p3 + 0.05f, 1.0f);
+                } else {
+                    slot.p4 = qBound(0.0f, slot.p4 + 0.05f, 1.0f);
+                }
             }
             syncBusEffects(m_selectedTrack);
             update();
@@ -320,6 +334,7 @@ void FxPageWidget::syncBusEffects(int trackIndex) {
             fx.p1 = slot.p1;
             fx.p2 = slot.p2;
             fx.p3 = slot.p3;
+            fx.p4 = slot.p4;
             ids.push_back(fx);
         }
     }
@@ -340,6 +355,7 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
     const float p1 = clamp01(slot.p1);
     const float p2 = clamp01(slot.p2);
     const float p3 = clamp01(slot.p3);
+    const float p4 = clamp01(slot.p4);
     const QString fx = slot.effect.toLower();
 
     if (fx.isEmpty()) {
@@ -359,77 +375,178 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
     }
 
     if (fx == "comp") {
-        // OP-1 style compressor: rubber air bag between plates.
-        const QColor lineColor(230, 230, 245, 220);
-        p.setPen(QPen(lineColor, 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        p.setBrush(Qt::NoBrush);
+        // Compressor UI preview (style reference).
+        const QColor bg(40, 40, 40);
+        const QColor panel(30, 30, 30);
+        const QColor cyan(20, 210, 255);
+        const QColor magenta(255, 50, 100);
+        const QColor white(235, 235, 240);
+        const QColor grid(80, 80, 90);
 
-        const float breathe = 0.02f * std::sin(t * 0.25f);
-        const float squeeze = clamp01(m_compValue);
-        const float bagW = w * 0.62f;
-        const float baseH = h * (0.28f + p3 * 0.1f);
-        const float bagH = baseH * (1.0f - squeeze * 0.6f) * (1.0f + breathe);
-        const float bagX = c.x() - bagW * 0.5f;
-        const float bagY = c.y() - bagH * 0.5f;
+        p.setBrush(bg);
+        p.setPen(Qt::NoPen);
+        p.drawRoundedRect(rect, 14, 14);
 
-        // Plates.
-        const float gap = 8.0f - squeeze * 5.0f;
-        const float plateW = bagW * 1.15f;
-        const float plateX = c.x() - plateW * 0.5f;
-        const float topY = bagY - gap;
-        const float bottomY = bagY + bagH + gap;
-        p.drawLine(QPointF(plateX, topY), QPointF(plateX + plateW, topY));
-        p.drawLine(QPointF(plateX, bottomY), QPointF(plateX + plateW, bottomY));
+        const float pad = 10.0f;
+        QRectF inner = rect.adjusted(pad, pad, -pad, -pad);
 
-        // Side limiters.
-        const float limiterH = bagH * 0.35f;
-        p.drawLine(QPointF(plateX + 4, c.y() - limiterH), QPointF(plateX + 4, c.y() + limiterH));
-        p.drawLine(QPointF(plateX + plateW - 4, c.y() - limiterH),
-                   QPointF(plateX + plateW - 4, c.y() + limiterH));
+        // Header
+        QRectF header(inner.left(), inner.top(), inner.width(), 26);
+        p.setPen(white);
+        p.setFont(Theme::condensedFont(12, QFont::Bold));
+        p.drawText(header, Qt::AlignLeft | Qt::AlignVCenter, "COMPRESSOR");
 
-        // Bag outline with slight irregularity.
-        QPainterPath bag;
-        const int points = 24;
-        for (int i = 0; i < points; ++i) {
-            const float ang = (static_cast<float>(i) / points) * 2.0f * static_cast<float>(M_PI);
-            const float irregular = 1.0f + 0.04f * std::sin(ang * 3.0f + t * 0.6f);
-            const float rx = (bagW * 0.5f) * irregular;
-            const float ry = (bagH * 0.5f) * (1.0f + 0.03f * std::cos(ang * 2.0f + t * 0.4f));
-            const QPointF pt(c.x() + std::cos(ang) * rx, c.y() + std::sin(ang) * ry);
+        // Menu icon (right)
+        const float menuX = inner.right() - 30;
+        const float menuY = header.center().y() - 6;
+        p.setPen(QPen(white, 2.0, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(QPointF(menuX, menuY), QPointF(menuX + 20, menuY));
+        p.drawLine(QPointF(menuX, menuY + 6), QPointF(menuX + 20, menuY + 6));
+        p.drawLine(QPointF(menuX, menuY + 12), QPointF(menuX + 20, menuY + 12));
+
+        // Layout zones
+        const float meterW = inner.width() * 0.12f;
+        const float gap = 10.0f;
+        const float footerH = inner.height() * 0.28f;
+        QRectF metersTop(inner.left(), header.bottom() + 6, inner.width(), inner.height() - header.height() - 6);
+        QRectF graphRect(inner.left() + meterW + gap,
+                         header.bottom() + 6,
+                         inner.width() - meterW * 2.0f - gap * 2.0f,
+                         metersTop.height() - footerH - 8);
+        QRectF footerRect(inner.left(), graphRect.bottom() + 8, inner.width(), footerH);
+
+        // IN/OUT meters
+        auto drawMeter = [&](const QRectF &mr, float lvl, const QString &label) {
+            p.setPen(QPen(grid, 1.0));
+            p.setBrush(panel);
+            p.drawRoundedRect(mr, 8, 8);
+            const float fillH = qMax(2.0f, (mr.height() - 6) * lvl);
+            QRectF fill(mr.left() + 3, mr.bottom() - 3 - fillH, mr.width() - 6, fillH);
+            p.setBrush(cyan);
+            p.setPen(Qt::NoPen);
+            p.drawRoundedRect(fill, 6, 6);
+            p.setPen(white);
+            p.setFont(Theme::baseFont(9, QFont::DemiBold));
+            p.drawText(QRectF(mr.left(), mr.top() - 18, mr.width(), 16),
+                       Qt::AlignCenter, label);
+            p.setPen(QPen(grid, 1.0));
+            p.drawLine(QPointF(mr.center().x(), mr.bottom() - 12), QPointF(mr.center().x(), mr.bottom() - 24));
+        };
+
+        const float inLevel = clamp01(level);
+        const float outLevel = clamp01(level * (1.0f - m_compValue * 0.5f));
+        QRectF inRect(inner.left(), graphRect.top(), meterW - 6, graphRect.height());
+        QRectF outRect(inner.right() - meterW + 6, graphRect.top(), meterW - 6, graphRect.height());
+        drawMeter(inRect, inLevel, "IN");
+        drawMeter(outRect, outLevel, "OUT");
+
+        // Graph area
+        p.setBrush(panel);
+        p.setPen(QPen(grid, 1.0));
+        p.drawRoundedRect(graphRect, 10, 10);
+
+        // Grid lines and dB labels
+        p.setFont(Theme::baseFont(8, QFont::DemiBold));
+        for (int i = 0; i <= 6; ++i) {
+            const float y = graphRect.top() + i * (graphRect.height() / 6.0f);
+            p.setPen(QPen(grid, 1.0));
+            p.drawLine(QPointF(graphRect.left() + 6, y), QPointF(graphRect.right() - 6, y));
+            const int db = -6 * i;
+            p.setPen(white);
+            p.drawText(QRectF(graphRect.left() + 8, y - 8, 40, 14),
+                       Qt::AlignLeft | Qt::AlignVCenter, QString::number(db));
+        }
+
+        // Threshold line
+        const float thrDb = -36.0f + p1 * 36.0f;
+        const float thrNorm = (0.0f - thrDb) / 36.0f;
+        const float thrY = graphRect.top() + thrNorm * graphRect.height();
+        p.setPen(QPen(magenta, 1.4));
+        p.drawLine(QPointF(graphRect.left() + 6, thrY),
+                   QPointF(graphRect.right() - 6, thrY));
+
+        // Waveforms
+        const int count = 120;
+        QPainterPath inWave;
+        QPainterPath outWave;
+        for (int i = 0; i < count; ++i) {
+            const float x = graphRect.left() + (graphRect.width() - 12) * (i / static_cast<float>(count - 1)) + 6;
+            const float noise = std::sin(t * 1.2f + i * 0.22f) * 0.35f +
+                                std::sin(t * 0.5f + i * 0.9f) * 0.2f +
+                                (hash2(i, 3, static_cast<int>(t * 10)) - 0.5f) * 0.4f;
+            const float base = 0.25f + inLevel * 0.5f;
+            const float yIn = graphRect.center().y() - noise * graphRect.height() * base;
+            const float yOut = graphRect.center().y() - noise * graphRect.height() * (base * (0.6f + 0.4f * (1.0f - m_compValue)));
             if (i == 0) {
-                bag.moveTo(pt);
+                inWave.moveTo(QPointF(x, yIn));
+                outWave.moveTo(QPointF(x, yOut));
             } else {
-                bag.lineTo(pt);
+                inWave.lineTo(QPointF(x, yIn));
+                outWave.lineTo(QPointF(x, yOut));
             }
         }
-        bag.closeSubpath();
-        p.drawPath(bag);
+        p.setPen(QPen(QColor(220, 220, 220, 200), 1.2));
+        p.drawPath(inWave);
+        p.setPen(QPen(QColor(50, 180, 200, 220), 1.2));
+        p.drawPath(outWave);
 
-        // Airflow lines inside.
-        p.save();
-        p.setClipPath(bag);
-        const int lines = 3 + static_cast<int>(squeeze * 4.0f);
-        for (int i = 0; i < lines; ++i) {
-            const float y = lerp(bagY + bagH * 0.2f, bagY + bagH * 0.8f,
-                                 static_cast<float>(i) / qMax(1, lines - 1));
-            QPainterPath flow;
-            flow.moveTo(bagX + bagW * 0.12f, y);
-            for (int k = 1; k <= 4; ++k) {
-                const float x = bagX + bagW * (0.12f + k * 0.2f);
-                const float amp = 3.0f + squeeze * 4.0f;
-                const float dy = std::sin(t * 0.8f + k * 1.2f + i) * amp;
-                flow.lineTo(x, y + dy);
-            }
-            p.drawPath(flow);
-        }
-        // Subtle pleat lines.
-        p.setPen(QPen(QColor(210, 210, 235, 140), 1.0));
-        for (int i = 0; i < 5; ++i) {
-            const float y = bagY + bagH * (0.15f + i * 0.17f);
-            p.drawLine(QPointF(bagX + bagW * 0.18f, y),
-                       QPointF(bagX + bagW * 0.82f, y));
-        }
-        p.restore();
+        // Buttons
+        const float btnY = footerRect.top() + 6;
+        auto drawButton = [&](const QRectF &br, const QString &label, bool active) {
+            p.setBrush(active ? QColor(40, 180, 230) : panel);
+            p.setPen(QPen(active ? QColor(120, 220, 255) : grid, 1.0));
+            p.drawRoundedRect(br, 8, 8);
+            p.setPen(active ? QColor(20, 40, 60) : white);
+            p.setFont(Theme::baseFont(9, QFont::DemiBold));
+            p.drawText(br, Qt::AlignCenter, label);
+        };
+        const float btnW = 70;
+        drawButton(QRectF(inner.left() + 6, btnY, btnW, 26), "makeup", true);
+        drawButton(QRectF(inner.left() + 6 + btnW + 8, btnY, btnW, 26), "KNEE", false);
+        drawButton(QRectF(inner.left() + 6 + (btnW + 8) * 2, btnY, btnW, 26), "GRAPH", true);
+
+        // Knobs
+        auto drawKnob = [&](const QPointF &center, float radius, const QString &label,
+                            const QString &value, float norm, bool highlight) {
+            p.setBrush(Qt::white);
+            p.setPen(QPen(QColor(230, 230, 230), 1.0));
+            p.drawEllipse(center, radius, radius);
+            const float ang = -120.0f + norm * 240.0f;
+            const float rad = ang * static_cast<float>(M_PI) / 180.0f;
+            p.setPen(QPen(QColor(40, 40, 40), 2.0));
+            p.drawLine(center, QPointF(center.x() + std::cos(rad) * radius * 0.8f,
+                                       center.y() + std::sin(rad) * radius * 0.8f));
+            p.setPen(highlight ? magenta : QColor(255, 100, 130));
+            p.setFont(Theme::baseFont(8, QFont::DemiBold));
+            p.drawText(QRectF(center.x() - radius, center.y() - radius - 18, radius * 2, 16),
+                       Qt::AlignCenter, label);
+            QRectF valRect(center.x() - radius, center.y() + radius + 6, radius * 2, 18);
+            p.setBrush(QColor(0, 0, 0));
+            p.setPen(Qt::NoPen);
+            p.drawRoundedRect(valRect, 6, 6);
+            p.setPen(white);
+            p.drawText(valRect, Qt::AlignCenter, value);
+        };
+
+        const float knobR = 26;
+        const float knobY = footerRect.bottom() - 40;
+        const float knobGap = (inner.width() - knobR * 2 * 4) / 5.0f;
+        const float threshDb = -36.0f + p1 * 36.0f;
+        const float ratio = 1.0f + p2 * 11.0f;
+        const float attackMs = 5.0f + p3 * 45.0f;
+        const float releaseMs = 30.0f + p4 * 350.0f;
+        const QString tVal = QString("%1dB").arg(QString::number(threshDb, 'f', 0));
+        const QString rVal = QString::number(ratio, 'f', 1);
+        const QString aVal = QString("%1ms").arg(QString::number(attackMs, 'f', 0));
+        const QString relVal = QString("%1ms").arg(QString::number(releaseMs, 'f', 0));
+        QPointF k1(inner.left() + knobGap + knobR, knobY);
+        QPointF k2(k1.x() + (knobR * 2 + knobGap), knobY);
+        QPointF k3(k2.x() + (knobR * 2 + knobGap), knobY);
+        QPointF k4(k3.x() + (knobR * 2 + knobGap), knobY);
+        drawKnob(k1, knobR, "THRESH", tVal, p1, m_selectedParam == 0);
+        drawKnob(k2, knobR, "RATIO", rVal, p2, m_selectedParam == 1);
+        drawKnob(k3, knobR, "ATTACK", aVal, p3, m_selectedParam == 2);
+        drawKnob(k4, knobR, "RELEASE", relVal, p4, m_selectedParam == 3);
     } else if (fx == "dist") {
         // Overdriven loudspeaker.
         const float baseR = qMin(w, h) * 0.26f;

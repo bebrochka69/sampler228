@@ -17,6 +17,7 @@ public:
         float p1 = 0.5f;
         float p2 = 0.5f;
         float p3 = 0.5f;
+        float p4 = 0.5f;
     };
 
     struct Buffer {
@@ -68,6 +69,7 @@ private:
         float p1 = 0.0f;
         float p2 = 0.0f;
         float p3 = 0.0f;
+        float p4 = 0.0f;
         std::vector<float> bufA;
         std::vector<float> bufB;
         int indexA = 0;
