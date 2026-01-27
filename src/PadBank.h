@@ -41,6 +41,7 @@ public:
         float p2 = 0.5f;
         float p3 = 0.5f;
         float p4 = 0.5f;
+        float p5 = 0.0f;
     };
 
     PadParams params(int index) const;

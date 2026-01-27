@@ -55,16 +55,15 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
 }
 
 QRectF SeqPageWidget::gridRect() const {
-    const int margin = Theme::px(24);
-    const int headerHeight = Theme::px(24);
-    const float heightRatio = 0.54f;
-    const int top = margin + headerHeight + Theme::px(6);
+    const int margin = Theme::px(18);
+    const int top = Theme::px(64);
+    const float heightRatio = 0.56f;
     return QRectF(margin, top, width() - 2 * margin, height() * heightRatio);
 }
 
 QRectF SeqPageWidget::padsRect() const {
     const QRectF grid = gridRect();
-    return QRectF(grid.left(), grid.bottom() + Theme::px(28), grid.width(), Theme::px(110));
+    return QRectF(grid.left(), grid.bottom() + Theme::px(18), grid.width(), Theme::px(110));
 }
 
 int SeqPageWidget::stepIntervalMs() const {
@@ -218,16 +217,64 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     Theme::applyRenderHints(p);
     const bool lite = Theme::liteMode();
 
-    const QRectF headerRect(Theme::px(24), Theme::px(18), width() - Theme::px(48),
-                            Theme::px(22));
+    // Top transport bar
+    const QRectF topBar(Theme::px(14), Theme::px(10), width() - Theme::px(28), Theme::px(40));
+    p.setBrush(QColor(40, 38, 46));
+    p.setPen(QPen(QColor(70, 70, 80), 1.0));
+    p.drawRoundedRect(topBar, Theme::px(8), Theme::px(8));
+
+    // Play + Record
+    QRectF playRect(topBar.left() + Theme::px(8), topBar.top() + Theme::px(8),
+                    Theme::px(24), Theme::px(24));
+    QRectF recRect(playRect.right() + Theme::px(6), playRect.top(),
+                   Theme::px(24), Theme::px(24));
+    p.setBrush(QColor(30, 30, 30));
+    p.setPen(QPen(QColor(90, 90, 100), 1.0));
+    p.drawRoundedRect(playRect, Theme::px(6), Theme::px(6));
+    p.drawRoundedRect(recRect, Theme::px(6), Theme::px(6));
+    QPolygonF tri;
+    tri << QPointF(playRect.left() + Theme::px(8), playRect.top() + Theme::px(6))
+        << QPointF(playRect.right() - Theme::px(7), playRect.center().y())
+        << QPointF(playRect.left() + Theme::px(8), playRect.bottom() - Theme::px(6));
+    p.setBrush(m_playing ? Theme::accentAlt() : Theme::accent());
+    p.setPen(Qt::NoPen);
+    p.drawPolygon(tri);
+    p.setBrush(QColor(230, 80, 100));
+    p.drawEllipse(recRect.center(), Theme::px(6), Theme::px(6));
+
+    // Bars dropdown
+    QRectF barsRect(recRect.right() + Theme::px(10), playRect.top(),
+                    Theme::px(86), Theme::px(24));
+    p.setBrush(QColor(30, 30, 30));
+    p.setPen(QPen(QColor(90, 90, 100), 1.0));
+    p.drawRoundedRect(barsRect, Theme::px(6), Theme::px(6));
     p.setPen(Theme::accent());
-    p.setFont(Theme::condensedFont(12, QFont::Bold));
-    p.drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, "SEQ / 64 STEPS");
-    p.setPen(Theme::textMuted());
-    const int bpm = m_pads ? m_pads->bpm() : m_bpm;
-    const QString state = m_waiting ? "LOADING..." : (m_playing ? "PLAYING [SPACE]" : "STOPPED [SPACE]");
-    p.drawText(headerRect, Qt::AlignRight | Qt::AlignVCenter,
-               QString("%1 BPM  %2").arg(bpm).arg(state));
+    p.setFont(Theme::baseFont(9, QFont::DemiBold));
+    p.drawText(barsRect, Qt::AlignCenter, "4 BARS");
+
+    // Mini keyboard (static)
+    QRectF kbRect(barsRect.right() + Theme::px(8), barsRect.top(),
+                  Theme::px(90), Theme::px(24));
+    p.setBrush(QColor(20, 20, 20));
+    p.setPen(QPen(QColor(100, 100, 110), 1.0));
+    p.drawRoundedRect(kbRect, Theme::px(4), Theme::px(4));
+    p.setPen(QPen(QColor(220, 220, 220), 1.0));
+    for (int i = 1; i < 7; ++i) {
+        const float x = kbRect.left() + i * (kbRect.width() / 7.0f);
+        p.drawLine(QPointF(x, kbRect.top() + 2), QPointF(x, kbRect.bottom() - 2));
+    }
+
+    // Timeline strip
+    QRectF tlRect(topBar.right() - Theme::px(210), barsRect.top(),
+                  Theme::px(180), Theme::px(24));
+    p.setBrush(QColor(55, 55, 60));
+    p.setPen(QPen(QColor(90, 90, 100), 1.0));
+    p.drawRoundedRect(tlRect, Theme::px(6), Theme::px(6));
+    p.setPen(QPen(QColor(170, 70, 90), Theme::pxF(3.0f)));
+    for (int i = 0; i < 8; ++i) {
+        const float x = tlRect.left() + Theme::px(10) + i * Theme::px(20);
+        p.drawLine(QPointF(x, tlRect.center().y()), QPointF(x + Theme::px(8), tlRect.center().y()));
+    }
 
     const QRectF grid = gridRect();
     const int cols = 16;
@@ -235,21 +282,9 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     const float cellW = grid.width() / cols;
     const float cellH = grid.height() / rows;
 
-    const QColor groupA = Theme::bg1();
-    const QColor groupB = Theme::withAlpha(Theme::stroke(), 32);
-
-    // Background groups.
-    if (!lite) {
-        for (int col = 0; col < cols; ++col) {
-            const int group = col / 4;
-            const QColor groupColor = (group % 2 == 0) ? groupA : groupB;
-            const QRectF groupRect(grid.left() + col * cellW, grid.top(), cellW, grid.height());
-            p.fillRect(groupRect, groupColor);
-        }
-    } else {
-        p.fillRect(grid, Theme::bg1());
-    }
-
+    p.setBrush(QColor(28, 28, 32));
+    p.setPen(QPen(QColor(70, 70, 80), 1.0));
+    p.drawRoundedRect(grid, Theme::px(8), Theme::px(8));
 
     // Grid and notes.
     for (int row = 0; row < rows; ++row) {
@@ -259,9 +294,9 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
                                              -Theme::px(6), -Theme::px(6));
             const int step = row * cols + col;
 
-            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.setPen(QPen(QColor(60, 60, 70), 1.0));
             p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(box, Theme::px(6), Theme::px(6));
+            p.drawRoundedRect(box, Theme::px(4), Theme::px(4));
 
             if (!lite) {
                 for (int pad = 0; pad < 8; ++pad) {
@@ -277,16 +312,16 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
                                                          -Theme::px(6), -Theme::px(6));
                     p.setBrush(ghost);
                     p.setPen(Qt::NoPen);
-                    p.drawRoundedRect(ghostBox, Theme::px(5), Theme::px(5));
+                    p.drawRoundedRect(ghostBox, Theme::px(4), Theme::px(4));
                 }
             }
 
             if (m_steps[m_activePad][step]) {
-                p.setBrush(m_padColors[m_activePad]);
+                p.setBrush(QColor(180, 70, 100));
                 p.setPen(Qt::NoPen);
-                p.drawRoundedRect(box.adjusted(Theme::px(3), Theme::px(3),
-                                               -Theme::px(3), -Theme::px(3)),
-                                  Theme::px(5), Theme::px(5));
+                p.drawRoundedRect(box.adjusted(Theme::px(4), Theme::px(4),
+                                               -Theme::px(4), -Theme::px(4)),
+                                  Theme::px(4), Theme::px(4));
             }
 
             if (step == m_playStep) {
@@ -302,7 +337,7 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     // Pad input row.
     const QRectF pads = padsRect();
     const float padW = pads.width() / 8.0f;
-    const float padH = Theme::pxF(64.0f);
+    const float padH = Theme::pxF(58.0f);
     p.setFont(Theme::baseFont(10, QFont::DemiBold));
 
     for (int i = 0; i < 8; ++i) {
@@ -310,7 +345,7 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
                              pads.top() + Theme::px(8),
                              padW - Theme::px(12), padH);
         const bool active = (i == m_activePad);
-        p.setBrush(active ? m_padColors[i] : Theme::bg1());
+        p.setBrush(active ? Theme::accent() : Theme::bg1());
         p.setPen(QPen(active ? Theme::accentAlt() : Theme::stroke(), 1.2));
         p.drawRoundedRect(padRect, Theme::px(10), Theme::px(10));
 
@@ -318,4 +353,13 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
         p.drawText(padRect, Qt::AlignCenter, QString("PAD %1").arg(i + 1));
     }
 
+    // Bottom toolbar (static)
+    QRectF bottomBar(Theme::px(14), height() - Theme::px(46), width() - Theme::px(28), Theme::px(34));
+    p.setBrush(QColor(40, 38, 46));
+    p.setPen(QPen(QColor(70, 70, 80), 1.0));
+    p.drawRoundedRect(bottomBar, Theme::px(6), Theme::px(6));
+    p.setPen(Theme::accent());
+    p.setFont(Theme::baseFont(9, QFont::DemiBold));
+    p.drawText(bottomBar.adjusted(Theme::px(10), 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter,
+               "SNAP: 1/16");
 }

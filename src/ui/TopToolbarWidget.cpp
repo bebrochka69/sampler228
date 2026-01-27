@@ -4,6 +4,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QWheelEvent>
+#include <cmath>
 
 #include "PadBank.h"
 #include "Theme.h"
@@ -80,6 +81,12 @@ void TopToolbarWidget::updateStats() {
     m_stats.update();
     if (m_pads) {
         m_bpm = m_pads->bpm();
+        const float level = qBound(0.0f, m_pads->busMeter(0), 1.0f);
+        const float attack = 0.35f;
+        const float release = 0.12f;
+        const float coeff = (level > m_levelL) ? attack : release;
+        m_levelL = m_levelL + (level - m_levelL) * coeff;
+        m_levelR = m_levelL;
     }
     update();
 }
@@ -218,32 +225,43 @@ void TopToolbarWidget::paintEvent(QPaintEvent *event) {
         p.drawText(statsRect, Qt::AlignLeft | Qt::AlignVCenter, statsText);
     }
 
-    // Stereo meter outline (no simulated audio).
+    // Master VU meter (arc)
     if (centerRect.width() > statsWidth + Theme::pxF(140.0f)) {
         const float meterLeft =
             statsRect.isNull() ? centerRect.left() : statsRect.right() + Theme::pxF(16.0f);
-        const QRectF meterRect(meterLeft, centerRect.top(), Theme::px(120), centerRect.height());
-        p.setPen(QPen(Theme::stroke(), 1.0));
+        const QRectF meterRect(meterLeft, centerRect.top(), Theme::px(140), centerRect.height());
         p.setBrush(Theme::bg1());
-        p.drawRect(meterRect.adjusted(0, Theme::px(2), 0, -Theme::px(2)));
-
-        p.setFont(Theme::baseFont(9, QFont::DemiBold));
-        p.setPen(Theme::text());
-        p.drawText(QRectF(meterRect.left() + Theme::px(6), meterRect.top() + Theme::px(6),
-                          Theme::px(20), Theme::px(12)),
-                   Qt::AlignLeft, "L");
-        p.drawText(QRectF(meterRect.left() + Theme::px(60), meterRect.top() + Theme::px(6),
-                          Theme::px(20), Theme::px(12)),
-                   Qt::AlignLeft, "R");
-
-        const QRectF lBar(meterRect.left() + Theme::px(16),
-                          meterRect.bottom() - Theme::px(12), Theme::px(40), Theme::px(6));
-        const QRectF rBar(meterRect.left() + Theme::px(62),
-                          meterRect.bottom() - Theme::px(12), Theme::px(40), Theme::px(6));
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.setBrush(Theme::bg2());
-        p.drawRect(lBar);
-        p.drawRect(rBar);
+        p.drawRoundedRect(meterRect.adjusted(0, Theme::px(4), 0, -Theme::px(4)), Theme::px(8),
+                          Theme::px(8));
+
+        const QRectF arcRect(meterRect.left() + Theme::px(10), meterRect.top() + Theme::px(6),
+                             meterRect.width() - Theme::px(20), meterRect.height() - Theme::px(12));
+        p.setPen(QPen(Theme::textMuted(), 2.0));
+        p.drawArc(arcRect, 210 * 16, 120 * 16);
+
+        // Tick marks
+        p.setPen(QPen(Theme::textMuted(), 1.4));
+        for (int i = 0; i <= 6; ++i) {
+            const float t = static_cast<float>(i) / 6.0f;
+            const float ang = (210.0f + 120.0f * t) * static_cast<float>(M_PI) / 180.0f;
+            const QPointF c = arcRect.center();
+            const float r1 = arcRect.width() * 0.45f;
+            const float r2 = r1 - Theme::pxF(6.0f);
+            p.drawLine(QPointF(c.x() + std::cos(ang) * r1, c.y() + std::sin(ang) * r1),
+                       QPointF(c.x() + std::cos(ang) * r2, c.y() + std::sin(ang) * r2));
+        }
+
+        // Needle based on master level
+        const float level = qBound(0.0f, m_levelL, 1.0f);
+        const float ang = (210.0f + 120.0f * level) * static_cast<float>(M_PI) / 180.0f;
+        const QPointF c = arcRect.center();
+        const float r = arcRect.width() * 0.42f;
+        p.setPen(QPen(Theme::accentAlt(), 2.0, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(c, QPointF(c.x() + std::cos(ang) * r, c.y() + std::sin(ang) * r));
+        p.setBrush(Theme::accentAlt());
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(c, Theme::pxF(3.0f), Theme::pxF(3.0f));
     }
 
     // Pad indicators.

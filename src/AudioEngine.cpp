@@ -242,6 +242,7 @@ void AudioEngine::setBusEffects(int bus, const std::vector<EffectSettings> &effe
         state.p2 = cfg.p2;
         state.p3 = cfg.p3;
         state.p4 = cfg.p4;
+        state.p5 = cfg.p5;
         chain.effects.push_back(std::move(state));
     }
 }
@@ -422,6 +423,7 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
         const float p2 = safeParam(fx.p2);
         const float p3 = safeParam(fx.p3);
         const float p4 = safeParam(fx.p4);
+        const float p5 = safeParam(fx.p5);
         switch (fx.type) {
             case 1: {  // reverb
                 if (fx.bufA.empty()) {
@@ -471,8 +473,9 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                         const float over = fx.env / threshold;
                         gain = std::pow(over, -(ratio - 1.0f) / ratio);
                     }
+                    const float makeup = (p5 >= 0.5f) ? 1.35f : 1.0f;
                     for (int ch = 0; ch < m_channels; ++ch) {
-                        buffer[i * m_channels + ch] *= gain;
+                        buffer[i * m_channels + ch] *= (gain * makeup);
                     }
                 }
                 break;

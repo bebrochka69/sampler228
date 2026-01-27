@@ -1169,6 +1169,7 @@ void PadBank::setBusEffects(int bus, const QVector<BusEffect> &effects) {
         cfg.p2 = fx.p2;
         cfg.p3 = fx.p3;
         cfg.p4 = fx.p4;
+        cfg.p5 = fx.p5;
         settings.push_back(cfg);
     }
     m_engine->setBusEffects(bus, settings);

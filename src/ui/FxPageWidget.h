@@ -22,6 +22,7 @@ struct FxInsert {
     float p2 = 0.5f;
     float p3 = 0.5f;
     float p4 = 0.5f;
+    float p5 = 0.0f; // makeup on/off
 };
 
 struct FxTrack {
@@ -77,4 +78,6 @@ private:
     float m_animTime = 0.0f;
     float m_sidechainValue = 0.0f;
     float m_compValue = 0.0f;
+    QVector<float> m_waveHistory;
+    QRectF m_makeupRect;
 };

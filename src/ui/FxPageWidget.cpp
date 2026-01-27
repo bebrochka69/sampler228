@@ -46,6 +46,8 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
     m_animTimer.setInterval(16);
     m_animTimer.setTimerType(Qt::PreciseTimer);
     connect(&m_animTimer, &QTimer::timeout, this, &FxPageWidget::advanceAnimation);
+
+    m_waveHistory.fill(0.0f, 200);
 }
 
 void FxPageWidget::assignEffect(int effectIndex) {
@@ -64,6 +66,7 @@ void FxPageWidget::assignEffect(int effectIndex) {
     track.inserts[m_selectedSlot].p2 = 0.5f;
     track.inserts[m_selectedSlot].p3 = 0.5f;
     track.inserts[m_selectedSlot].p4 = 0.5f;
+    track.inserts[m_selectedSlot].p5 = 0.0f;
     syncBusEffects(m_selectedTrack);
     update();
 }
@@ -271,12 +274,18 @@ void FxPageWidget::advanceAnimation() {
             amount = (level - threshold) / qMax(0.001f, (1.0f - threshold));
         }
         const float target = clamp01(amount) * (0.4f + clamp01(slot.p2) * 0.6f);
-        const float attack = 0.18f;
-        const float release = 0.04f + clamp01(slot.p3) * 0.08f;
+        const float attack = 0.12f + clamp01(slot.p3) * 0.25f;
+        const float release = 0.04f + clamp01(slot.p4) * 0.18f;
         const float coeff = (target > m_compValue) ? attack : release;
         m_compValue = m_compValue + (target - m_compValue) * coeff;
     } else {
         m_compValue *= 0.9f;
+    }
+
+    const float waveLevel = m_pads ? m_pads->busMeter(m_selectedTrack) : 0.0f;
+    if (!m_waveHistory.isEmpty()) {
+        m_waveHistory.remove(0);
+        m_waveHistory.push_back(clamp01(waveLevel));
     }
 
     update();
@@ -298,6 +307,19 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
         m_showMenu = false;
         update();
         return;
+    }
+
+    if (m_makeupRect.contains(pos)) {
+        if (m_selectedTrack >= 0 && m_selectedTrack < m_tracks.size() &&
+            m_selectedSlot >= 0 && m_selectedSlot < m_tracks[m_selectedTrack].inserts.size()) {
+            FxInsert &slot = m_tracks[m_selectedTrack].inserts[m_selectedSlot];
+            if (slot.effect.toLower() == "comp") {
+                slot.p5 = (slot.p5 >= 0.5f) ? 0.0f : 1.0f;
+                syncBusEffects(m_selectedTrack);
+                update();
+                return;
+            }
+        }
     }
 
     for (const FxInsertHit &hit : m_slotHits) {
@@ -335,6 +357,7 @@ void FxPageWidget::syncBusEffects(int trackIndex) {
             fx.p2 = slot.p2;
             fx.p3 = slot.p3;
             fx.p4 = slot.p4;
+            fx.p5 = slot.p5;
             ids.push_back(fx);
         }
     }
@@ -345,6 +368,7 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
                                      float level) {
     p.save();
     Theme::applyRenderHints(p);
+    m_makeupRect = QRectF();
 
     const QRectF r = rect.adjusted(10, 10, -10, -10);
     const QPointF c = r.center();
@@ -356,6 +380,7 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
     const float p2 = clamp01(slot.p2);
     const float p3 = clamp01(slot.p3);
     const float p4 = clamp01(slot.p4);
+    const float p5 = clamp01(slot.p5);
     const QString fx = slot.effect.toLower();
 
     if (fx.isEmpty()) {
@@ -445,6 +470,14 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.setPen(QPen(grid, 1.0));
         p.drawRoundedRect(graphRect, 10, 10);
 
+        // Compression amount label
+        const float grDb = -m_compValue * 18.0f;
+        p.setPen(magenta);
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.drawText(QRectF(graphRect.left() + 8, graphRect.top() + 2, graphRect.width(), 14),
+                   Qt::AlignLeft | Qt::AlignVCenter,
+                   QString("GR %1 dB").arg(QString::number(grDb, 'f', 1)));
+
         // Grid lines and dB labels
         p.setFont(Theme::baseFont(8, QFont::DemiBold));
         for (int i = 0; i <= 6; ++i) {
@@ -465,45 +498,36 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.drawLine(QPointF(graphRect.left() + 6, thrY),
                    QPointF(graphRect.right() - 6, thrY));
 
-        // Waveforms
-        const int count = 120;
-        QPainterPath inWave;
-        QPainterPath outWave;
-        for (int i = 0; i < count; ++i) {
-            const float x = graphRect.left() + (graphRect.width() - 12) * (i / static_cast<float>(count - 1)) + 6;
-            const float noise = std::sin(t * 1.2f + i * 0.22f) * 0.35f +
-                                std::sin(t * 0.5f + i * 0.9f) * 0.2f +
-                                (hash2(i, 3, static_cast<int>(t * 10)) - 0.5f) * 0.4f;
-            const float base = 0.25f + inLevel * 0.5f;
-            const float yIn = graphRect.center().y() - noise * graphRect.height() * base;
-            const float yOut = graphRect.center().y() - noise * graphRect.height() * (base * (0.6f + 0.4f * (1.0f - m_compValue)));
-            if (i == 0) {
-                inWave.moveTo(QPointF(x, yIn));
-                outWave.moveTo(QPointF(x, yOut));
-            } else {
-                inWave.lineTo(QPointF(x, yIn));
-                outWave.lineTo(QPointF(x, yOut));
+        // Waveform (real level history)
+        if (!m_waveHistory.isEmpty()) {
+            QPainterPath wave;
+            const int count = m_waveHistory.size();
+            for (int i = 0; i < count; ++i) {
+                const float x = graphRect.left() + 6 +
+                                (graphRect.width() - 12) * (i / static_cast<float>(count - 1));
+                const float amp = m_waveHistory[i];
+                const float y = graphRect.center().y() - (amp * 0.9f) * (graphRect.height() * 0.45f);
+                if (i == 0) {
+                    wave.moveTo(QPointF(x, y));
+                } else {
+                    wave.lineTo(QPointF(x, y));
+                }
             }
+            p.setPen(QPen(QColor(220, 220, 220, 210), 1.2));
+            p.drawPath(wave);
         }
-        p.setPen(QPen(QColor(220, 220, 220, 200), 1.2));
-        p.drawPath(inWave);
-        p.setPen(QPen(QColor(50, 180, 200, 220), 1.2));
-        p.drawPath(outWave);
 
-        // Buttons
+        // Makeup button
         const float btnY = footerRect.top() + 6;
-        auto drawButton = [&](const QRectF &br, const QString &label, bool active) {
-            p.setBrush(active ? QColor(40, 180, 230) : panel);
-            p.setPen(QPen(active ? QColor(120, 220, 255) : grid, 1.0));
-            p.drawRoundedRect(br, 8, 8);
-            p.setPen(active ? QColor(20, 40, 60) : white);
-            p.setFont(Theme::baseFont(9, QFont::DemiBold));
-            p.drawText(br, Qt::AlignCenter, label);
-        };
-        const float btnW = 70;
-        drawButton(QRectF(inner.left() + 6, btnY, btnW, 26), "makeup", true);
-        drawButton(QRectF(inner.left() + 6 + btnW + 8, btnY, btnW, 26), "KNEE", false);
-        drawButton(QRectF(inner.left() + 6 + (btnW + 8) * 2, btnY, btnW, 26), "GRAPH", true);
+        const float btnW = 80;
+        m_makeupRect = QRectF(inner.left() + 6, btnY, btnW, 26);
+        const bool makeupOn = (p5 >= 0.5f);
+        p.setBrush(makeupOn ? QColor(40, 180, 230) : panel);
+        p.setPen(QPen(makeupOn ? QColor(120, 220, 255) : grid, 1.0));
+        p.drawRoundedRect(m_makeupRect, 8, 8);
+        p.setPen(makeupOn ? QColor(20, 40, 60) : white);
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.drawText(m_makeupRect, Qt::AlignCenter, "makeup");
 
         // Knobs
         auto drawKnob = [&](const QPointF &center, float radius, const QString &label,
@@ -638,33 +662,47 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.drawLine(QPointF(screen.right() - 40, screen.bottom() - 14),
                    QPointF(screen.right() - 18, screen.bottom() - 14));
     } else if (fx == "eq") {
-        // Living creature line (fish/snake).
-        const float low = lerp(0.25f, 0.85f, p1);
-        const float mid = lerp(0.2f, 0.9f, p2);
-        const float high = lerp(0.25f, 0.85f, p3);
-        const float sway = std::sin(t * 0.6f) * 0.05f;
-        const QPointF head(r.left(), r.center().y() - h * (low * 0.3f + sway));
-        const QPointF midPt(c.x(), r.center().y() - h * (mid * 0.4f - sway));
-        const QPointF tail(r.right(), r.center().y() - h * (high * 0.3f + sway * 0.6f));
-        QPainterPath body(head);
-        body.cubicTo(QPointF(r.left() + w * 0.25f, head.y() - h * 0.2f),
-                     QPointF(c.x() - w * 0.1f, midPt.y() + h * 0.15f), midPt);
-        body.cubicTo(QPointF(c.x() + w * 0.1f, midPt.y() - h * 0.15f),
-                     QPointF(r.right() - w * 0.25f, tail.y() + h * 0.18f), tail);
-        p.setPen(QPen(QColor(140, 255, 210, 220), 2.0, Qt::SolidLine, Qt::RoundCap,
-                      Qt::RoundJoin));
-        p.drawPath(body);
+        // Static EQ curve with spectrum look (no drift).
+        const QRectF frame = r.adjusted(8, 10, -8, -12);
+        p.setPen(QPen(QColor(80, 160, 200, 200), 1.2));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(frame, 8, 8);
 
-        p.setBrush(QColor(140, 255, 210, 200));
+        // Grid
+        p.setPen(QPen(QColor(60, 60, 80, 160), 1.0));
+        for (int i = 1; i < 6; ++i) {
+            const float y = frame.top() + (frame.height() / 6.0f) * i;
+            p.drawLine(QPointF(frame.left() + 6, y), QPointF(frame.right() - 6, y));
+        }
+
+        const float low = lerp(0.15f, 0.9f, p1);
+        const float mid = lerp(0.15f, 0.9f, p2);
+        const float high = lerp(0.15f, 0.9f, p3);
+        const QPointF pL(frame.left() + frame.width() * 0.1f,
+                         frame.bottom() - frame.height() * low);
+        const QPointF pM(frame.left() + frame.width() * 0.5f,
+                         frame.bottom() - frame.height() * mid);
+        const QPointF pH(frame.left() + frame.width() * 0.9f,
+                         frame.bottom() - frame.height() * high);
+
+        QPainterPath curve;
+        curve.moveTo(frame.left(), frame.bottom());
+        curve.cubicTo(QPointF(frame.left() + frame.width() * 0.2f, pL.y()),
+                      QPointF(frame.left() + frame.width() * 0.35f, pM.y()), pM);
+        curve.cubicTo(QPointF(frame.left() + frame.width() * 0.65f, pM.y()),
+                      QPointF(frame.left() + frame.width() * 0.8f, pH.y()), pH);
+        curve.lineTo(frame.right(), frame.bottom());
+        curve.closeSubpath();
+
+        p.setBrush(QColor(80, 160, 200, 80));
+        p.setPen(QPen(QColor(190, 210, 220, 220), 1.4));
+        p.drawPath(curve);
+
+        p.setBrush(QColor(220, 220, 220));
         p.setPen(Qt::NoPen);
-        p.drawEllipse(head + QPointF(6, -2), 3, 3);  // eye
-        p.drawEllipse(midPt, 4, 4);
-        p.drawEllipse(tail + QPointF(-6, 2), 3, 3);
-
-        // Fin / ripple accents.
-        p.setPen(QPen(QColor(140, 255, 210, 120), 1.0));
-        p.drawLine(midPt + QPointF(-10, 6), midPt + QPointF(-2, 14));
-        p.drawLine(midPt + QPointF(8, -6), midPt + QPointF(16, -14));
+        p.drawEllipse(pL, 3, 3);
+        p.drawEllipse(pM, 3, 3);
+        p.drawEllipse(pH, 3, 3);
     } else if (fx == "cassette") {
         // Cassette shell.
         const QRectF shell = r.adjusted(10, 14, -10, -18);
@@ -860,63 +898,77 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         QRectF stripRect(x, stripsRect.top(), stripW, stripH);
         const bool activeTrack = (i == m_selectedTrack);
 
-        p.setBrush(Theme::bg1());
+        const QColor busBg(46, 38, 80);
+        const QColor slotCyan(12, 200, 255);
+        const QColor meterRed(255, 40, 90);
+        const QColor meterCyan(20, 210, 255);
+
+        p.setBrush(busBg);
         p.setPen(QPen(activeTrack ? Theme::accentAlt() : Theme::stroke(), 1.2));
         p.drawRoundedRect(stripRect, 10, 10);
 
-        QRectF nameRect(stripRect.left(), stripRect.top(), stripRect.width(), 20);
-        p.setPen(activeTrack ? Theme::accentAlt() : Theme::textMuted());
+        QRectF nameRect(stripRect.left(), stripRect.top(), stripRect.width(), Theme::px(22));
+        p.setPen(Qt::white);
         p.drawText(nameRect, Qt::AlignCenter, m_tracks[i].name);
 
-        // Meter (real bus level).
-        QRectF meterRect(stripRect.left() + Theme::px(6), nameRect.bottom() + Theme::px(8),
-                         Theme::px(10), stripRect.height() - Theme::px(60));
-        p.setBrush(Theme::bg2());
+        const float meterW = Theme::pxF(18.0f);
+        QRectF meterRect(stripRect.right() - meterW - Theme::px(6), nameRect.bottom() + Theme::px(6),
+                         meterW, stripRect.height() - Theme::px(58));
+        p.setBrush(QColor(60, 50, 95));
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(meterRect, 4, 4);
+        p.drawRoundedRect(meterRect, Theme::px(4), Theme::px(4));
+
         float level = 0.0f;
         if (m_pads) {
             level = m_pads->busMeter(i);
         }
         level = qBound(0.0f, level, 1.0f);
-        QRectF meterFill(meterRect.left() + Theme::px(1),
+        QRectF meterFill(meterRect.left() + Theme::px(2),
                          meterRect.bottom() - meterRect.height() * level,
-                         meterRect.width() - Theme::px(2),
-                         meterRect.height() * level - Theme::px(1));
-        p.setBrush(Theme::accent());
+                         meterRect.width() - Theme::px(4),
+                         meterRect.height() * level - Theme::px(2));
+        p.setBrush(meterCyan);
         p.setPen(Qt::NoPen);
         p.drawRect(meterFill);
 
-        // Insert slots.
-        float slotTop = nameRect.bottom() + Theme::px(6);
+        // dB label bar
+        QRectF dbBar(meterRect.left() - Theme::px(8), meterRect.top(), Theme::px(8),
+                     meterRect.height());
+        p.setBrush(meterRed);
+        p.drawRect(dbBar);
+
+        // Insert slots (cyan blocks)
+        float slotTop = nameRect.bottom() + Theme::px(8);
+        const float slotLeft = stripRect.left() + Theme::px(8);
+        const float slotRight = meterRect.left() - Theme::px(8);
         for (int s = 0; s < slotCount; ++s) {
-            QRectF slotRect(stripRect.left() + Theme::px(22), slotTop,
-                            stripRect.width() - Theme::px(30), slotH);
+            QRectF slotRect(slotLeft, slotTop, slotRight - slotLeft, slotH);
             const bool slotSelected = (activeTrack && s == m_selectedSlot);
-            p.setBrush(slotSelected ? Theme::bg3() : Theme::bg2());
-            p.setPen(QPen(slotSelected ? Theme::accent() : Theme::stroke(), 1.0));
+            p.setBrush(slotSelected ? Theme::accentAlt() : slotCyan);
+            p.setPen(Qt::NoPen);
             p.drawRoundedRect(slotRect, Theme::px(6), Theme::px(6));
             const QString effectName = m_tracks[i].inserts[s].effect;
-            QString label = effectName.isEmpty() ? QString("INSERT %1").arg(s + 1)
-                                                 : effectName.toUpper();
-            p.setPen(slotSelected ? Theme::accent() : Theme::text());
+            QString label = effectName.isEmpty() ? QString("--") : effectName.toUpper();
+            p.setPen(QColor(20, 30, 40));
             p.drawText(slotRect.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
                        Qt::AlignVCenter | Qt::AlignLeft, label);
             m_slotHits.push_back({slotRect, i, s});
             slotTop += slotH + Theme::px(6);
         }
 
-        // Fader.
-        QRectF faderRect(stripRect.left() + stripRect.width() / 2.0f - Theme::px(6),
-                         stripRect.bottom() - Theme::px(120), Theme::px(12), Theme::px(90));
-        p.setBrush(Theme::bg2());
+        // M / S buttons
+        const QRectF msRect(stripRect.left(), stripRect.bottom() - Theme::px(30),
+                            stripRect.width(), Theme::px(30));
+        QRectF mRect(msRect.left(), msRect.top(), msRect.width() * 0.5f, msRect.height());
+        QRectF sRect(msRect.center().x(), msRect.top(), msRect.width() * 0.5f, msRect.height());
+        p.setBrush(QColor(36, 30, 70));
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(faderRect, Theme::px(4), Theme::px(4));
-        QRectF knob(faderRect.left() - Theme::px(6),
-                    faderRect.bottom() - Theme::px(30), Theme::px(24), Theme::px(12));
-        p.setBrush(Theme::accentAlt());
-        p.setPen(Qt::NoPen);
-        p.drawRoundedRect(knob, Theme::px(3), Theme::px(3));
+        p.drawRect(mRect);
+        p.drawRect(sRect);
+        p.setPen(QColor(255, 80, 120));
+        p.drawText(mRect, Qt::AlignCenter, "M");
+        p.setPen(QColor(20, 200, 255));
+        p.drawText(sRect, Qt::AlignCenter, "S");
     }
 
     if (m_showMenu) {
