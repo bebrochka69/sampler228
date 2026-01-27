@@ -68,6 +68,7 @@ private:
     int m_selectedSlot = 0;
     int m_selectedEffect = 0;
     bool m_showMenu = false;
+    bool m_showEditor = false;
     int m_selectedParam = 0;
 
     QVector<FxInsertHit> m_slotHits;
@@ -80,4 +81,5 @@ private:
     float m_compValue = 0.0f;
     QVector<float> m_waveHistory;
     QRectF m_makeupRect;
+    QRectF m_closeRect;
 };
