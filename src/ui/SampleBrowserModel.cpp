@@ -49,7 +49,7 @@ void scanProcMounts(QSet<QString> &seenRoots,
     }
 }
 
-void scanAudioRecursive(Node *node, int depth, int maxDepth) {
+void scanAudioRecursive(SampleBrowserModel::Node *node, int depth, int maxDepth) {
     if (!node || !node->isDir || depth > maxDepth) {
         return;
     }
