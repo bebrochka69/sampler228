@@ -50,6 +50,7 @@ public:
 
     void setBusEffects(int bus, const std::vector<EffectSettings> &effects);
     float busMeter(int bus) const;
+    void setBusGain(int bus, float gain);
 
 private:
     struct Voice {
@@ -106,5 +107,6 @@ private:
     std::array<BusChain, 6> m_busChains;
     std::array<std::vector<float>, 6> m_busBuffers;
     std::array<std::atomic<float>, 6> m_busMeters{};
+    std::array<std::atomic<float>, 6> m_busGains{};
     void *m_pcmHandle = nullptr;
 };

@@ -12,6 +12,70 @@
 #include "Theme.h"
 #include "WaveformRenderer.h"
 
+namespace {
+void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &samples) {
+    if (samples.isEmpty() || rect.width() <= 2.0 || rect.height() <= 2.0) {
+        return;
+    }
+
+    const int count = samples.size();
+    const int steps = qMax(2, static_cast<int>(rect.width()));
+    const float midY = rect.center().y();
+    const float amp = rect.height() * 0.45f;
+
+    QPainterPath area;
+    QPainterPath outline;
+    bool first = true;
+
+    for (int x = 0; x < steps; ++x) {
+        const int i0 = (x * count) / steps;
+        const int i1 = qMin(count - 1, ((x + 1) * count) / steps);
+        float minV = 1.0f;
+        float maxV = -1.0f;
+        for (int i = i0; i <= i1; ++i) {
+            const float v = samples[i];
+            if (v < minV) minV = v;
+            if (v > maxV) maxV = v;
+        }
+        const float px = rect.left() + static_cast<float>(x);
+        const float yMax = midY - maxV * amp;
+        if (first) {
+            outline.moveTo(px, yMax);
+            area.moveTo(px, yMax);
+            first = false;
+        } else {
+            outline.lineTo(px, yMax);
+            area.lineTo(px, yMax);
+        }
+    }
+
+    for (int x = steps - 1; x >= 0; --x) {
+        const int i0 = (x * count) / steps;
+        const int i1 = qMin(count - 1, ((x + 1) * count) / steps);
+        float minV = 1.0f;
+        for (int i = i0; i <= i1; ++i) {
+            const float v = samples[i];
+            if (v < minV) minV = v;
+        }
+        const float px = rect.left() + static_cast<float>(x);
+        const float yMin = midY - minV * amp;
+        area.lineTo(px, yMin);
+    }
+    area.closeSubpath();
+
+    p.save();
+    p.setClipRect(rect);
+    p.setPen(QPen(QColor(235, 140, 140), 1.4));
+    p.drawPath(outline);
+    p.setBrush(QColor(150, 220, 190, 130));
+    p.setPen(Qt::NoPen);
+    p.drawPath(area);
+    p.setPen(QPen(QColor(180, 180, 180, 120), 1.0));
+    p.drawLine(QPointF(rect.left(), midY), QPointF(rect.right(), midY));
+    p.restore();
+}
+}  // namespace
+
 EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *parent)
     : QWidget(parent), m_session(session), m_pads(pads) {
     setAutoFillBackground(false);
@@ -335,8 +399,7 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         p.setFont(Theme::baseFont(12, QFont::DemiBold));
         p.drawText(waveInner, Qt::AlignCenter, "NO SAMPLE");
     } else {
-        WaveformRenderer::drawWaveform(p, waveInner, wave, Theme::accent(),
-                                       Theme::withAlpha(Theme::textMuted(), 120));
+        drawWaveformRibbon(p, waveInner, wave);
     }
 
     // Vertical grid lines with stronger center divisions.

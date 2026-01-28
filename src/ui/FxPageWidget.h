@@ -49,6 +49,8 @@ public:
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
@@ -73,6 +75,7 @@ private:
 
     QVector<FxInsertHit> m_slotHits;
     QVector<FxEffectHit> m_effectHits;
+    QVector<QRectF> m_faderHits;
 
     QTimer m_animTimer;
     QElapsedTimer m_clock;
@@ -82,4 +85,5 @@ private:
     QVector<float> m_waveHistory;
     QRectF m_makeupRect;
     QRectF m_closeRect;
+    int m_dragFaderTrack = -1;
 };

@@ -180,6 +180,12 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
     if (m_engineAvailable) {
         m_engineRate = m_engine->sampleRate();
     }
+    m_busGain.fill(1.0f);
+    if (m_engineAvailable && m_engine) {
+        for (int i = 0; i < static_cast<int>(m_busGain.size()); ++i) {
+            m_engine->setBusGain(i, m_busGain[static_cast<size_t>(i)]);
+        }
+    }
     m_ffmpegPath = QStandardPaths::findExecutable("ffmpeg");
 
     bool forceExternal = false;
@@ -1180,6 +1186,24 @@ float PadBank::busMeter(int bus) const {
         return 0.0f;
     }
     return m_engine->busMeter(bus);
+}
+
+float PadBank::busGain(int bus) const {
+    if (bus < 0 || bus >= static_cast<int>(m_busGain.size())) {
+        return 1.0f;
+    }
+    return m_busGain[static_cast<size_t>(bus)];
+}
+
+void PadBank::setBusGain(int bus, float gain) {
+    if (bus < 0 || bus >= static_cast<int>(m_busGain.size())) {
+        return;
+    }
+    const float clamped = qBound(0.0f, gain, 1.2f);
+    m_busGain[static_cast<size_t>(bus)] = clamped;
+    if (m_engineAvailable && m_engine) {
+        m_engine->setBusGain(bus, clamped);
+    }
 }
 
 int PadBank::stretchCount() {

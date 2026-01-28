@@ -72,6 +72,8 @@ public:
     static QString fxBusLabel(int index);
     void setBusEffects(int bus, const QVector<BusEffect> &effects);
     float busMeter(int bus) const;
+    float busGain(int bus) const;
+    void setBusGain(int bus, float gain);
 
 signals:
     void padChanged(int index);
@@ -95,4 +97,5 @@ private:
     int m_renderSerial = 0;
     QString m_ffmpegPath;
     std::unique_ptr<class AudioEngine> m_engine;
+    std::array<float, 6> m_busGain{};
 };

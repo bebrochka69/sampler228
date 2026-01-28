@@ -345,6 +345,20 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
         }
     }
 
+    for (int i = 0; i < m_faderHits.size(); ++i) {
+        if (m_faderHits[i].contains(pos)) {
+            m_dragFaderTrack = i;
+            if (m_pads) {
+                const QRectF fader = m_faderHits[i];
+                const float norm =
+                    1.0f - (pos.y() - fader.top()) / qMax(1.0f, fader.height());
+                m_pads->setBusGain(i, qBound(0.0f, norm, 1.2f));
+            }
+            update();
+            return;
+        }
+    }
+
     for (const FxInsertHit &hit : m_slotHits) {
         if (hit.rect.contains(pos)) {
             m_selectedTrack = hit.track;
@@ -358,6 +372,22 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
 
     m_showMenu = false;
     update();
+}
+
+void FxPageWidget::mouseMoveEvent(QMouseEvent *event) {
+    if (m_dragFaderTrack < 0 || !m_pads) {
+        return;
+    }
+    const QRectF fader = m_faderHits.value(m_dragFaderTrack);
+    const QPointF pos = event->position();
+    const float norm = 1.0f - (pos.y() - fader.top()) / qMax(1.0f, fader.height());
+    m_pads->setBusGain(m_dragFaderTrack, qBound(0.0f, norm, 1.2f));
+    update();
+}
+
+void FxPageWidget::mouseReleaseEvent(QMouseEvent *event) {
+    Q_UNUSED(event);
+    m_dragFaderTrack = -1;
 }
 
 void FxPageWidget::syncBusEffects(int trackIndex) {
@@ -869,6 +899,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     const int slotCount = m_tracks.first().inserts.size();
 
     m_slotHits.clear();
+    m_faderHits.clear();
     p.setFont(Theme::baseFont(9, QFont::DemiBold));
 
     for (int i = 0; i < trackCount; ++i) {
@@ -878,7 +909,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
         const QColor busBg(46, 38, 80);
         const QColor slotCyan(12, 200, 255);
-        const QColor meterRed(255, 40, 90);
+        const QColor meterPink(255, 60, 120);
         const QColor meterCyan(20, 210, 255);
 
         p.setBrush(busBg);
@@ -909,29 +940,41 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.setPen(Qt::NoPen);
         p.drawRect(meterFill);
 
-        // dB label bar
-        QRectF dbBar(meterRect.left() - Theme::px(8), meterRect.top(), Theme::px(8),
-                     meterRect.height());
-        p.setBrush(meterRed);
-        p.drawRect(dbBar);
+        // Pink volume bar (interactive).
+        QRectF faderRect(meterRect.left() - Theme::px(14), meterRect.top(), Theme::px(10),
+                         meterRect.height());
+        p.setBrush(QColor(90, 70, 120));
+        p.setPen(Qt::NoPen);
+        p.drawRect(faderRect);
+        float gain = 1.0f;
+        if (m_pads) {
+            gain = m_pads->busGain(i);
+        }
+        gain = qBound(0.0f, gain, 1.2f);
+        const float gainH = faderRect.height() * (gain / 1.2f);
+        QRectF gainFill(faderRect.left(), faderRect.bottom() - gainH, faderRect.width(), gainH);
+        p.setBrush(meterPink);
+        p.drawRect(gainFill);
+        m_faderHits.push_back(faderRect);
 
         // Insert slots (cyan blocks)
         float slotTop = nameRect.bottom() + Theme::px(8);
         const float slotLeft = stripRect.left() + Theme::px(8);
         const float slotRight = meterRect.left() - Theme::px(8);
+        const float slotSize = qMin(slotH, slotRight - slotLeft);
         for (int s = 0; s < slotCount; ++s) {
-            QRectF slotRect(slotLeft, slotTop, slotRight - slotLeft, slotH);
+            QRectF slotRect(slotLeft, slotTop, slotSize, slotSize);
             const bool slotSelected = (activeTrack && s == m_selectedSlot);
             p.setBrush(slotSelected ? Theme::accentAlt() : slotCyan);
             p.setPen(Qt::NoPen);
-            p.drawRoundedRect(slotRect, Theme::px(6), Theme::px(6));
+            p.drawRect(slotRect);
             const QString effectName = m_tracks[i].inserts[s].effect;
             QString label = effectName.isEmpty() ? QString("--") : effectName.toUpper();
             p.setPen(QColor(20, 30, 40));
             p.drawText(slotRect.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
                        Qt::AlignVCenter | Qt::AlignLeft, label);
             m_slotHits.push_back({slotRect, i, s});
-            slotTop += slotH + Theme::px(6);
+            slotTop += slotSize + Theme::px(6);
         }
 
         // M / S buttons

@@ -41,7 +41,15 @@ void computePanGains(float pan, float volume, float &left, float &right) {
 }  // namespace
 
 AudioEngine::AudioEngine(QObject *parent) : QObject(parent) {
+#ifndef GROOVEBOX_WITH_ALSA
+    for (auto &gain : m_busGains) {
+        gain.store(1.0f);
+    }
+#endif
 #ifdef GROOVEBOX_WITH_ALSA
+    for (auto &gain : m_busGains) {
+        gain.store(1.0f);
+    }
     start();
 #endif
 }
@@ -254,6 +262,13 @@ float AudioEngine::busMeter(int bus) const {
     return m_busMeters[static_cast<size_t>(bus)].load();
 }
 
+void AudioEngine::setBusGain(int bus, float gain) {
+    if (bus < 0 || bus >= static_cast<int>(m_busGains.size())) {
+        return;
+    }
+    m_busGains[static_cast<size_t>(bus)].store(qBound(0.0f, gain, 1.2f));
+}
+
 void AudioEngine::run() {
 #ifdef GROOVEBOX_WITH_ALSA
     snd_pcm_t *pcm = static_cast<snd_pcm_t *>(m_pcmHandle);
@@ -370,6 +385,10 @@ void AudioEngine::mix(float *out, int frames) {
     // Process buses 1..5 into master.
     for (size_t bus = 1; bus < m_busBuffers.size(); ++bus) {
         processBus(static_cast<int>(bus), m_busBuffers[bus].data(), frames, sideEnv);
+        const float gain = m_busGains[bus].load();
+        for (int i = 0; i < frames * m_channels; ++i) {
+            m_busBuffers[bus][i] *= gain;
+        }
         for (int i = 0; i < frames * m_channels; ++i) {
             master[i] += m_busBuffers[bus][i];
         }
@@ -380,6 +399,10 @@ void AudioEngine::mix(float *out, int frames) {
     // Process master chain (bus 0).
     if (!m_busBuffers.empty()) {
         processBus(0, master.data(), frames, sideEnv);
+    }
+    const float masterGain = m_busGains[0].load();
+    for (int i = 0; i < frames * m_channels; ++i) {
+        master[i] *= masterGain;
     }
     m_busMeters[0].store(computePeak(master.data(), frames));
 
