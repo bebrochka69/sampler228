@@ -578,14 +578,66 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 break;
             }
             case 7: {  // eq (simple tilt)
-                const float low = 0.02f + p1 * 0.2f;
-                const float high = 0.02f + p2 * 0.2f;
-                for (int i = 0; i < frames * m_channels; ++i) {
-                    fx.z1L = fx.z1L + low * (buffer[i] - fx.z1L);
-                    const float lowBand = fx.z1L;
-                    const float highBand = buffer[i] - fx.z1L;
-                    buffer[i] = buffer[i] * (0.8f - p3 * 0.3f) + lowBand * 0.2f +
-                                highBand * high;
+                const float dbLow = (p1 - 0.5f) * 24.0f;
+                const float dbMid1 = (p2 - 0.5f) * 24.0f;
+                const float dbMid2 = (p3 - 0.5f) * 24.0f;
+                const float dbHigh = (p4 - 0.5f) * 24.0f;
+
+                const float gLow = std::pow(10.0f, dbLow / 20.0f);
+                const float gMid1 = std::pow(10.0f, dbMid1 / 20.0f);
+                const float gMid2 = std::pow(10.0f, dbMid2 / 20.0f);
+                const float gHigh = std::pow(10.0f, dbHigh / 20.0f);
+
+                auto alphaFor = [&](float hz) {
+                    const float x = -2.0f * static_cast<float>(M_PI) * hz / m_sampleRate;
+                    return std::exp(x);
+                };
+                const float aLow = alphaFor(200.0f);
+                const float aHigh = alphaFor(4000.0f);
+                const float aM1Low = alphaFor(300.0f);
+                const float aM1High = alphaFor(1200.0f);
+                const float aM2Low = alphaFor(1200.0f);
+                const float aM2High = alphaFor(5000.0f);
+
+                auto onePoleLow = [](float x, float &z, float a) {
+                    z = a * z + (1.0f - a) * x;
+                    return z;
+                };
+                auto onePoleHigh = [](float x, float &z, float a) {
+                    z = a * z + (1.0f - a) * x;
+                    return x - z;
+                };
+
+                for (int i = 0; i < frames; ++i) {
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        const int idx = i * m_channels + ch;
+                        float x = buffer[idx];
+
+                        float low = (ch == 0)
+                                        ? onePoleLow(x, fx.eqLowL, aLow)
+                                        : onePoleLow(x, fx.eqLowR, aLow);
+                        float high = (ch == 0)
+                                         ? onePoleHigh(x, fx.eqHighL, aHigh)
+                                         : onePoleHigh(x, fx.eqHighR, aHigh);
+
+                        float m1lp = (ch == 0)
+                                         ? onePoleLow(x, fx.eqLp1L, aM1High)
+                                         : onePoleLow(x, fx.eqLp1R, aM1High);
+                        float mid1 = (ch == 0)
+                                         ? onePoleHigh(m1lp, fx.eqHp1L, aM1Low)
+                                         : onePoleHigh(m1lp, fx.eqHp1R, aM1Low);
+
+                        float m2lp = (ch == 0)
+                                         ? onePoleLow(x, fx.eqLp2L, aM2High)
+                                         : onePoleLow(x, fx.eqLp2R, aM2High);
+                        float mid2 = (ch == 0)
+                                         ? onePoleHigh(m2lp, fx.eqHp2L, aM2Low)
+                                         : onePoleHigh(m2lp, fx.eqHp2R, aM2Low);
+
+                        const float out = x + (gLow - 1.0f) * low + (gMid1 - 1.0f) * mid1 +
+                                          (gMid2 - 1.0f) * mid2 + (gHigh - 1.0f) * high;
+                        buffer[idx] = out;
+                    }
                 }
                 break;
             }

@@ -44,6 +44,7 @@ private:
     int m_selectedParam = 0;
     QHash<int, QPixmap> m_iconCache;
     QRectF m_fxBusRect;
+    QRectF m_normalizeRect;
     QVector<QRectF> m_paramRects;
 
     QString iconFileFor(Param::Type type) const;

@@ -33,6 +33,7 @@ public:
         int sliceIndex = 0;
         bool loop = false;
         int fxBus = 0;
+        bool normalize = false;
     };
 
     struct BusEffect {
@@ -54,6 +55,7 @@ public:
     void setSliceCountIndex(int index, int sliceCountIndex);
     void setSliceIndex(int index, int sliceIndex);
     void setLoop(int index, bool loop);
+    void setNormalize(int index, bool enabled);
     int fxBus(int index) const;
     void setFxBus(int index, int bus);
 

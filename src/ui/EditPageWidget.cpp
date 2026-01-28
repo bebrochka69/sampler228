@@ -350,6 +350,14 @@ void EditPageWidget::mousePressEvent(QMouseEvent *event) {
         return;
     }
 
+    if (m_normalizeRect.contains(pos) && m_pads) {
+        const int pad = m_pads->activePad();
+        PadBank::PadParams params = m_pads->params(pad);
+        m_pads->setNormalize(pad, !params.normalize);
+        update();
+        return;
+    }
+
     for (int i = 0; i < m_paramRects.size(); ++i) {
         if (m_paramRects[i].contains(pos)) {
             m_selectedParam = i;
@@ -569,6 +577,17 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     const QString busText = QString("FX BUS: %1").arg(PadBank::fxBusLabel(busIndex));
     p.setPen(Theme::accent());
     p.drawText(fxRect, Qt::AlignCenter, busText);
+
+    // Normalize button.
+    const QRectF normRect(fxRect.left() - Theme::px(190), buttonsRect.top(), Theme::px(170),
+                          Theme::px(40));
+    m_normalizeRect = normRect;
+    const bool normOn = m_pads ? m_pads->params(m_pads->activePad()).normalize : false;
+    p.setBrush(normOn ? Theme::accentAlt() : Theme::bg1());
+    p.setPen(QPen(normOn ? Theme::accentAlt() : Theme::accent(), 1.2));
+    p.drawRoundedRect(normRect, Theme::px(8), Theme::px(8));
+    p.setPen(normOn ? Theme::bg0() : Theme::accent());
+    p.drawText(normRect, Qt::AlignCenter, "NORMALIZE");
 
     p.setBrush(Theme::bg1());
     p.setPen(QPen(Theme::accentAlt(), 1.2));

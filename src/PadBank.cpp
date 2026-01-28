@@ -14,6 +14,7 @@
 #include <QUrl>
 #include <QtGlobal>
 #include <QtMath>
+#include <cmath>
 #include <cstdint>
 
 namespace {
@@ -171,6 +172,7 @@ struct PadBank::PadRuntime {
     bool pendingProcessed = false;
     int renderJobId = 0;
     bool pendingTrigger = false;
+    float normalizeGain = 1.0f;
 };
 
 PadBank::PadBank(QObject *parent) : QObject(parent) {
@@ -306,6 +308,7 @@ void PadBank::setPadPath(int index, const QString &path) {
         rt->pendingProcessed = false;
         rt->rawPath.clear();
         rt->rawDurationMs = 0;
+        rt->normalizeGain = 1.0f;
     }
     if (rt && rt->player) {
         rt->player->setSource(QUrl::fromLocalFile(path));
@@ -451,6 +454,29 @@ void PadBank::setLoop(int index, bool loop) {
         return;
     }
     m_params[static_cast<size_t>(index)].loop = loop;
+    emit padParamsChanged(index);
+}
+
+void PadBank::setNormalize(int index, bool enabled) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    m_params[static_cast<size_t>(index)].normalize = enabled;
+    PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (rt && rt->rawBuffer && rt->rawBuffer->isValid()) {
+        float peak = 0.0f;
+        for (float v : rt->rawBuffer->samples) {
+            const float a = std::fabs(v);
+            if (a > peak) {
+                peak = a;
+            }
+        }
+        if (peak > 0.0001f) {
+            rt->normalizeGain = qBound(0.5f, 1.0f / peak, 2.5f);
+        } else {
+            rt->normalizeGain = 1.0f;
+        }
+    }
     emit padParamsChanged(index);
 }
 
@@ -766,6 +792,18 @@ void PadBank::scheduleRawRender(int index) {
                     rt->rawDurationMs =
                         (buffer->frames() * 1000LL) / qMax(1, buffer->sampleRate);
                     rt->durationMs = rt->rawDurationMs;
+                    float peak = 0.0f;
+                    for (float v : buffer->samples) {
+                        const float a = std::fabs(v);
+                        if (a > peak) {
+                            peak = a;
+                        }
+                    }
+                    if (peak > 0.0001f) {
+                        rt->normalizeGain = qBound(0.5f, 1.0f / peak, 2.5f);
+                    } else {
+                        rt->normalizeGain = 1.0f;
+                    }
                 }
                 if (needsProcessing(m_params[static_cast<size_t>(index)])) {
                     scheduleProcessedRender(index);
@@ -935,6 +973,7 @@ void PadBank::triggerPad(int index) {
 
     const double pitchRate = pitchToRate(params.pitch);
     const bool wantsProcessing = needsProcessing(params);
+    const float normalizeGain = (params.normalize && rt) ? rt->normalizeGain : 1.0f;
     if (rt->useEngine && m_engineAvailable && m_engine) {
         std::shared_ptr<AudioEngine::Buffer> buffer;
         if (wantsProcessing) {
@@ -979,7 +1018,8 @@ void PadBank::triggerPad(int index) {
                 endFrame = totalFrames;
             }
             const float rate = wantsProcessing ? 1.0f : static_cast<float>(pitchRate);
-            m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, params.volume,
+            const float volume = params.volume * normalizeGain;
+            m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, volume,
                               params.pan, rate, params.fxBus);
             rt->pendingTrigger = false;
             return;
@@ -990,7 +1030,8 @@ void PadBank::triggerPad(int index) {
     const bool needsSlice = (params.sliceCountIndex > 0) || !isNear(params.start, 0.0) ||
                             !isNear(params.end, 1.0);
     const bool needsEffectTransform =
-        stretchEnabled || !isNear(params.pitch, 0.0) || !isNear(params.pan, 0.0);
+        stretchEnabled || !isNear(params.pitch, 0.0) || !isNear(params.pan, 0.0) ||
+        (params.normalize && !isNear(normalizeGain, 1.0f));
 
     if (rt->effect && !rt->effectPath.isEmpty() && !needsSlice && !needsEffectTransform) {
         if (rt->effect->status() == QSoundEffect::Ready) {
@@ -998,7 +1039,7 @@ void PadBank::triggerPad(int index) {
                 rt->effect->stop();
             }
             rt->effect->setLoopCount(params.loop ? QSoundEffect::Infinite : 1);
-            rt->effect->setVolume(params.volume);
+            rt->effect->setVolume(params.volume * normalizeGain);
             rt->effect->play();
             return;
         }
@@ -1064,9 +1105,12 @@ void PadBank::triggerPad(int index) {
     }
 
     const bool needsTransformExternal = wantsStretch || !isNear(params.pitch, 0.0) ||
-                                        !isNear(params.pan, 0.0) || !isNear(params.volume, 1.0);
+                                        !isNear(params.pan, 0.0) ||
+                                        !isNear(params.volume * normalizeGain, 1.0f);
+    PadParams renderParams = params;
+    renderParams.volume = params.volume * normalizeGain;
     const QString filter =
-        needsTransformExternal ? buildAudioFilter(params, tempoFactor, pitchRate) : QString();
+        needsTransformExternal ? buildAudioFilter(renderParams, tempoFactor, pitchRate) : QString();
     QString program;
     QStringList args;
     if (!buildExternalCommand(path, startMs, segmentMs, filter, needsSlice || needsTransformExternal, program,

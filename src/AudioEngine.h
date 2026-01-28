@@ -81,6 +81,18 @@ private:
         float env = 0.0f;
         float z1L = 0.0f;
         float z1R = 0.0f;
+        float eqLp1L = 0.0f;
+        float eqLp1R = 0.0f;
+        float eqHp1L = 0.0f;
+        float eqHp1R = 0.0f;
+        float eqLp2L = 0.0f;
+        float eqLp2R = 0.0f;
+        float eqHp2L = 0.0f;
+        float eqHp2R = 0.0f;
+        float eqLowL = 0.0f;
+        float eqLowR = 0.0f;
+        float eqHighL = 0.0f;
+        float eqHighR = 0.0f;
     };
 
     struct BusChain {

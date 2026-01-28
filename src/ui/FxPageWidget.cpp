@@ -674,88 +674,96 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
                        QPointF(c.x() + std::cos(ang) * coneR, c.y() + std::sin(ang) * coneR * 0.85f));
         }
     } else if (fx == "lofi") {
-        // Broken memory screen.
-        const QRectF screen = r.adjusted(10, 14, -10, -18);
-        p.setPen(QPen(QColor(140, 255, 210, 200), 1.4));
+        // Old TV screen (bit crusher).
+        const QRectF screen = r.adjusted(6, 10, -6, -12);
+        p.setPen(QPen(QColor(255, 80, 120, 220), 2.0));
         p.setBrush(Qt::NoBrush);
-        p.drawRoundedRect(screen, 8, 8);
+        p.drawRoundedRect(screen, 12, 12);
 
-        const int cols = 10;
-        const int rows = 6;
-        const float dropProb = 0.08f + p1 * 0.55f;
-        const int phase = static_cast<int>(t * (1.5f + p2 * 6.0f));
-        const float cellW = screen.width() / cols;
-        const float cellH = screen.height() / rows;
+        const QRectF inner = screen.adjusted(6, 6, -6, -8);
+        const int cols = 6 + static_cast<int>(p1 * 18.0f);
+        const int rows = 4 + static_cast<int>(p2 * 12.0f);
+        const float cellW = inner.width() / cols;
+        const float cellH = inner.height() / rows;
+        const int phase = static_cast<int>(t * (1.0f + p3 * 5.0f));
+
+        p.save();
+        p.setClipRect(inner);
         for (int y = 0; y < rows; ++y) {
             for (int x = 0; x < cols; ++x) {
                 const float hsh = hash2(x, y, phase);
-                if (hsh < dropProb) {
-                    continue;
-                }
-                QColor col(140, 255, 210, static_cast<int>((0.12f + hsh * 0.4f) * 255));
-                p.setPen(QPen(col, 1.0));
-                p.setBrush(Qt::NoBrush);
-                p.drawRect(QRectF(screen.left() + x * cellW, screen.top() + y * cellH,
-                                  cellW - 2.0f, cellH - 2.0f));
+                const float bright = 0.2f + 0.8f * hsh;
+                QColor col(40, 200, 255, static_cast<int>(bright * 255));
+                p.setPen(Qt::NoPen);
+                p.setBrush(col);
+                p.drawRect(QRectF(inner.left() + x * cellW, inner.top() + y * cellH,
+                                  cellW - 1.0f, cellH - 1.0f));
             }
         }
 
-        // Broken scanline.
-        p.setPen(QPen(QColor(255, 160, 190, 160), 1.6));
-        const float scanY = screen.top() + screen.height() * (0.25f + p3 * 0.4f);
-        p.drawLine(QPointF(screen.left() + 6, scanY),
-                   QPointF(screen.right() - 6, scanY));
-        p.setPen(QPen(QColor(90, 110, 140, 180), 1.2));
-        p.drawLine(QPointF(screen.left() + 14, scanY + 6),
-                   QPointF(screen.right() - 40, scanY + 6));
+        // Scanlines
+        p.setPen(QPen(QColor(30, 40, 60, 120), 1.0));
+        for (int y = 0; y < inner.height(); y += 3) {
+            const float yy = inner.top() + y;
+            p.drawLine(QPointF(inner.left(), yy), QPointF(inner.right(), yy));
+        }
 
-        // Bit rot blocks.
-        p.setPen(QPen(QColor(255, 140, 180, 140), 1.0));
-        p.drawLine(QPointF(screen.left() + 10, screen.top() + 10),
-                   QPointF(screen.left() + 28, screen.top() + 10));
-        p.drawLine(QPointF(screen.right() - 40, screen.bottom() - 14),
-                   QPointF(screen.right() - 18, screen.bottom() - 14));
+        // Wobbly sine trace (jitter)
+        QPainterPath wave;
+        const float amp = inner.height() * (0.1f + p3 * 0.15f);
+        for (int x = 0; x <= inner.width(); ++x) {
+            const float xx = inner.left() + x;
+            const float yy =
+                inner.center().y() + std::sin((x / inner.width()) * 6.28f * (1.2f + p2)) * amp;
+            if (x == 0) {
+                wave.moveTo(QPointF(xx, yy));
+            } else {
+                wave.lineTo(QPointF(xx, yy));
+            }
+        }
+        p.setPen(QPen(QColor(120, 220, 255, 200), 2.0));
+        p.drawPath(wave);
+        p.restore();
     } else if (fx == "eq") {
-        // Static EQ curve with spectrum look (no drift).
+        // 4-band EQ: low shelf, peak1, peak2, high shelf (flat at center).
         const QRectF frame = r.adjusted(8, 10, -8, -12);
         p.setPen(QPen(QColor(80, 160, 200, 200), 1.2));
         p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(frame, 8, 8);
 
-        // Grid
         p.setPen(QPen(QColor(60, 60, 80, 160), 1.0));
         for (int i = 1; i < 6; ++i) {
             const float y = frame.top() + (frame.height() / 6.0f) * i;
             p.drawLine(QPointF(frame.left() + 6, y), QPointF(frame.right() - 6, y));
         }
 
-        const float low = lerp(0.15f, 0.9f, p1);
-        const float mid = lerp(0.15f, 0.9f, p2);
-        const float high = lerp(0.15f, 0.9f, p3);
-        const QPointF pL(frame.left() + frame.width() * 0.1f,
-                         frame.bottom() - frame.height() * low);
-        const QPointF pM(frame.left() + frame.width() * 0.5f,
-                         frame.bottom() - frame.height() * mid);
-        const QPointF pH(frame.left() + frame.width() * 0.9f,
-                         frame.bottom() - frame.height() * high);
+        auto mapY = [&](float v) {
+            const float norm = lerp(0.2f, 0.8f, v);
+            return frame.bottom() - frame.height() * norm;
+        };
+        const QPointF pL(frame.left() + frame.width() * 0.12f, mapY(p1));
+        const QPointF pM1(frame.left() + frame.width() * 0.38f, mapY(p2));
+        const QPointF pM2(frame.left() + frame.width() * 0.62f, mapY(p3));
+        const QPointF pH(frame.left() + frame.width() * 0.88f, mapY(p4));
 
         QPainterPath curve;
-        curve.moveTo(frame.left(), frame.bottom());
+        curve.moveTo(frame.left(), frame.bottom() - frame.height() * 0.5f);
         curve.cubicTo(QPointF(frame.left() + frame.width() * 0.2f, pL.y()),
-                      QPointF(frame.left() + frame.width() * 0.35f, pM.y()), pM);
-        curve.cubicTo(QPointF(frame.left() + frame.width() * 0.65f, pM.y()),
+                      QPointF(frame.left() + frame.width() * 0.3f, pM1.y()), pM1);
+        curve.cubicTo(QPointF(frame.left() + frame.width() * 0.46f, pM1.y()),
+                      QPointF(frame.left() + frame.width() * 0.54f, pM2.y()), pM2);
+        curve.cubicTo(QPointF(frame.left() + frame.width() * 0.7f, pM2.y()),
                       QPointF(frame.left() + frame.width() * 0.8f, pH.y()), pH);
-        curve.lineTo(frame.right(), frame.bottom());
-        curve.closeSubpath();
+        curve.lineTo(frame.right(), frame.bottom() - frame.height() * 0.5f);
 
-        p.setBrush(QColor(80, 160, 200, 80));
         p.setPen(QPen(QColor(190, 210, 220, 220), 1.4));
         p.drawPath(curve);
 
         p.setBrush(QColor(220, 220, 220));
         p.setPen(Qt::NoPen);
         p.drawEllipse(pL, 3, 3);
-        p.drawEllipse(pM, 3, 3);
+        p.drawEllipse(pM1, 3, 3);
+        p.drawEllipse(pM2, 3, 3);
         p.drawEllipse(pH, 3, 3);
     } else if (fx == "cassette") {
         // Cassette shell.
@@ -921,7 +929,10 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.drawText(nameRect, Qt::AlignCenter, m_tracks[i].name);
 
         const float meterW = Theme::pxF(12.0f);
-        QRectF meterRect(stripRect.right() - meterW - Theme::px(6), nameRect.bottom() + Theme::px(6),
+        const float barW = Theme::pxF(16.0f);
+        QRectF faderRect(stripRect.right() - barW - Theme::px(6), nameRect.bottom() + Theme::px(6),
+                         barW, stripRect.height() - Theme::px(58));
+        QRectF meterRect(faderRect.left() - meterW - Theme::px(6), nameRect.bottom() + Theme::px(6),
                          meterW, stripRect.height() - Theme::px(58));
         p.setBrush(QColor(60, 50, 95));
         p.setPen(QPen(Theme::stroke(), 1.0));
@@ -941,9 +952,6 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.drawRect(meterFill);
 
         // Pink volume bar (interactive) on the right.
-        const float barW = Theme::pxF(16.0f);
-        QRectF faderRect(stripRect.right() - barW - Theme::px(6), nameRect.bottom() + Theme::px(6),
-                         barW, stripRect.height() - Theme::px(58));
         p.setBrush(QColor(70, 60, 95));
         p.setPen(Qt::NoPen);
         p.drawRect(faderRect);
@@ -972,7 +980,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         // Insert slots (cyan blocks) - square tiles
         float slotTop = nameRect.bottom() + Theme::px(8);
         const float slotLeft = stripRect.left() + Theme::px(8);
-        const float slotRight = faderRect.left() - Theme::px(8);
+        const float slotRight = meterRect.left() - Theme::px(8);
         const float slotSize = qMin(slotH, slotRight - slotLeft);
         for (int s = 0; s < slotCount; ++s) {
             QRectF slotRect(slotLeft, slotTop, slotSize, slotSize);
