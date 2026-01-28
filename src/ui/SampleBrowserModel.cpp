@@ -124,6 +124,8 @@ void SampleBrowserModel::refresh() {
     scanMountRoot("/media");
     scanMountRoot("/run/media");
     scanMountRoot("/mnt");
+    addRootIfExists("/mnt/usb", "USB", true, true);
+    addRootIfExists("/media/usb", "USB", true, true);
 
     if (m_roots.empty()) {
         const QString home = QDir::homePath();
