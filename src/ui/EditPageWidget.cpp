@@ -578,9 +578,9 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.setPen(Theme::accent());
     p.drawText(fxRect, Qt::AlignCenter, busText);
 
-    // Normalize button.
-    const QRectF normRect(fxRect.left() - Theme::px(190), buttonsRect.top(), Theme::px(170),
-                          Theme::px(40));
+    // Normalize button (placed above button row for visibility).
+    const QRectF normRect(margin, buttonsRect.top() - Theme::px(46),
+                          Theme::px(180), Theme::px(40));
     m_normalizeRect = normRect;
     const bool normOn = m_pads ? m_pads->params(m_pads->activePad()).normalize : false;
     p.setBrush(normOn ? Theme::accentAlt() : Theme::bg1());

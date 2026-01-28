@@ -383,7 +383,9 @@ void PadBank::setPitch(int index, float semitones) {
         return;
     }
     m_params[static_cast<size_t>(index)].pitch = qBound(-12.0f, semitones, 12.0f);
-    scheduleProcessedRender(index);
+    if (!m_engineAvailable) {
+        scheduleProcessedRender(index);
+    }
     emit padParamsChanged(index);
 }
 
@@ -393,7 +395,9 @@ void PadBank::setStretchIndex(int index, int stretchIndex) {
     }
     const int maxIndex = stretchCount() - 1;
     m_params[static_cast<size_t>(index)].stretchIndex = qBound(0, stretchIndex, maxIndex);
-    scheduleProcessedRender(index);
+    if (!m_engineAvailable) {
+        scheduleProcessedRender(index);
+    }
     emit padParamsChanged(index);
 }
 
@@ -407,7 +411,9 @@ void PadBank::setStart(int index, float value) {
         value = qMax(0.0f, end - 0.01f);
     }
     m_params[static_cast<size_t>(index)].start = value;
-    scheduleProcessedRender(index);
+    if (!m_engineAvailable) {
+        scheduleProcessedRender(index);
+    }
     emit padParamsChanged(index);
 }
 
@@ -421,7 +427,9 @@ void PadBank::setEnd(int index, float value) {
         value = qMin(1.0f, start + 0.01f);
     }
     m_params[static_cast<size_t>(index)].end = value;
-    scheduleProcessedRender(index);
+    if (!m_engineAvailable) {
+        scheduleProcessedRender(index);
+    }
     emit padParamsChanged(index);
 }
 
@@ -435,7 +443,9 @@ void PadBank::setSliceCountIndex(int index, int sliceCountIndex) {
     const int count = sliceCountForIndex(clamped);
     int &sliceIndex = m_params[static_cast<size_t>(index)].sliceIndex;
     sliceIndex = qBound(0, sliceIndex, count - 1);
-    scheduleProcessedRender(index);
+    if (!m_engineAvailable) {
+        scheduleProcessedRender(index);
+    }
     emit padParamsChanged(index);
 }
 
@@ -445,7 +455,9 @@ void PadBank::setSliceIndex(int index, int sliceIndex) {
     }
     const int count = sliceCountForIndex(m_params[static_cast<size_t>(index)].sliceCountIndex);
     m_params[static_cast<size_t>(index)].sliceIndex = qBound(0, sliceIndex, count - 1);
-    scheduleProcessedRender(index);
+    if (!m_engineAvailable) {
+        scheduleProcessedRender(index);
+    }
     emit padParamsChanged(index);
 }
 
@@ -707,6 +719,9 @@ static QStringList buildFfmpegArgsSegment(const QString &path, const QString &fi
 }
 
 bool PadBank::needsProcessing(const PadParams &params) const {
+    if (m_engineAvailable) {
+        return false;
+    }
     return params.stretchIndex > 0;
 }
 
@@ -973,6 +988,7 @@ void PadBank::triggerPad(int index) {
 
     const double pitchRate = pitchToRate(params.pitch);
     const bool wantsProcessing = needsProcessing(params);
+    const bool stretchEnabled = params.stretchIndex > 0;
     const float normalizeGain = (params.normalize && rt) ? rt->normalizeGain : 1.0f;
     if (rt->useEngine && m_engineAvailable && m_engine) {
         std::shared_ptr<AudioEngine::Buffer> buffer;
@@ -1017,7 +1033,20 @@ void PadBank::triggerPad(int index) {
                 startFrame = 0;
                 endFrame = totalFrames;
             }
-            const float rate = wantsProcessing ? 1.0f : static_cast<float>(pitchRate);
+            float tempoFactor = 1.0f;
+            if (stretchEnabled) {
+                const int segmentFrames = qMax(1, endFrame - startFrame);
+                const qint64 segmentMs =
+                    static_cast<qint64>(segmentFrames * 1000.0 / qMax(1, buffer->sampleRate));
+                const qint64 targetMs = stretchTargetMs(m_bpm, params.stretchIndex);
+                if (targetMs > 0) {
+                    tempoFactor = static_cast<float>(
+                        static_cast<double>(segmentMs) / static_cast<double>(targetMs));
+                }
+                tempoFactor = qBound(0.25f, tempoFactor, 4.0f);
+            }
+
+            const float rate = static_cast<float>(pitchRate) * tempoFactor;
             const float volume = params.volume * normalizeGain;
             m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, volume,
                               params.pan, rate, params.fxBus);
@@ -1026,7 +1055,6 @@ void PadBank::triggerPad(int index) {
         }
     }
 
-    const bool stretchEnabled = params.stretchIndex > 0;
     const bool needsSlice = (params.sliceCountIndex > 0) || !isNear(params.start, 0.0) ||
                             !isNear(params.end, 1.0);
     const bool needsEffectTransform =
