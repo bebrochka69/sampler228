@@ -39,7 +39,8 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
             if (v > maxV) maxV = v;
         }
         const float px = rect.left() + static_cast<float>(x);
-        const float yMax = midY - maxV * amp;
+        const float maxAbs = qMax(std::fabs(minV), std::fabs(maxV));
+        const float yMax = midY - maxAbs * amp;
         if (first) {
             outline.moveTo(px, yMax);
             area.moveTo(px, yMax);
@@ -54,24 +55,27 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
         const int i0 = (x * count) / steps;
         const int i1 = qMin(count - 1, ((x + 1) * count) / steps);
         float minV = 1.0f;
+        float maxV = -1.0f;
         for (int i = i0; i <= i1; ++i) {
             const float v = samples[i];
             if (v < minV) minV = v;
+            if (v > maxV) maxV = v;
         }
         const float px = rect.left() + static_cast<float>(x);
-        const float yMin = midY - minV * amp;
+        const float maxAbs = qMax(std::fabs(minV), std::fabs(maxV));
+        const float yMin = midY + maxAbs * amp;
         area.lineTo(px, yMin);
     }
     area.closeSubpath();
 
     p.save();
     p.setClipRect(rect);
-    p.setPen(QPen(QColor(235, 140, 140), 1.4));
+    p.setPen(QPen(QColor(25, 220, 255), 1.6));
     p.drawPath(outline);
-    p.setBrush(QColor(150, 220, 190, 130));
+    p.setBrush(QColor(25, 220, 255, 80));
     p.setPen(Qt::NoPen);
     p.drawPath(area);
-    p.setPen(QPen(QColor(180, 180, 180, 120), 1.0));
+    p.setPen(QPen(QColor(180, 200, 220, 120), 1.0));
     p.drawLine(QPointF(rect.left(), midY), QPointF(rect.right(), midY));
     p.restore();
 }
@@ -385,8 +389,8 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     const QRectF waveRect(margin, headerRect.bottom() + Theme::px(10),
                           width() - 2 * margin, height() * 0.42f);
 
-    p.setBrush(Theme::bg1());
-    p.setPen(QPen(Theme::stroke(), 1.2));
+    p.setBrush(QColor(128, 35, 60));
+    p.setPen(QPen(Theme::accent(), 1.4));
     p.drawRoundedRect(waveRect, Theme::px(12), Theme::px(12));
 
     const QRectF waveInner = waveRect.adjusted(Theme::px(12), Theme::px(12),

@@ -909,7 +909,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
 
         const QColor busBg(46, 38, 80);
         const QColor slotCyan(12, 200, 255);
-        const QColor meterPink(255, 60, 120);
+        const QColor meterPink(255, 50, 100);
         const QColor meterCyan(20, 210, 255);
 
         p.setBrush(busBg);
@@ -920,7 +920,7 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.setPen(Qt::white);
         p.drawText(nameRect, Qt::AlignCenter, m_tracks[i].name);
 
-        const float meterW = Theme::pxF(18.0f);
+        const float meterW = Theme::pxF(12.0f);
         QRectF meterRect(stripRect.right() - meterW - Theme::px(6), nameRect.bottom() + Theme::px(6),
                          meterW, stripRect.height() - Theme::px(58));
         p.setBrush(QColor(60, 50, 95));
@@ -940,10 +940,11 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.setPen(Qt::NoPen);
         p.drawRect(meterFill);
 
-        // Pink volume bar (interactive).
-        QRectF faderRect(meterRect.left() - Theme::px(14), meterRect.top(), Theme::px(10),
-                         meterRect.height());
-        p.setBrush(QColor(90, 70, 120));
+        // Pink volume bar (interactive) on the right.
+        const float barW = Theme::pxF(16.0f);
+        QRectF faderRect(stripRect.right() - barW - Theme::px(6), nameRect.bottom() + Theme::px(6),
+                         barW, stripRect.height() - Theme::px(58));
+        p.setBrush(QColor(70, 60, 95));
         p.setPen(Qt::NoPen);
         p.drawRect(faderRect);
         float gain = 1.0f;
@@ -957,10 +958,21 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.drawRect(gainFill);
         m_faderHits.push_back(faderRect);
 
-        // Insert slots (cyan blocks)
+        // dB label in the pink bar.
+        p.save();
+        p.setPen(Qt::white);
+        p.setFont(Theme::baseFont(8, QFont::DemiBold));
+        p.translate(faderRect.center());
+        p.rotate(-90.0);
+        p.drawText(QRectF(-faderRect.height() * 0.5f, -Theme::px(6),
+                          faderRect.height(), Theme::px(12)),
+                   Qt::AlignCenter, "-0.0 dB");
+        p.restore();
+
+        // Insert slots (cyan blocks) - square tiles
         float slotTop = nameRect.bottom() + Theme::px(8);
         const float slotLeft = stripRect.left() + Theme::px(8);
-        const float slotRight = meterRect.left() - Theme::px(8);
+        const float slotRight = faderRect.left() - Theme::px(8);
         const float slotSize = qMin(slotH, slotRight - slotLeft);
         for (int s = 0; s < slotCount; ++s) {
             QRectF slotRect(slotLeft, slotTop, slotSize, slotSize);
