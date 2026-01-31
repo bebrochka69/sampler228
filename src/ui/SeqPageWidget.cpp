@@ -188,6 +188,21 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
     const float headerH = Theme::pxF(24.0f);
     const QRectF gridArea(grid.left() + labelW, grid.top() + headerH,
                           grid.width() - labelW, grid.height() - headerH);
+
+    // Click on label column -> open edit/synth for that pad.
+    if (pos.x() < gridArea.left()) {
+        const float cellH = gridArea.height() / rows;
+        const int row = static_cast<int>((pos.y() - gridArea.top()) / cellH);
+        if (row >= 0 && row < rows) {
+            m_activePad = row;
+            if (m_pads) {
+                m_pads->setActivePad(row);
+            }
+            emit padOpenRequested(row);
+            update();
+        }
+        return;
+    }
     if (!gridArea.contains(pos)) {
         return;
     }
@@ -218,6 +233,33 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
     }
 
     update();
+}
+
+void SeqPageWidget::mouseDoubleClickEvent(QMouseEvent *event) {
+    setFocus(Qt::MouseFocusReason);
+    const QPointF pos = event->position();
+    const QRectF grid = gridRect();
+    if (!grid.contains(pos)) {
+        return;
+    }
+    const int rows = 8;
+    const float labelW = Theme::pxF(48.0f);
+    const float headerH = Theme::pxF(24.0f);
+    const QRectF gridArea(grid.left() + labelW, grid.top() + headerH,
+                          grid.width() - labelW, grid.height() - headerH);
+    if (pos.x() < gridArea.left()) {
+        const float cellH = gridArea.height() / rows;
+        const int row = static_cast<int>((pos.y() - gridArea.top()) / cellH);
+        if (row >= 0 && row < rows) {
+            m_activePad = row;
+            if (m_pads) {
+                m_pads->setActivePad(row);
+            }
+            emit padAssignRequested(row);
+            update();
+        }
+        return;
+    }
 }
 
 void SeqPageWidget::paintEvent(QPaintEvent *event) {

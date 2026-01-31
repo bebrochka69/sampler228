@@ -185,6 +185,9 @@ void SamplePageWidget::keyPressEvent(QKeyEvent *event) {
                 m_selectedIndex = indexOfNode(node);
                 clampScroll();
                 update();
+            } else if (node && !node->isDir && m_pads && m_assignMode) {
+                m_pads->setPadPath(m_pads->activePad(), node->path);
+                emit sampleAssigned();
             }
             break;
         case Qt::Key_Backspace:
@@ -270,6 +273,11 @@ void SamplePageWidget::mousePressEvent(QMouseEvent *event) {
         m_browser.toggleExpanded(node);
     } else if (m_session) {
         m_session->setSource(node->path, SampleSession::DecodeMode::None);
+        if (m_pads && m_assignMode) {
+            m_pads->setPadPath(m_pads->activePad(), node->path);
+            emit sampleAssigned();
+            return;
+        }
     }
 
     m_entries = m_browser.entries();

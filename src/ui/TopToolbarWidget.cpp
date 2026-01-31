@@ -14,7 +14,7 @@ TopToolbarWidget::TopToolbarWidget(PadBank *pads, QWidget *parent)
     setFixedHeight(Theme::px(72));
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-    m_tabs << "SAMPLES" << "EDIT" << "SEQ" << "FX" << "ARRANGE";
+    m_tabs << "SEQ" << "FX" << "ARRANGE";
 
     connect(&m_statsTimer, &QTimer::timeout, this, &TopToolbarWidget::updateStats);
     m_statsTimer.start(2000);

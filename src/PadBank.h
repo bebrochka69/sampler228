@@ -21,6 +21,9 @@ public:
     QString padPath(int index) const;
     QString padName(int index) const;
     bool isLoaded(int index) const;
+    bool isSynth(int index) const;
+    QString synthName(int index) const;
+    void setSynth(int index, const QString &name);
 
     struct PadParams {
         float volume = 1.0f;
@@ -91,6 +94,8 @@ private:
     bool needsProcessing(const PadParams &params) const;
 
     std::array<QString, 8> m_paths;
+    std::array<bool, 8> m_isSynth{};
+    std::array<QString, 8> m_synthNames;
     std::array<PadParams, 8> m_params;
     std::array<PadRuntime *, 8> m_runtime;
     int m_activePad = 0;

@@ -19,6 +19,10 @@ class SamplePageWidget : public QWidget {
     Q_OBJECT
 public:
     explicit SamplePageWidget(SampleSession *session, PadBank *pads, QWidget *parent = nullptr);
+    void setAssignMode(bool enabled) { m_assignMode = enabled; }
+
+signals:
+    void sampleAssigned();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -36,6 +40,7 @@ private:
 
     SampleSession *m_session = nullptr;
     PadBank *m_pads = nullptr;
+    bool m_assignMode = false;
     SampleBrowserModel m_browser;
     QVector<SampleBrowserModel::Entry> m_entries;
     QStringList m_projects;

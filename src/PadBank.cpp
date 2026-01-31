@@ -205,6 +205,8 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
 
     for (int i = 0; i < kPadCount; ++i) {
         m_runtime[i] = new PadRuntime();
+        m_isSynth[static_cast<size_t>(i)] = false;
+        m_synthNames[static_cast<size_t>(i)].clear();
         m_runtime[i]->useExternal = forceExternal;
         m_runtime[i]->useEngine = m_engineAvailable;
         if (!m_engineAvailable) {
@@ -296,6 +298,8 @@ void PadBank::setPadPath(int index, const QString &path) {
         return;
     }
     m_paths[static_cast<size_t>(index)] = path;
+    m_isSynth[static_cast<size_t>(index)] = false;
+    m_synthNames[static_cast<size_t>(index)].clear();
     m_params[static_cast<size_t>(index)].start = 0.0f;
     m_params[static_cast<size_t>(index)].end = 1.0f;
     m_params[static_cast<size_t>(index)].sliceIndex = 0;
@@ -343,6 +347,10 @@ QString PadBank::padPath(int index) const {
 }
 
 QString PadBank::padName(int index) const {
+    if (isSynth(index)) {
+        const QString name = m_synthNames[static_cast<size_t>(index)];
+        return name.isEmpty() ? QString("SYNTH") : name;
+    }
     const QString path = padPath(index);
     if (path.isEmpty()) {
         return QString();
@@ -352,7 +360,68 @@ QString PadBank::padName(int index) const {
 }
 
 bool PadBank::isLoaded(int index) const {
-    return !padPath(index).isEmpty();
+    return !padPath(index).isEmpty() || isSynth(index);
+}
+
+bool PadBank::isSynth(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return false;
+    }
+    return m_isSynth[static_cast<size_t>(index)];
+}
+
+QString PadBank::synthName(int index) const {
+    if (!isSynth(index)) {
+        return QString();
+    }
+    return m_synthNames[static_cast<size_t>(index)];
+}
+
+static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name, int sampleRate) {
+    const int frames = sampleRate;
+    auto buffer = std::make_shared<AudioEngine::Buffer>();
+    buffer->channels = 2;
+    buffer->sampleRate = sampleRate;
+    buffer->samples.resize(frames * 2);
+
+    const QString wave = name.toLower();
+    for (int i = 0; i < frames; ++i) {
+        const float t = static_cast<float>(i) / static_cast<float>(sampleRate);
+        float v = 0.0f;
+        if (wave.contains("saw")) {
+            v = 2.0f * (t - std::floor(t + 0.5f));
+        } else if (wave.contains("square")) {
+            v = (std::sin(2.0f * static_cast<float>(M_PI) * 220.0f * t) >= 0.0f) ? 0.7f : -0.7f;
+        } else {
+            v = std::sin(2.0f * static_cast<float>(M_PI) * 220.0f * t);
+        }
+        buffer->samples[i * 2] = v;
+        buffer->samples[i * 2 + 1] = v;
+    }
+    return buffer;
+}
+
+void PadBank::setSynth(int index, const QString &name) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    m_isSynth[static_cast<size_t>(index)] = true;
+    m_synthNames[static_cast<size_t>(index)] = name;
+    m_paths[static_cast<size_t>(index)].clear();
+
+    PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (rt) {
+        rt->rawBuffer = buildSynthBuffer(name, m_engineRate);
+        rt->processedBuffer = rt->rawBuffer;
+        rt->processedReady = true;
+        rt->pendingProcessed = false;
+        rt->rawPath = QString("synth:%1").arg(name);
+        rt->rawDurationMs = 1000;
+        rt->durationMs = rt->rawDurationMs;
+        rt->normalizeGain = 1.0f;
+    }
+    emit padChanged(index);
+    emit padParamsChanged(index);
 }
 
 PadBank::PadParams PadBank::params(int index) const {

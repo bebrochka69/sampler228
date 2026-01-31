@@ -6,6 +6,8 @@ class QStackedWidget;
 class TopToolbarWidget;
 class SampleSession;
 class PadBank;
+class PadAssignOverlay;
+class SynthPageWidget;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -20,4 +22,6 @@ private:
     QStackedWidget *m_stack = nullptr;
     SampleSession *m_sampleSession = nullptr;
     PadBank *m_padBank = nullptr;
+    PadAssignOverlay *m_assignOverlay = nullptr;
+    SynthPageWidget *m_synthPage = nullptr;
 };
