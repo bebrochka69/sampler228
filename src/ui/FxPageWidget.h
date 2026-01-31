@@ -7,6 +7,7 @@
 #include <QTimer>
 #include <QVector>
 #include <QWidget>
+#include <QPixmap>
 
 class QKeyEvent;
 class QHideEvent;
@@ -85,6 +86,8 @@ private:
     QVector<float> m_waveHistory;
     int m_waveHead = 0;
     bool m_waveFilled = false;
+    QPixmap m_compGraphCache;
+    QSize m_compGraphCacheSize;
     QRectF m_makeupRect;
     QRectF m_closeRect;
     int m_dragFaderTrack = -1;

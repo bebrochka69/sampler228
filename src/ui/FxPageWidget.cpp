@@ -524,10 +524,30 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         drawMeter(inRect, inLevel, "IN");
         drawMeter(outRect, outLevel, "OUT");
 
-        // Graph area
-        p.setBrush(panel);
-        p.setPen(QPen(grid, 1.0));
-        p.drawRoundedRect(graphRect, 10, 10);
+        // Graph area (cached grid + labels)
+        const QSize graphSize = graphRect.size().toSize();
+        if (m_compGraphCacheSize != graphSize || m_compGraphCache.isNull()) {
+            m_compGraphCacheSize = graphSize;
+            m_compGraphCache = QPixmap(graphSize);
+            m_compGraphCache.fill(Qt::transparent);
+            QPainter gp(&m_compGraphCache);
+            gp.setRenderHint(QPainter::Antialiasing, false);
+            const QRectF g(0, 0, graphSize.width(), graphSize.height());
+            gp.setBrush(panel);
+            gp.setPen(QPen(grid, 1.0));
+            gp.drawRoundedRect(g, 10, 10);
+            gp.setFont(Theme::baseFont(8, QFont::DemiBold));
+            for (int i = 0; i <= 6; ++i) {
+                const float y = g.top() + i * (g.height() / 6.0f);
+                gp.setPen(QPen(grid, 1.0));
+                gp.drawLine(QPointF(g.left() + 6, y), QPointF(g.right() - 6, y));
+                const int db = -6 * i;
+                gp.setPen(white);
+                gp.drawText(QRectF(g.left() + 8, y - 8, 40, 14),
+                            Qt::AlignLeft | Qt::AlignVCenter, QString::number(db));
+            }
+        }
+        p.drawPixmap(graphRect.topLeft(), m_compGraphCache);
 
         // Compression amount label
         const float grDb = -m_compValue * 18.0f;
@@ -536,18 +556,6 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.drawText(QRectF(graphRect.left() + 8, graphRect.top() + 2, graphRect.width(), 14),
                    Qt::AlignLeft | Qt::AlignVCenter,
                    QString("GR %1 dB").arg(QString::number(grDb, 'f', 1)));
-
-        // Grid lines and dB labels
-        p.setFont(Theme::baseFont(8, QFont::DemiBold));
-        for (int i = 0; i <= 6; ++i) {
-            const float y = graphRect.top() + i * (graphRect.height() / 6.0f);
-            p.setPen(QPen(grid, 1.0));
-            p.drawLine(QPointF(graphRect.left() + 6, y), QPointF(graphRect.right() - 6, y));
-            const int db = -6 * i;
-            p.setPen(white);
-            p.drawText(QRectF(graphRect.left() + 8, y - 8, 40, 14),
-                       Qt::AlignLeft | Qt::AlignVCenter, QString::number(db));
-        }
 
         // Threshold line
         const float thrDb = -36.0f + p1 * 36.0f;
