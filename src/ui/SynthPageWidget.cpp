@@ -3,6 +3,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 
 #include "PadBank.h"
 #include "Theme.h"
