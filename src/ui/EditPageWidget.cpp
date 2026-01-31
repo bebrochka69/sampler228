@@ -14,7 +14,7 @@
 #include "WaveformRenderer.h"
 
 namespace {
-void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &samples) {
+void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &samples, float gain) {
     if (samples.isEmpty() || rect.width() <= 2.0 || rect.height() <= 2.0) {
         return;
     }
@@ -34,7 +34,7 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
         float minV = 1.0f;
         float maxV = -1.0f;
         for (int i = i0; i <= i1; ++i) {
-            const float v = samples[i];
+            const float v = qBound(-1.0f, samples[i] * gain, 1.0f);
             if (v < minV) minV = v;
             if (v > maxV) maxV = v;
         }
@@ -57,7 +57,7 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
         float minV = 1.0f;
         float maxV = -1.0f;
         for (int i = i0; i <= i1; ++i) {
-            const float v = samples[i];
+            const float v = qBound(-1.0f, samples[i] * gain, 1.0f);
             if (v < minV) minV = v;
             if (v > maxV) maxV = v;
         }
@@ -412,7 +412,11 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
         p.setFont(Theme::baseFont(12, QFont::DemiBold));
         p.drawText(waveInner, Qt::AlignCenter, "NO SAMPLE");
     } else {
-        drawWaveformRibbon(p, waveInner, wave);
+        float normGain = 1.0f;
+        if (m_pads) {
+            normGain = m_pads->normalizeGainForPad(m_pads->activePad());
+        }
+        drawWaveformRibbon(p, waveInner, wave, normGain);
     }
 
     // Vertical grid lines with stronger center divisions.

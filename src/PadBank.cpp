@@ -1278,6 +1278,21 @@ void PadBank::setBusGain(int bus, float gain) {
     }
 }
 
+float PadBank::normalizeGainForPad(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return 1.0f;
+    }
+    const PadParams &params = m_params[static_cast<size_t>(index)];
+    if (!params.normalize) {
+        return 1.0f;
+    }
+    const PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (!rt) {
+        return 1.0f;
+    }
+    return rt->normalizeGain;
+}
+
 int PadBank::stretchCount() {
     return static_cast<int>(sizeof(kStretchLabels) / sizeof(kStretchLabels[0]));
 }

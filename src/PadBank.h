@@ -76,6 +76,7 @@ public:
     float busMeter(int bus) const;
     float busGain(int bus) const;
     void setBusGain(int bus, float gain);
+    float normalizeGainForPad(int index) const;
 
 signals:
     void padChanged(int index);
