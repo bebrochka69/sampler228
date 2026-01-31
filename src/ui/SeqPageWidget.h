@@ -54,6 +54,7 @@ private:
     bool m_waiting = false;
     bool m_longPressTriggered = false;
     bool m_pressOnLabel = false;
+    bool m_scrubActive = false;
     int m_playStep = 0;
     int m_bpm = 120;
     PadBank *m_pads = nullptr;

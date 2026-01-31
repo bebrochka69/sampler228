@@ -214,6 +214,23 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
     const QRectF gridArea(grid.left() + labelW, grid.top() + headerH,
                           grid.width() - labelW, grid.height() - headerH);
 
+    // Scrub playhead by dragging in header area (right side).
+    if (pos.x() >= gridArea.left() && pos.x() <= gridArea.right() &&
+        pos.y() >= grid.top() && pos.y() <= gridArea.top()) {
+        const float cellW = gridArea.width() / cols;
+        const int step = qBound(0, static_cast<int>((pos.x() - gridArea.left()) / cellW), cols - 1);
+        m_playStep = step;
+        if (m_playClock.isValid()) {
+            m_lastStepMs = m_playClock.elapsed();
+        }
+        if (m_playing) {
+            triggerStep(m_playStep);
+        }
+        m_scrubActive = true;
+        update();
+        return;
+    }
+
     // Click on label column -> open edit/synth for that pad or long-press for piano roll.
     if (pos.x() < gridArea.left()) {
         const float cellH = gridArea.height() / rows;
@@ -252,6 +269,7 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
     m_pressOnLabel = false;
     m_pressedPad = -1;
     m_longPressTimer.stop();
+    m_scrubActive = false;
 
     if (event->modifiers().testFlag(Qt::ShiftModifier)) {
         const bool nextState = !m_steps[row][step];
@@ -268,6 +286,23 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
 }
 
 void SeqPageWidget::mouseMoveEvent(QMouseEvent *event) {
+    if (m_scrubActive) {
+        const QRectF grid = gridRect();
+        const float labelW = Theme::pxF(48.0f);
+        const float headerH = Theme::pxF(24.0f);
+        const QRectF gridArea(grid.left() + labelW, grid.top() + headerH,
+                              grid.width() - labelW, grid.height() - headerH);
+        const int cols = 64;
+        const float cellW = gridArea.width() / cols;
+        const int step = qBound(0, static_cast<int>((event->position().x() - gridArea.left()) / cellW),
+                                cols - 1);
+        m_playStep = step;
+        if (m_playClock.isValid()) {
+            m_lastStepMs = m_playClock.elapsed();
+        }
+        update();
+        return;
+    }
     if (!m_pressOnLabel || m_pressedPad < 0) {
         return;
     }
@@ -278,6 +313,10 @@ void SeqPageWidget::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void SeqPageWidget::mouseReleaseEvent(QMouseEvent *event) {
+    if (m_scrubActive) {
+        m_scrubActive = false;
+        return;
+    }
     if (!m_pressOnLabel || m_pressedPad < 0) {
         return;
     }
