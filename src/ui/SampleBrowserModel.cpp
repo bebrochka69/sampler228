@@ -57,6 +57,9 @@ void scanAudioRecursive(SampleBrowserModel::Node *node, int depth, int maxDepth)
     if (!dir.exists()) {
         return;
     }
+    if (depth == 0) {
+        node->children.clear();
+    }
 
     const QFileInfoList dirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Readable,
                                                  QDir::Name | QDir::IgnoreCase);
