@@ -749,6 +749,9 @@ bool PadBank::isPadReady(int index) const {
     if (!rt) {
         return true;
     }
+    if (isSynth(index)) {
+        return rt->rawBuffer && rt->rawBuffer->isValid();
+    }
     if (padPath(index).isEmpty()) {
         return false;
     }
@@ -1208,7 +1211,8 @@ void PadBank::triggerPad(int index) {
         return;
     }
     const QString path = padPath(index);
-    if (path.isEmpty()) {
+    const bool synthPad = isSynth(index);
+    if (path.isEmpty() && !synthPad) {
         return;
     }
 
@@ -1219,7 +1223,7 @@ void PadBank::triggerPad(int index) {
     }
 
     const double pitchRate = pitchToRate(params.pitch);
-    const bool wantsProcessing = needsProcessing(params);
+    const bool wantsProcessing = !synthPad && needsProcessing(params);
     const bool stretchEnabled = params.stretchIndex > 0;
     const float normalizeGain = (params.normalize && rt) ? rt->normalizeGain : 1.0f;
     if (rt->useEngine && m_engineAvailable && m_engine) {
@@ -1237,9 +1241,16 @@ void PadBank::triggerPad(int index) {
             buffer = rt->rawBuffer;
         }
         if (!buffer || !buffer->isValid()) {
-            rt->pendingTrigger = true;
-            scheduleRawRender(index);
-            return;
+            if (synthPad) {
+                buffer = buildSynthBuffer(m_synthNames[static_cast<size_t>(index)], m_engineRate);
+                rt->rawBuffer = buffer;
+                rt->processedBuffer = buffer;
+                rt->processedReady = true;
+            } else {
+                rt->pendingTrigger = true;
+                scheduleRawRender(index);
+                return;
+            }
         }
         if (buffer && buffer->isValid()) {
             float start = clamp01(params.start);
