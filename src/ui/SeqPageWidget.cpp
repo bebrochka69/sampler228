@@ -53,7 +53,7 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
     connect(&m_longPressTimer, &QTimer::timeout, this, [this]() {
         if (m_pressedPad >= 0 && m_pressOnLabel) {
             m_longPressTriggered = true;
-            emit padPianoRollRequested(m_pressedPad);
+            emit padMenuRequested(m_pressedPad);
         }
     });
 

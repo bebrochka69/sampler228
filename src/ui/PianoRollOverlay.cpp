@@ -46,9 +46,18 @@ QRectF PianoRollOverlay::timelineRect() const {
     const QRectF rightPanel = rightPanelRect();
     const float top = panel.top() + Theme::px(48);
     const float left = panel.left() + Theme::px(12);
-    return QRectF(left, top,
-                  rightPanel.left() - left - Theme::px(10),
+    const float keyboardW = Theme::pxF(54.0f);
+    return QRectF(left + keyboardW, top,
+                  rightPanel.left() - left - Theme::px(10) - keyboardW,
                   panel.bottom() - top - Theme::px(12));
+}
+
+QRectF PianoRollOverlay::keyboardRect() const {
+    const QRectF panel = panelRect();
+    const float top = panel.top() + Theme::px(48);
+    const float left = panel.left() + Theme::px(12);
+    const float keyboardW = Theme::pxF(54.0f);
+    return QRectF(left, top, keyboardW, panel.bottom() - top - Theme::px(12));
 }
 
 float PianoRollOverlay::baseCellWidth() const {
@@ -57,6 +66,11 @@ float PianoRollOverlay::baseCellWidth() const {
 
 float PianoRollOverlay::cellWidth() const {
     return baseCellWidth() * m_zoom;
+}
+
+float PianoRollOverlay::rowHeight() const {
+    const QRectF grid = timelineRect();
+    return grid.height() / static_cast<float>(m_rows);
 }
 
 int PianoRollOverlay::clampStep(int step) const {
@@ -75,6 +89,27 @@ float PianoRollOverlay::xFromStep(int step) const {
     return grid.left() + (step - m_scroll) * cellWidth();
 }
 
+int PianoRollOverlay::rowFromY(float y) const {
+    const QRectF grid = timelineRect();
+    const float local = y - grid.top();
+    const int row = static_cast<int>(std::floor(local / rowHeight()));
+    return qBound(0, row, m_rows - 1);
+}
+
+float PianoRollOverlay::yFromRow(int row) const {
+    const QRectF grid = timelineRect();
+    return grid.top() + row * rowHeight();
+}
+
+QString PianoRollOverlay::noteLabel(int row) const {
+    static const char *names[] = {"C", "C#", "D", "D#", "E", "F",
+                                  "F#", "G", "G#", "A", "A#", "B"};
+    const int midi = m_baseMidi + (m_rows - 1 - row);
+    const int octave = midi / 12 - 1;
+    const int note = midi % 12;
+    return QString("%1%2").arg(names[note]).arg(octave);
+}
+
 int PianoRollOverlay::noteAt(const QPointF &pos) const {
     const QRectF grid = timelineRect();
     if (!grid.contains(pos)) {
@@ -85,8 +120,9 @@ int PianoRollOverlay::noteAt(const QPointF &pos) const {
         const Note &note = notes[i];
         const float x = xFromStep(note.start);
         const float w = note.length * cellWidth();
-        QRectF r(x, grid.top() + Theme::px(10),
-                 w, grid.height() - Theme::px(20));
+        const float y = yFromRow(note.row);
+        QRectF r(x, y + Theme::px(1),
+                 w, rowHeight() - Theme::px(2));
         if (r.contains(pos)) {
             return i;
         }
@@ -181,7 +217,11 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
                Qt::AlignTop | Qt::AlignLeft,
                "PARAMETERS\n(soon)");
 
+    const QRectF keys = keyboardRect();
     const QRectF grid = timelineRect();
+    p.setBrush(QColor(24, 24, 28));
+    p.setPen(QPen(QColor(60, 60, 70), 1.0));
+    p.drawRoundedRect(keys.adjusted(0, 0, 0, 0), Theme::px(6), Theme::px(6));
     p.setBrush(QColor(28, 28, 32));
     p.setPen(QPen(QColor(70, 70, 80), 1.0));
     p.drawRoundedRect(grid, Theme::px(8), Theme::px(8));
@@ -207,7 +247,28 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
         }
     }
 
-    // Grid lines.
+    // Keyboard + horizontal grid lines.
+    const float rH = rowHeight();
+    for (int row = 0; row < m_rows; ++row) {
+        const float y = yFromRow(row);
+        const int midi = m_baseMidi + (m_rows - 1 - row);
+        const int note = midi % 12;
+        const bool black = (note == 1 || note == 3 || note == 6 || note == 8 || note == 10);
+        const QRectF keyRect(keys.left(), y, keys.width(), rH);
+        p.setBrush(black ? QColor(40, 40, 48) : QColor(70, 70, 78));
+        p.setPen(QPen(QColor(50, 50, 58), 1.0));
+        p.drawRect(keyRect);
+        if (note == 0) {
+            p.setPen(Theme::text());
+            p.setFont(Theme::baseFont(9, QFont::DemiBold));
+            p.drawText(keyRect.adjusted(Theme::px(6), 0, -Theme::px(4), 0),
+                       Qt::AlignVCenter | Qt::AlignLeft, noteLabel(row));
+        }
+        p.setPen(QPen(QColor(55, 55, 70), 1.0));
+        p.drawLine(QPointF(grid.left(), y), QPointF(grid.right(), y));
+    }
+
+    // Vertical grid lines.
     for (int step = startStep; step <= endStep; ++step) {
         const float x = xFromStep(step);
         const bool major = (step % 4 == 0);
@@ -215,9 +276,6 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
                       major ? 1.4 : 1.0));
         p.drawLine(QPointF(x, grid.top()), QPointF(x, grid.bottom()));
     }
-    p.setPen(QPen(QColor(55, 55, 70), 1.0));
-    p.drawLine(QPointF(grid.left(), grid.center().y()),
-               QPointF(grid.right(), grid.center().y()));
 
     // Notes.
     const auto &notes = m_notes[static_cast<size_t>(m_activePad)];
@@ -225,14 +283,18 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
         const Note &note = notes[i];
         const float x = xFromStep(note.start);
         const float w = note.length * cellW;
-        QRectF r(x, grid.top() + Theme::px(10),
-                 w, grid.height() - Theme::px(20));
+        const float y = yFromRow(note.row);
+        QRectF r(x, y + Theme::px(1), w, rH - Theme::px(2));
         if (r.right() < grid.left() || r.left() > grid.right()) {
             continue;
         }
-        p.setBrush(QColor(180, 70, 100));
+        p.setBrush(QColor(140, 220, 160));
         p.setPen(Qt::NoPen);
         p.drawRoundedRect(r, Theme::px(6), Theme::px(6));
+        p.setPen(QColor(24, 30, 26));
+        p.setFont(Theme::baseFont(8, QFont::DemiBold));
+        p.drawText(r.adjusted(Theme::px(4), 0, -Theme::px(4), 0),
+                   Qt::AlignVCenter | Qt::AlignLeft, noteLabel(note.row));
     }
 }
 
@@ -317,7 +379,9 @@ void PianoRollOverlay::mouseMoveEvent(QMouseEvent *event) {
     auto &notes = m_notes[static_cast<size_t>(m_activePad)];
     if (m_dragMode == DragMove) {
         const int step = stepFromX(pos.x());
+        const int row = rowFromY(pos.y());
         notes[m_dragNoteIndex].start = clampStep(step - m_pressNote.length / 2);
+        notes[m_dragNoteIndex].row = row;
         emitStepsChanged();
         update();
         return;
@@ -341,6 +405,7 @@ void PianoRollOverlay::mouseReleaseEvent(QMouseEvent *event) {
             Note note;
             note.start = step;
             note.length = 4;
+            note.row = rowFromY(event->position().y());
             m_notes[static_cast<size_t>(m_activePad)].push_back(note);
             emitStepsChanged();
             update();

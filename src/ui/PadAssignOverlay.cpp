@@ -106,6 +106,10 @@ PadAssignOverlay::PadAssignOverlay(SampleSession *session, PadBank *pads, QWidge
 }
 
 void PadAssignOverlay::showForPad(int pad) {
+    showForPad(pad, 0);
+}
+
+void PadAssignOverlay::showForPad(int pad, int tabIndex) {
     m_activePad = pad;
     if (parentWidget()) {
         setGeometry(parentWidget()->rect());
@@ -116,7 +120,7 @@ void PadAssignOverlay::showForPad(int pad) {
     if (auto *synth = qobject_cast<SynthSelectWidget *>(m_synthSelect)) {
         synth->setActivePad(pad);
     }
-    switchTab(0);
+    switchTab(tabIndex);
     setVisible(true);
     raise();
     update();

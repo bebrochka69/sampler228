@@ -8,6 +8,7 @@
 #include "ui/EditPageWidget.h"
 #include "ui/FxPageWidget.h"
 #include "ui/PadAssignOverlay.h"
+#include "ui/PadHoldMenuOverlay.h"
 #include "ui/PianoRollOverlay.h"
 #include "ui/SeqPageWidget.h"
 #include "ui/SimplePageWidget.h"
@@ -71,6 +72,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Overlay for piano roll editor
     m_pianoRoll = new PianoRollOverlay(m_padBank, central);
     m_pianoRoll->hide();
+
+    // Hold menu overlay
+    m_holdMenu = new PadHoldMenuOverlay(m_padBank, central);
+    m_holdMenu->hide();
     connect(seqPage, &SeqPageWidget::padOpenRequested, this, [this, editPage](int pad) {
         if (m_padBank && m_padBank->isSynth(pad)) {
             m_stack->setCurrentIndex(4);
@@ -86,9 +91,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             m_assignOverlay->showForPad(pad);
         }
     });
-    connect(seqPage, &SeqPageWidget::padPianoRollRequested, this, [this](int pad) {
-        if (m_pianoRoll) {
-            m_pianoRoll->showForPad(pad);
+    connect(seqPage, &SeqPageWidget::padMenuRequested, this, [this](int pad) {
+        if (m_holdMenu) {
+            m_holdMenu->showForPad(pad);
         }
     });
     connect(m_assignOverlay, &PadAssignOverlay::closed, this, [this]() {
@@ -101,6 +106,24 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             [seqPage](int pad, const QVector<int> &steps) {
                 seqPage->applyPianoSteps(pad, steps);
             });
+    connect(m_holdMenu, &PadHoldMenuOverlay::closed, this, [this]() {
+        m_stack->setCurrentIndex(0);
+    });
+    connect(m_holdMenu, &PadHoldMenuOverlay::pianoRollRequested, this, [this](int pad) {
+        if (m_pianoRoll) {
+            m_pianoRoll->showForPad(pad);
+        }
+    });
+    connect(m_holdMenu, &PadHoldMenuOverlay::assignSampleRequested, this, [this](int pad) {
+        if (m_assignOverlay) {
+            m_assignOverlay->showForPad(pad, 0);
+        }
+    });
+    connect(m_holdMenu, &PadHoldMenuOverlay::assignSynthRequested, this, [this](int pad) {
+        if (m_assignOverlay) {
+            m_assignOverlay->showForPad(pad, 1);
+        }
+    });
 
 }
 

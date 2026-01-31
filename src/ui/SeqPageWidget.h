@@ -23,7 +23,7 @@ public:
 signals:
     void padOpenRequested(int pad);
     void padAssignRequested(int pad);
-    void padPianoRollRequested(int pad);
+    void padMenuRequested(int pad);
 
 protected:
     void paintEvent(QPaintEvent *event) override;

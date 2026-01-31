@@ -12,6 +12,7 @@ public:
     struct Note {
         int start = 0;
         int length = 4;
+        int row = 0;
     };
 
     explicit PianoRollOverlay(PadBank *pads, QWidget *parent = nullptr);
@@ -38,13 +39,18 @@ private:
     };
 
     QRectF timelineRect() const;
+    QRectF keyboardRect() const;
     QRectF panelRect() const;
     QRectF rightPanelRect() const;
     float baseCellWidth() const;
     float cellWidth() const;
+    float rowHeight() const;
     int clampStep(int step) const;
     int stepFromX(float x) const;
     float xFromStep(int step) const;
+    int rowFromY(float y) const;
+    float yFromRow(int row) const;
+    QString noteLabel(int row) const;
     int noteAt(const QPointF &pos) const;
     bool hitNoteRightEdge(const Note &note, float x) const;
 
@@ -59,6 +65,8 @@ private:
     float m_zoom = 1.0f;
     float m_scroll = 0.0f;
     int m_totalSteps = 128;
+    int m_rows = 24;
+    int m_baseMidi = 60;
 
     bool m_deleteMode = false;
     DragMode m_dragMode = DragNone;

@@ -16,6 +16,7 @@ public:
     explicit PadAssignOverlay(SampleSession *session, PadBank *pads, QWidget *parent = nullptr);
 
     void showForPad(int pad);
+    void showForPad(int pad, int tabIndex);
 
 signals:
     void closed();

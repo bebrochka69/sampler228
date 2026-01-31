@@ -7,6 +7,7 @@ class TopToolbarWidget;
 class SampleSession;
 class PadBank;
 class PadAssignOverlay;
+class PadHoldMenuOverlay;
 class PianoRollOverlay;
 class SynthPageWidget;
 
@@ -24,6 +25,7 @@ private:
     SampleSession *m_sampleSession = nullptr;
     PadBank *m_padBank = nullptr;
     PadAssignOverlay *m_assignOverlay = nullptr;
+    PadHoldMenuOverlay *m_holdMenu = nullptr;
     PianoRollOverlay *m_pianoRoll = nullptr;
     SynthPageWidget *m_synthPage = nullptr;
 };
