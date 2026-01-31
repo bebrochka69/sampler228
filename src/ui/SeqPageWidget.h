@@ -3,6 +3,7 @@
 #include <array>
 #include <QColor>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QWidget>
 
 class QMouseEvent;
@@ -36,6 +37,9 @@ private:
     int m_activePad = 0;
     QTimer m_playTimer;
     QTimer m_readyTimer;
+    QTimer m_animTimer;
+    QElapsedTimer m_playClock;
+    qint64 m_lastStepMs = 0;
     bool m_playing = false;
     bool m_waiting = false;
     int m_playStep = 0;

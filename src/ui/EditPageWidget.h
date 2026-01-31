@@ -22,6 +22,7 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private:
     struct Param {
@@ -47,6 +48,7 @@ private:
     QRectF m_normalizeRect;
     QVector<QRectF> m_paramRects;
 
+    void syncWaveSource();
     QString iconFileFor(Param::Type type) const;
     QPixmap iconForType(Param::Type type);
 };

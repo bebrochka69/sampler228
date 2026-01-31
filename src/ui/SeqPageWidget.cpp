@@ -25,6 +25,14 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
     m_playTimer.setInterval(stepIntervalMs());
     connect(&m_playTimer, &QTimer::timeout, this, &SeqPageWidget::advancePlayhead);
 
+    m_animTimer.setTimerType(Qt::PreciseTimer);
+    m_animTimer.setInterval(qMax(12, stepIntervalMs() / 4));
+    connect(&m_animTimer, &QTimer::timeout, this, [this]() {
+        if (m_playing || m_waiting) {
+            update();
+        }
+    });
+
     m_readyTimer.setInterval(60);
     connect(&m_readyTimer, &QTimer::timeout, this, [this]() {
         if (!m_waiting) {
@@ -48,6 +56,7 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
         connect(m_pads, &PadBank::bpmChanged, this, [this](int) {
             if (m_playing) {
                 m_playTimer.setInterval(stepIntervalMs());
+                m_animTimer.setInterval(qMax(12, stepIntervalMs() / 4));
             }
             update();
         });
@@ -91,6 +100,14 @@ void SeqPageWidget::startPlayback() {
     triggerStep(m_playStep);
     m_playTimer.setInterval(stepIntervalMs());
     m_playTimer.start();
+    if (!m_playClock.isValid()) {
+        m_playClock.start();
+    } else {
+        m_playClock.restart();
+    }
+    m_lastStepMs = 0;
+    m_animTimer.setInterval(qMax(12, stepIntervalMs() / 4));
+    m_animTimer.start();
     update();
 }
 
@@ -100,6 +117,7 @@ void SeqPageWidget::togglePlayback() {
         m_waiting = false;
         m_readyTimer.stop();
         m_playTimer.stop();
+        m_animTimer.stop();
         if (m_pads) {
             m_pads->stopAll();
         }
@@ -117,6 +135,9 @@ void SeqPageWidget::togglePlayback() {
 void SeqPageWidget::advancePlayhead() {
     m_playStep = (m_playStep + 1) % 64;
     triggerStep(m_playStep);
+    if (m_playClock.isValid()) {
+        m_lastStepMs = m_playClock.elapsed();
+    }
     update();
 }
 
@@ -269,9 +290,15 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
         }
     }
 
-    // Playhead
+    // Playhead (smooth)
     if (m_playing || m_waiting) {
-        const float x = gridArea.left() + m_playStep * cellW;
+        float frac = 0.0f;
+        const int stepMs = stepIntervalMs();
+        if (m_playClock.isValid() && stepMs > 0) {
+            const qint64 elapsed = m_playClock.elapsed() - m_lastStepMs;
+            frac = qBound(0.0f, static_cast<float>(elapsed) / static_cast<float>(stepMs), 1.0f);
+        }
+        const float x = gridArea.left() + (m_playStep + frac) * cellW;
         p.setPen(QPen(Theme::accentAlt(), 2.0));
         p.drawLine(QPointF(x, gridArea.top()), QPointF(x, gridArea.bottom()));
     }

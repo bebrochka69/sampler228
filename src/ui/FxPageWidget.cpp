@@ -568,25 +568,33 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         // Waveform (real level history)
         if (!m_waveHistory.isEmpty()) {
             QPainterPath wave;
+            QPainterPath compWave;
             const int total = m_waveHistory.size();
             const int count = m_waveFilled ? total : qMax(1, m_waveHead);
             const int start = m_waveFilled ? m_waveHead : 0;
+            const float compScale = qBound(0.2f, 1.0f - m_compValue * 0.7f, 1.0f);
             for (int i = 0; i < count; ++i) {
                 const int idx = (start + i) % total;
                 const float x = graphRect.left() + 6 +
                                 (graphRect.width() - 12) * (i / static_cast<float>(qMax(1, count - 1)));
                 const float amp = m_waveHistory[idx];
                 const float y = graphRect.center().y() - (amp * 0.9f) * (graphRect.height() * 0.45f);
+                const float yc = graphRect.center().y() -
+                                 (amp * 0.9f * compScale) * (graphRect.height() * 0.45f);
                 if (i == 0) {
                     wave.moveTo(QPointF(x, y));
+                    compWave.moveTo(QPointF(x, yc));
                 } else {
                     wave.lineTo(QPointF(x, y));
+                    compWave.lineTo(QPointF(x, yc));
                 }
             }
             p.save();
             p.setRenderHint(QPainter::Antialiasing, false);
             p.setPen(QPen(QColor(220, 220, 220, 210), 1.2));
             p.drawPath(wave);
+            p.setPen(QPen(QColor(255, 80, 110, 220), 1.4));
+            p.drawPath(compWave);
             p.restore();
         }
 
@@ -969,6 +977,33 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
         p.setBrush(meterCyan);
         p.setPen(Qt::NoPen);
         p.drawRect(meterFill);
+
+        auto dbToY = [&](float db) {
+            const float amp = std::pow(10.0f, db / 20.0f);
+            return meterRect.bottom() - amp * (meterRect.height() - Theme::pxF(2.0f));
+        };
+        const QVector<float> ticks = {0.0f, -12.0f, -24.0f, -36.0f};
+        p.setPen(QPen(QColor(200, 200, 220, 140), 1.0));
+        p.setFont(Theme::baseFont(7, QFont::DemiBold));
+        for (float db : ticks) {
+            const float y = dbToY(db);
+            p.drawLine(QPointF(meterRect.left() + Theme::pxF(1.0f), y),
+                       QPointF(meterRect.right() - Theme::pxF(1.0f), y));
+            p.drawText(QRectF(meterRect.right() + Theme::px(2), y - Theme::px(6),
+                              Theme::px(18), Theme::px(12)),
+                       Qt::AlignLeft | Qt::AlignVCenter, QString::number(static_cast<int>(db)));
+        }
+        // zero line highlight
+        const float y0 = dbToY(0.0f);
+        p.setPen(QPen(QColor(255, 80, 110), 1.2));
+        p.drawLine(QPointF(meterRect.left(), y0), QPointF(meterRect.right(), y0));
+        // clip indicator
+        if (level > 0.98f) {
+            p.setBrush(QColor(255, 60, 90));
+            p.setPen(Qt::NoPen);
+            p.drawRect(QRectF(meterRect.left() + Theme::pxF(1.0f), meterRect.top() + Theme::pxF(1.0f),
+                              meterRect.width() - Theme::pxF(2.0f), Theme::pxF(3.0f)));
+        }
 
         // Pink volume bar (interactive) on the right.
         p.setBrush(QColor(70, 60, 95));

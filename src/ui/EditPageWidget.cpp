@@ -6,6 +6,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QShowEvent>
 #include <QtGlobal>
 
 #include "PadBank.h"
@@ -103,9 +104,17 @@ EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *p
     }
     if (m_pads) {
         connect(m_pads, &PadBank::padParamsChanged, this, [this](int) { update(); });
-        connect(m_pads, &PadBank::activePadChanged, this, [this](int) { update(); });
-        connect(m_pads, &PadBank::padChanged, this, [this](int) { update(); });
+        connect(m_pads, &PadBank::activePadChanged, this, [this](int) {
+            syncWaveSource();
+            update();
+        });
+        connect(m_pads, &PadBank::padChanged, this, [this](int) {
+            syncWaveSource();
+            update();
+        });
     }
+
+    syncWaveSource();
 }
 
 QString EditPageWidget::iconFileFor(Param::Type type) const {
@@ -367,21 +376,31 @@ void EditPageWidget::mousePressEvent(QMouseEvent *event) {
     }
 }
 
+void EditPageWidget::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    syncWaveSource();
+}
+
+void EditPageWidget::syncWaveSource() {
+    if (!m_pads || !m_session) {
+        return;
+    }
+    const QString padPath = m_pads->padPath(m_pads->activePad());
+    if (padPath.isEmpty()) {
+        return;
+    }
+    if (padPath != m_session->sourcePath() ||
+        m_session->decodeMode() != SampleSession::DecodeMode::Full) {
+        m_session->setSource(padPath, SampleSession::DecodeMode::Full);
+    }
+}
+
 void EditPageWidget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
     QPainter p(this);
     Theme::paintBackground(p, rect());
     Theme::applyRenderHints(p);
-
-    if (m_pads && m_session) {
-        const QString padPath = m_pads->padPath(m_pads->activePad());
-        if (!padPath.isEmpty() &&
-            (padPath != m_session->sourcePath() ||
-             m_session->decodeMode() != SampleSession::DecodeMode::Full)) {
-            m_session->setSource(padPath, SampleSession::DecodeMode::Full);
-        }
-    }
 
     const int margin = Theme::px(24);
     const int headerHeight = Theme::px(24);
