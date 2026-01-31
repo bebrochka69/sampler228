@@ -47,7 +47,9 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
     m_animTimer.setTimerType(Qt::PreciseTimer);
     connect(&m_animTimer, &QTimer::timeout, this, &FxPageWidget::advanceAnimation);
 
-    m_waveHistory.fill(0.0f, 200);
+    m_waveHistory.fill(0.0f, 128);
+    m_waveHead = 0;
+    m_waveFilled = false;
 }
 
 void FxPageWidget::assignEffect(int effectIndex) {
@@ -300,8 +302,11 @@ void FxPageWidget::advanceAnimation() {
 
     const float waveLevel = m_pads ? m_pads->busMeter(m_selectedTrack) : 0.0f;
     if (!m_waveHistory.isEmpty()) {
-        m_waveHistory.remove(0);
-        m_waveHistory.push_back(clamp01(waveLevel));
+        m_waveHistory[m_waveHead] = clamp01(waveLevel);
+        m_waveHead = (m_waveHead + 1) % m_waveHistory.size();
+        if (m_waveHead == 0) {
+            m_waveFilled = true;
+        }
     }
 
     update();
@@ -555,11 +560,14 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         // Waveform (real level history)
         if (!m_waveHistory.isEmpty()) {
             QPainterPath wave;
-            const int count = m_waveHistory.size();
+            const int total = m_waveHistory.size();
+            const int count = m_waveFilled ? total : qMax(1, m_waveHead);
+            const int start = m_waveFilled ? m_waveHead : 0;
             for (int i = 0; i < count; ++i) {
+                const int idx = (start + i) % total;
                 const float x = graphRect.left() + 6 +
-                                (graphRect.width() - 12) * (i / static_cast<float>(count - 1));
-                const float amp = m_waveHistory[i];
+                                (graphRect.width() - 12) * (i / static_cast<float>(qMax(1, count - 1)));
+                const float amp = m_waveHistory[idx];
                 const float y = graphRect.center().y() - (amp * 0.9f) * (graphRect.height() * 0.45f);
                 if (i == 0) {
                     wave.moveTo(QPointF(x, y));
@@ -567,8 +575,11 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
                     wave.lineTo(QPointF(x, y));
                 }
             }
+            p.save();
+            p.setRenderHint(QPainter::Antialiasing, false);
             p.setPen(QPen(QColor(220, 220, 220, 210), 1.2));
             p.drawPath(wave);
+            p.restore();
         }
 
         // Makeup button

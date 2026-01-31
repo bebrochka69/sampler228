@@ -83,6 +83,8 @@ private:
     float m_sidechainValue = 0.0f;
     float m_compValue = 0.0f;
     QVector<float> m_waveHistory;
+    int m_waveHead = 0;
+    bool m_waveFilled = false;
     QRectF m_makeupRect;
     QRectF m_closeRect;
     int m_dragFaderTrack = -1;
