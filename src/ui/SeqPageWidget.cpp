@@ -97,6 +97,9 @@ bool SeqPageWidget::padsReady() const {
                 break;
             }
         }
+        if (!used && !m_pianoNotes[pad].isEmpty()) {
+            used = true;
+        }
         if (used && !m_pads->isPadReady(pad)) {
             return false;
         }
@@ -156,6 +159,19 @@ void SeqPageWidget::triggerStep(int step) {
         return;
     }
     for (int pad = 0; pad < 8; ++pad) {
+        if (m_pads->isSynth(pad) && !m_pianoNotes[pad].isEmpty()) {
+            const int baseMidi = 60;
+            const int rows = 24;
+            const auto &notes = m_pianoNotes[pad];
+            for (const auto &note : notes) {
+                if (note.start != step) {
+                    continue;
+                }
+                const int midi = baseMidi + (rows - 1 - note.row);
+                m_pads->triggerPadMidi(pad, midi, note.length);
+            }
+            continue;
+        }
         if (m_steps[pad][step]) {
             m_pads->triggerPad(pad);
         }
@@ -173,6 +189,22 @@ void SeqPageWidget::applyPianoSteps(int pad, const QVector<int> &steps) {
         if (step >= 0 && step < 64) {
             m_steps[pad][step] = true;
         }
+    }
+    update();
+}
+
+void SeqPageWidget::applyPianoNotes(int pad, const QVector<int> &notesData) {
+    if (pad < 0 || pad >= 8) {
+        return;
+    }
+    auto &notes = m_pianoNotes[pad];
+    notes.clear();
+    for (int i = 0; i + 2 < notesData.size(); i += 3) {
+        PianoNote note;
+        note.start = qMax(0, notesData[i]);
+        note.length = qMax(1, notesData[i + 1]);
+        note.row = qBound(0, notesData[i + 2], 23);
+        notes.push_back(note);
     }
     update();
 }

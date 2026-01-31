@@ -66,6 +66,7 @@ public:
     bool isPlaying(int index) const;
     bool isPadReady(int index) const;
     void triggerPad(int index);
+    void triggerPadMidi(int index, int midiNote, int lengthSteps);
     void stopPad(int index);
     void stopAll();
 
@@ -99,6 +100,7 @@ private:
     std::array<QString, 8> m_paths;
     std::array<bool, 8> m_isSynth{};
     std::array<QString, 8> m_synthNames;
+    std::array<int, 8> m_synthBaseMidi{};
     std::array<PadParams, 8> m_params;
     std::array<PadRuntime *, 8> m_runtime;
     int m_activePad = 0;

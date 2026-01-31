@@ -22,6 +22,7 @@ public:
 signals:
     void closed();
     void stepsChanged(int pad, const QVector<int> &steps);
+    void notesChanged(int pad, const QVector<int> &notes);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -57,6 +58,7 @@ private:
     void zoomBy(float factor);
     void clampScroll();
     void emitStepsChanged();
+    void emitNotesChanged();
     void setPlayheadStep(int step);
 
     PadBank *m_pads = nullptr;

@@ -313,6 +313,19 @@ void PianoRollOverlay::emitStepsChanged() {
         steps.push_back(qBound(0, note.start, m_totalSteps - 1));
     }
     emit stepsChanged(m_activePad, steps);
+    emitNotesChanged();
+}
+
+void PianoRollOverlay::emitNotesChanged() {
+    QVector<int> data;
+    const auto &notes = m_notes[static_cast<size_t>(m_activePad)];
+    data.reserve(notes.size() * 3);
+    for (const auto &note : notes) {
+        data.push_back(qBound(0, note.start, m_totalSteps - 1));
+        data.push_back(qMax(1, note.length));
+        data.push_back(qBound(0, note.row, m_rows - 1));
+    }
+    emit notesChanged(m_activePad, data);
 }
 
 void PianoRollOverlay::setPlayheadStep(int step) {

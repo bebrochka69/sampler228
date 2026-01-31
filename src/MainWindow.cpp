@@ -106,6 +106,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             [seqPage](int pad, const QVector<int> &steps) {
                 seqPage->applyPianoSteps(pad, steps);
             });
+    connect(m_pianoRoll, &PianoRollOverlay::notesChanged, this,
+            [seqPage](int pad, const QVector<int> &notes) {
+                seqPage->applyPianoNotes(pad, notes);
+            });
     connect(m_holdMenu, &PadHoldMenuOverlay::closed, this, [this]() {
         m_stack->setCurrentIndex(0);
     });

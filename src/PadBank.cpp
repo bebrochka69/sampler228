@@ -54,8 +54,8 @@ constexpr SynthPresetInfo kSynthPresets[] = {
     {"PIANO", 0, 0, 60},
     {"E.PIANO", 0, 4, 60},
     {"ORGAN", 0, 16, 60},
-    {"BASS", 0, 32, 36},
-    {"LEAD", 0, 80, 72},
+    {"BASS", 0, 32, 60},
+    {"LEAD", 0, 80, 60},
     {"PAD", 0, 88, 60},
     {"STRINGS", 0, 48, 60},
     {"BRASS", 0, 56, 60},
@@ -227,7 +227,7 @@ FluidContext *getFluidContext(int sampleRate) {
 }
 
 std::shared_ptr<AudioEngine::Buffer> renderFluidSynth(const SynthPresetInfo &preset,
-                                                      int sampleRate) {
+                                                      int sampleRate, int midiNote) {
     FluidContext *ctx = getFluidContext(sampleRate);
     if (!ctx || !ctx->synth || ctx->sfid < 0) {
         return nullptr;
@@ -240,11 +240,11 @@ std::shared_ptr<AudioEngine::Buffer> renderFluidSynth(const SynthPresetInfo &pre
 
     fluid_synth_all_notes_off(ctx->synth, 0);
     fluid_synth_program_select(ctx->synth, 0, ctx->sfid, preset.bank, preset.program);
-    fluid_synth_noteon(ctx->synth, 0, preset.note, 96);
+    fluid_synth_noteon(ctx->synth, 0, midiNote, 96);
 
     fluid_synth_write_float(ctx->synth, noteFrames,
                             left.data(), 0, 1, right.data(), 0, 1);
-    fluid_synth_noteoff(ctx->synth, 0, preset.note);
+    fluid_synth_noteoff(ctx->synth, 0, midiNote);
     fluid_synth_write_float(ctx->synth, totalFrames - noteFrames,
                             left.data() + noteFrames, 0, 1,
                             right.data() + noteFrames, 0, 1);
@@ -267,7 +267,6 @@ std::shared_ptr<AudioEngine::Buffer> renderFluidSynth(const SynthPresetInfo &pre
     }
     return buffer;
 }
-#endif
 }  // namespace
 
 struct RenderSignature {
@@ -321,6 +320,7 @@ struct PadBank::PadRuntime {
     int renderJobId = 0;
     bool pendingTrigger = false;
     float normalizeGain = 1.0f;
+    int synthStopToken = 0;
 };
 
 PadBank::PadBank(QObject *parent) : QObject(parent) {
@@ -355,6 +355,7 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
         m_runtime[i] = new PadRuntime();
         m_isSynth[static_cast<size_t>(i)] = false;
         m_synthNames[static_cast<size_t>(i)].clear();
+        m_synthBaseMidi[static_cast<size_t>(i)] = 60;
         m_runtime[i]->useExternal = forceExternal;
         m_runtime[i]->useEngine = m_engineAvailable;
         if (!m_engineAvailable) {
@@ -525,11 +526,11 @@ QString PadBank::synthName(int index) const {
     return m_synthNames[static_cast<size_t>(index)];
 }
 
-static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name, int sampleRate) {
+static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name, int sampleRate, int baseMidi) {
 #ifdef GROOVEBOX_WITH_FLUIDSYNTH
     const SynthPresetInfo *preset = findSynthPreset(name);
     if (preset) {
-        auto rendered = renderFluidSynth(*preset, sampleRate);
+        auto rendered = renderFluidSynth(*preset, sampleRate, baseMidi);
         if (rendered && rendered->isValid()) {
             return rendered;
         }
@@ -543,15 +544,16 @@ static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name
     buffer->samples.resize(frames * 2);
 
     const QString wave = name.toLower();
+    const float baseFreq = 440.0f * std::pow(2.0f, (static_cast<float>(baseMidi) - 69.0f) / 12.0f);
     for (int i = 0; i < frames; ++i) {
         const float t = static_cast<float>(i) / static_cast<float>(sampleRate);
         float v = 0.0f;
         if (wave.contains("saw")) {
             v = 2.0f * (t - std::floor(t + 0.5f));
         } else if (wave.contains("square")) {
-            v = (std::sin(2.0f * static_cast<float>(M_PI) * 220.0f * t) >= 0.0f) ? 0.7f : -0.7f;
+            v = (std::sin(2.0f * static_cast<float>(M_PI) * baseFreq * t) >= 0.0f) ? 0.7f : -0.7f;
         } else {
-            v = std::sin(2.0f * static_cast<float>(M_PI) * 220.0f * t);
+            v = std::sin(2.0f * static_cast<float>(M_PI) * baseFreq * t);
         }
         buffer->samples[i * 2] = v;
         buffer->samples[i * 2 + 1] = v;
@@ -566,10 +568,16 @@ void PadBank::setSynth(int index, const QString &name) {
     m_isSynth[static_cast<size_t>(index)] = true;
     m_synthNames[static_cast<size_t>(index)] = name;
     m_paths[static_cast<size_t>(index)].clear();
+    const SynthPresetInfo *preset = findSynthPreset(name);
+    if (preset) {
+        m_synthBaseMidi[static_cast<size_t>(index)] = preset->note;
+    } else {
+        m_synthBaseMidi[static_cast<size_t>(index)] = 60;
+    }
 
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (rt) {
-        rt->rawBuffer = buildSynthBuffer(name, m_engineRate);
+        rt->rawBuffer = buildSynthBuffer(name, m_engineRate, m_synthBaseMidi[static_cast<size_t>(index)]);
         rt->processedBuffer = rt->rawBuffer;
         rt->processedReady = true;
         rt->pendingProcessed = false;
@@ -1242,7 +1250,8 @@ void PadBank::triggerPad(int index) {
         }
         if (!buffer || !buffer->isValid()) {
             if (synthPad) {
-                buffer = buildSynthBuffer(m_synthNames[static_cast<size_t>(index)], m_engineRate);
+                const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
+                buffer = buildSynthBuffer(m_synthNames[static_cast<size_t>(index)], m_engineRate, baseMidi);
                 rt->rawBuffer = buffer;
                 rt->processedBuffer = buffer;
                 rt->processedReady = true;
@@ -1424,6 +1433,69 @@ void PadBank::triggerPad(int index) {
             });
 
     rt->external->start();
+}
+
+void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    if (!isSynth(index)) {
+        triggerPad(index);
+        return;
+    }
+    PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (!rt) {
+        return;
+    }
+    if (!rt->useEngine || !m_engineAvailable || !m_engine) {
+        return;
+    }
+
+    const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
+    const QString name = m_synthNames[static_cast<size_t>(index)];
+    if (!rt->rawBuffer || !rt->rawBuffer->isValid()) {
+        rt->rawBuffer = buildSynthBuffer(name, m_engineRate, baseMidi);
+        rt->processedBuffer = rt->rawBuffer;
+        rt->processedReady = true;
+    }
+    auto buffer = rt->rawBuffer;
+    if (!buffer || !buffer->isValid()) {
+        return;
+    }
+
+    PadParams &params = m_params[static_cast<size_t>(index)];
+    const float semis = params.pitch + static_cast<float>(midiNote - baseMidi);
+    const float rate = static_cast<float>(pitchToRate(semis));
+
+    const int bpm = m_bpm;
+    const int stepMs = 60000 / qMax(1, bpm) / 4;
+    const int steps = qMax(1, lengthSteps);
+    const qint64 lengthMs = qMax<qint64>(1, static_cast<qint64>(steps) * stepMs);
+    int lengthFrames = static_cast<int>(
+        static_cast<double>(lengthMs) * buffer->sampleRate * rate / 1000.0);
+    lengthFrames = qMax(1, lengthFrames);
+
+    const int totalFrames = buffer->frames();
+    bool loop = false;
+    int endFrame = qMin(totalFrames, lengthFrames);
+    if (lengthFrames > totalFrames) {
+        endFrame = totalFrames;
+        loop = true;
+    }
+
+    m_engine->trigger(index, buffer, 0, endFrame, loop, params.volume,
+                      params.pan, rate, params.fxBus);
+
+    if (loop) {
+        const int token = ++rt->synthStopToken;
+        QTimer::singleShot(static_cast<int>(lengthMs), this, [this, index, token]() {
+            PadRuntime *rtLocal = m_runtime[static_cast<size_t>(index)];
+            if (!rtLocal || rtLocal->synthStopToken != token) {
+                return;
+            }
+            stopPad(index);
+        });
+    }
 }
 
 void PadBank::stopPad(int index) {

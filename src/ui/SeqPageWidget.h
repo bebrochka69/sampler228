@@ -19,6 +19,7 @@ class SeqPageWidget : public QWidget {
 public:
     explicit SeqPageWidget(PadBank *pads, QWidget *parent = nullptr);
     void applyPianoSteps(int pad, const QVector<int> &steps);
+    void applyPianoNotes(int pad, const QVector<int> &notesData);
 
 signals:
     void padOpenRequested(int pad);
@@ -41,7 +42,14 @@ private:
     void advancePlayhead();
     void triggerStep(int step);
 
+    struct PianoNote {
+        int start = 0;
+        int length = 1;
+        int row = 0;
+    };
+
     std::array<std::array<bool, 64>, 8> m_steps;
+    std::array<QVector<PianoNote>, 8> m_pianoNotes;
     std::array<QColor, 8> m_padColors;
     int m_activePad = 0;
     QTimer m_playTimer;
