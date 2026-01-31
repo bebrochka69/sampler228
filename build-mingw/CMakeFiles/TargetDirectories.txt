@@ -1,0 +1,5 @@
+C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/GrooveBoxUI.dir
+C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/edit_cache.dir
+C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/rebuild_cache.dir
+C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/GrooveBoxUI_autogen_timestamp_deps.dir
+C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/GrooveBoxUI_autogen.dir

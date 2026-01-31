@@ -1,0 +1,3268 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineSystem.cmake:212 (message)"
+      - "CMakeLists.txt:2 (project)"
+    message: |
+      The system is: Windows - 10.0.19045 - AMD64
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeNinjaFindMake.cmake:5 (find_program)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_MAKE_PROGRAM"
+    description: "Program used to build from build.ninja files."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ninja-build"
+      - "ninja"
+      - "samu"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/mingw64/sbin/"
+      - "D:/MSYS/mingw64/"
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/ninja-build.com"
+      - "D:/MSYS/mingw64/bin/ninja-build.exe"
+      - "D:/MSYS/mingw64/bin/ninja-build"
+      - "D:/MSYS/mingw64/bin/ninja.com"
+    found: "D:/MSYS/mingw64/bin/ninja.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompiler.cmake:63 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:69 (_cmake_find_compiler)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_CXX_COMPILER"
+    description: "CXX compiler"
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: false
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "c++"
+      - "g++"
+      - "cl"
+      - "bcc"
+      - "icx"
+      - "clang++"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/c++.com"
+    found: "D:/MSYS/mingw64/bin/c++.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerId.cmake:462 (find_file)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerId.cmake:500 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:125 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeCXXCompilerId.cpp.in"
+    candidate_directories:
+      - "D:/MSYS/mingw64/share/cmake/Modules/"
+    found: "D:/MSYS/mingw64/share/cmake/Modules/CMakeCXXCompilerId.cpp.in"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:125 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:2 (project)"
+    message: |
+      Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
+      Compiler: D:/MSYS/mingw64/bin/c++.exe 
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      0
+      
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "a.exe"
+      
+      The CXX compiler identification is GNU, found in:
+        C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/4.2.2/CompilerIdCXX/a.exe
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_AR"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ar"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/ar.com"
+    found: "D:/MSYS/mingw64/bin/ar.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_RANLIB"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ranlib"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/ranlib.com"
+    found: "D:/MSYS/mingw64/bin/ranlib.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_STRIP"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "strip"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/strip.com"
+    found: "D:/MSYS/mingw64/bin/strip.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_LINKER"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ld"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/ld.com"
+    found: "D:/MSYS/mingw64/bin/ld.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_NM"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "nm"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/nm.com"
+    found: "D:/MSYS/mingw64/bin/nm.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_OBJDUMP"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "objdump"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/objdump.com"
+    found: "D:/MSYS/mingw64/bin/objdump.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_OBJCOPY"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "objcopy"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/objcopy.com"
+    found: "D:/MSYS/mingw64/bin/objcopy.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_READELF"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "readelf"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/readelf.com"
+    found: "D:/MSYS/mingw64/bin/readelf.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_DLLTOOL"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "dlltool"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/dlltool.com"
+    found: "D:/MSYS/mingw64/bin/dlltool.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_ADDR2LINE"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "addr2line"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/addr2line.com"
+    found: "D:/MSYS/mingw64/bin/addr2line.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_TAPI"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "tapi"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/tapi.com"
+      - "D:/MSYS/mingw64/bin/tapi.exe"
+      - "D:/MSYS/mingw64/bin/tapi"
+      - "D:/MSYS/usr/local/bin/tapi.com"
+      - "D:/MSYS/usr/local/bin/tapi.exe"
+      - "D:/MSYS/usr/local/bin/tapi"
+      - "D:/MSYS/usr/bin/tapi.com"
+      - "D:/MSYS/usr/bin/tapi.exe"
+      - "D:/MSYS/usr/bin/tapi"
+      - "C:/Windows/System32/tapi.com"
+      - "C:/Windows/System32/tapi.exe"
+      - "C:/Windows/System32/tapi"
+      - "C:/Windows/tapi.com"
+      - "C:/Windows/tapi.exe"
+      - "C:/Windows/tapi"
+      - "C:/Windows/System32/wbem/tapi.com"
+      - "C:/Windows/System32/wbem/tapi.exe"
+      - "C:/Windows/System32/wbem/tapi"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/tapi.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/tapi.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/tapi"
+      - "D:/MSYS/usr/bin/site_perl/tapi.com"
+      - "D:/MSYS/usr/bin/site_perl/tapi.exe"
+      - "D:/MSYS/usr/bin/site_perl/tapi"
+      - "D:/MSYS/usr/bin/vendor_perl/tapi.com"
+      - "D:/MSYS/usr/bin/vendor_perl/tapi.exe"
+      - "D:/MSYS/usr/bin/vendor_perl/tapi"
+      - "D:/MSYS/usr/bin/core_perl/tapi.com"
+      - "D:/MSYS/usr/bin/core_perl/tapi.exe"
+      - "D:/MSYS/usr/bin/core_perl/tapi"
+    found: false
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/Compiler/GNU-FindBinUtils.cmake:18 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:207 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_CXX_COMPILER_AR"
+    description: "A wrapper around 'ar' adding the appropriate '--plugin' option for the GCC compiler"
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "gcc-ar-15.2"
+      - "gcc-ar-15"
+      - "gcc-ar15"
+      - "gcc-ar"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/gcc-ar-15.2.com"
+      - "D:/MSYS/mingw64/bin/gcc-ar-15.2.exe"
+      - "D:/MSYS/mingw64/bin/gcc-ar-15.2"
+      - "D:/MSYS/usr/local/bin/gcc-ar-15.2.com"
+      - "D:/MSYS/usr/local/bin/gcc-ar-15.2.exe"
+      - "D:/MSYS/usr/local/bin/gcc-ar-15.2"
+      - "D:/MSYS/usr/bin/gcc-ar-15.2.com"
+      - "D:/MSYS/usr/bin/gcc-ar-15.2.exe"
+      - "D:/MSYS/usr/bin/gcc-ar-15.2"
+      - "C:/Windows/System32/gcc-ar-15.2.com"
+      - "C:/Windows/System32/gcc-ar-15.2.exe"
+      - "C:/Windows/System32/gcc-ar-15.2"
+      - "C:/Windows/gcc-ar-15.2.com"
+      - "C:/Windows/gcc-ar-15.2.exe"
+      - "C:/Windows/gcc-ar-15.2"
+      - "C:/Windows/System32/wbem/gcc-ar-15.2.com"
+      - "C:/Windows/System32/wbem/gcc-ar-15.2.exe"
+      - "C:/Windows/System32/wbem/gcc-ar-15.2"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar-15.2.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar-15.2.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar-15.2"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar-15.2.com"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar-15.2.exe"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar-15.2"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar-15.2.com"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar-15.2.exe"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar-15.2"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar-15.2.com"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar-15.2.exe"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar-15.2"
+      - "D:/MSYS/mingw64/bin/gcc-ar-15.com"
+      - "D:/MSYS/mingw64/bin/gcc-ar-15.exe"
+      - "D:/MSYS/mingw64/bin/gcc-ar-15"
+      - "D:/MSYS/usr/local/bin/gcc-ar-15.com"
+      - "D:/MSYS/usr/local/bin/gcc-ar-15.exe"
+      - "D:/MSYS/usr/local/bin/gcc-ar-15"
+      - "D:/MSYS/usr/bin/gcc-ar-15.com"
+      - "D:/MSYS/usr/bin/gcc-ar-15.exe"
+      - "D:/MSYS/usr/bin/gcc-ar-15"
+      - "C:/Windows/System32/gcc-ar-15.com"
+      - "C:/Windows/System32/gcc-ar-15.exe"
+      - "C:/Windows/System32/gcc-ar-15"
+      - "C:/Windows/gcc-ar-15.com"
+      - "C:/Windows/gcc-ar-15.exe"
+      - "C:/Windows/gcc-ar-15"
+      - "C:/Windows/System32/wbem/gcc-ar-15.com"
+      - "C:/Windows/System32/wbem/gcc-ar-15.exe"
+      - "C:/Windows/System32/wbem/gcc-ar-15"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar-15.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar-15.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar-15"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar-15.com"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar-15.exe"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar-15"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar-15.com"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar-15.exe"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar-15"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar-15.com"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar-15.exe"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar-15"
+      - "D:/MSYS/mingw64/bin/gcc-ar15.com"
+      - "D:/MSYS/mingw64/bin/gcc-ar15.exe"
+      - "D:/MSYS/mingw64/bin/gcc-ar15"
+      - "D:/MSYS/usr/local/bin/gcc-ar15.com"
+      - "D:/MSYS/usr/local/bin/gcc-ar15.exe"
+      - "D:/MSYS/usr/local/bin/gcc-ar15"
+      - "D:/MSYS/usr/bin/gcc-ar15.com"
+      - "D:/MSYS/usr/bin/gcc-ar15.exe"
+      - "D:/MSYS/usr/bin/gcc-ar15"
+      - "C:/Windows/System32/gcc-ar15.com"
+      - "C:/Windows/System32/gcc-ar15.exe"
+      - "C:/Windows/System32/gcc-ar15"
+      - "C:/Windows/gcc-ar15.com"
+      - "C:/Windows/gcc-ar15.exe"
+      - "C:/Windows/gcc-ar15"
+      - "C:/Windows/System32/wbem/gcc-ar15.com"
+      - "C:/Windows/System32/wbem/gcc-ar15.exe"
+      - "C:/Windows/System32/wbem/gcc-ar15"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar15.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar15.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ar15"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar15.com"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar15.exe"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ar15"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar15.com"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar15.exe"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ar15"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar15.com"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar15.exe"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ar15"
+      - "D:/MSYS/mingw64/bin/gcc-ar.com"
+    found: "D:/MSYS/mingw64/bin/gcc-ar.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/Compiler/GNU-FindBinUtils.cmake:30 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:207 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_CXX_COMPILER_RANLIB"
+    description: "A wrapper around 'ranlib' adding the appropriate '--plugin' option for the GCC compiler"
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "gcc-ranlib-15.2"
+      - "gcc-ranlib-15"
+      - "gcc-ranlib15"
+      - "gcc-ranlib"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/gcc-ranlib-15.2.com"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib-15.2.exe"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib-15.2"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib-15.2.com"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib-15.2.exe"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib-15.2"
+      - "D:/MSYS/usr/bin/gcc-ranlib-15.2.com"
+      - "D:/MSYS/usr/bin/gcc-ranlib-15.2.exe"
+      - "D:/MSYS/usr/bin/gcc-ranlib-15.2"
+      - "C:/Windows/System32/gcc-ranlib-15.2.com"
+      - "C:/Windows/System32/gcc-ranlib-15.2.exe"
+      - "C:/Windows/System32/gcc-ranlib-15.2"
+      - "C:/Windows/gcc-ranlib-15.2.com"
+      - "C:/Windows/gcc-ranlib-15.2.exe"
+      - "C:/Windows/gcc-ranlib-15.2"
+      - "C:/Windows/System32/wbem/gcc-ranlib-15.2.com"
+      - "C:/Windows/System32/wbem/gcc-ranlib-15.2.exe"
+      - "C:/Windows/System32/wbem/gcc-ranlib-15.2"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib-15.2.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib-15.2.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib-15.2"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib-15.2.com"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib-15.2.exe"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib-15.2"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib-15.2.com"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib-15.2.exe"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib-15.2"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib-15.2.com"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib-15.2.exe"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib-15.2"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib-15.com"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib-15.exe"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib-15"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib-15.com"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib-15.exe"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib-15"
+      - "D:/MSYS/usr/bin/gcc-ranlib-15.com"
+      - "D:/MSYS/usr/bin/gcc-ranlib-15.exe"
+      - "D:/MSYS/usr/bin/gcc-ranlib-15"
+      - "C:/Windows/System32/gcc-ranlib-15.com"
+      - "C:/Windows/System32/gcc-ranlib-15.exe"
+      - "C:/Windows/System32/gcc-ranlib-15"
+      - "C:/Windows/gcc-ranlib-15.com"
+      - "C:/Windows/gcc-ranlib-15.exe"
+      - "C:/Windows/gcc-ranlib-15"
+      - "C:/Windows/System32/wbem/gcc-ranlib-15.com"
+      - "C:/Windows/System32/wbem/gcc-ranlib-15.exe"
+      - "C:/Windows/System32/wbem/gcc-ranlib-15"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib-15.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib-15.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib-15"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib-15.com"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib-15.exe"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib-15"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib-15.com"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib-15.exe"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib-15"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib-15.com"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib-15.exe"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib-15"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib15.com"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib15.exe"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib15"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib15.com"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib15.exe"
+      - "D:/MSYS/usr/local/bin/gcc-ranlib15"
+      - "D:/MSYS/usr/bin/gcc-ranlib15.com"
+      - "D:/MSYS/usr/bin/gcc-ranlib15.exe"
+      - "D:/MSYS/usr/bin/gcc-ranlib15"
+      - "C:/Windows/System32/gcc-ranlib15.com"
+      - "C:/Windows/System32/gcc-ranlib15.exe"
+      - "C:/Windows/System32/gcc-ranlib15"
+      - "C:/Windows/gcc-ranlib15.com"
+      - "C:/Windows/gcc-ranlib15.exe"
+      - "C:/Windows/gcc-ranlib15"
+      - "C:/Windows/System32/wbem/gcc-ranlib15.com"
+      - "C:/Windows/System32/wbem/gcc-ranlib15.exe"
+      - "C:/Windows/System32/wbem/gcc-ranlib15"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib15.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib15.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/gcc-ranlib15"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib15.com"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib15.exe"
+      - "D:/MSYS/usr/bin/site_perl/gcc-ranlib15"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib15.com"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib15.exe"
+      - "D:/MSYS/usr/bin/vendor_perl/gcc-ranlib15"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib15.com"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib15.exe"
+      - "D:/MSYS/usr/bin/core_perl/gcc-ranlib15"
+      - "D:/MSYS/mingw64/bin/gcc-ranlib.com"
+    found: "D:/MSYS/mingw64/bin/gcc-ranlib.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineRCCompiler.cmake:40 (find_program)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/Platform/Windows-GNU.cmake:169 (enable_language)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/Platform/Windows-GNU-CXX.cmake:2 (__windows_compiler_gnu)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeCXXInformation.cmake:48 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "program"
+    variable: "CMAKE_RC_COMPILER"
+    description: "RC compiler"
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "windres"
+      - "windres"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/mingw64/sbin/"
+      - "D:/MSYS/mingw64/"
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+      - "C:/Program Files/bin/"
+      - "C:/Program Files/sbin/"
+      - "C:/Program Files/"
+      - "C:/Program Files (x86)/bin/"
+      - "C:/Program Files (x86)/sbin/"
+      - "C:/Program Files (x86)/"
+      - "C:/Program Files (x86)/GrooveBoxUI/bin/"
+      - "C:/Program Files (x86)/GrooveBoxUI/sbin/"
+      - "C:/Program Files (x86)/GrooveBoxUI/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/windres.com"
+    found: "D:/MSYS/mingw64/bin/windres.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:83 (try_compile)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:2 (project)"
+    checks:
+      - "Detecting CXX compiler ABI info"
+    directories:
+      source: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-borbi5"
+      binary: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-borbi5"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_CXX_SCAN_FOR_MODULES: "OFF"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "CMAKE_CXX_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-borbi5'
+        
+        Run Build Command(s): D:/MSYS/mingw64/bin/ninja.exe -v cmTC_68142
+        [1/2] D:\\MSYS\\mingw64\\bin\\c++.exe   -v -o CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj -c D:/MSYS/mingw64/share/cmake/Modules/CMakeCXXCompilerABI.cpp
+        Using built-in specs.
+        COLLECT_GCC=D:\\MSYS\\mingw64\\bin\\c++.exe
+        Target: x86_64-w64-mingw32
+        Configured with: ../gcc-15.2.0/configure --prefix=/mingw64 --with-local-prefix=/mingw64/local --with-native-system-header-dir=/mingw64/include --libexecdir=/mingw64/lib --enable-bootstrap --enable-checking=release --with-arch=nocona --with-tune=generic --enable-mingw-wildcard --enable-languages=c,lto,c++,fortran,ada,objc,obj-c++,jit --enable-shared --enable-static --enable-libatomic --enable-threads=posix --enable-graphite --enable-fully-dynamic-string --enable-libstdcxx-backtrace=yes --enable-libstdcxx-filesystem-ts --enable-libstdcxx-time --disable-libstdcxx-pch --enable-lto --enable-libgomp --disable-libssp --disable-multilib --disable-rpath --disable-win32-registry --disable-nls --disable-werror --disable-symvers --with-libiconv --with-system-zlib --with-gmp=/mingw64 --with-mpfr=/mingw64 --with-mpc=/mingw64 --with-isl=/mingw64 --with-pkgversion='Rev9, Built by MSYS2 project' --with-bugurl=https://github.com/msys2/MINGW-packages/issues --with-gnu-as --with-gnu-ld --with-libstdcxx-zoneinfo=yes --disable-libstdcxx-debug --enable-plugin --with-boot-ldflags=-static-libstdc++ --with-stage1-ldflags=-static-libstdc++
+        Thread model: posix
+        Supported LTO compression algorithms: zlib zstd
+        gcc version 15.2.0 (Rev9, Built by MSYS2 project) 
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'CMakeFiles/cmTC_68142.dir/'
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/cc1plus.exe -quiet -v -iprefix D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/ -D_REENTRANT D:/MSYS/mingw64/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_68142.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=nocona -version -o D:\\MSYS\\tmp\\ccmp8oTZ.s
+        GNU C++17 (Rev9, Built by MSYS2 project) version 15.2.0 (x86_64-w64-mingw32)
+        	compiled by GNU C version 15.2.0, GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.27-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring nonexistent directory "D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/include"
+        ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0"
+        ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/x86_64-w64-mingw32"
+        ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/backward"
+        ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/include"
+        ignoring nonexistent directory "D:/M/msys64/mingw64/include"
+        ignoring nonexistent directory "/mingw64/include"
+        ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed"
+        ignoring nonexistent directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/include"
+        ignoring nonexistent directory "D:/M/msys64/mingw64/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/x86_64-w64-mingw32
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/backward
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed
+        End of search list.
+        Compiler executable checksum: 36f124312e4c846faa2272518edc4df1
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'CMakeFiles/cmTC_68142.dir/'
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/as.exe -v -o CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj D:\\MSYS\\tmp\\ccmp8oTZ.s
+        GNU assembler version 2.45.1 (x86_64-w64-mingw32) using BFD version (GNU Binutils) 2.45.1
+        COMPILER_PATH=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/;D:/MSYS/mingw64/bin/../lib/gcc/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/
+        LIBRARY_PATH=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/;D:/MSYS/mingw64/bin/../lib/gcc/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.'
+        [2/2] C:\\Windows\\system32\\cmd.exe /C "cd . && D:\\MSYS\\mingw64\\bin\\c++.exe  -v -Wl,-v CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj -o cmTC_68142.exe -Wl,--out-implib,libcmTC_68142.dll.a -Wl,--major-image-version,0,--minor-image-version,0   && cd ."
+        Using built-in specs.
+        COLLECT_GCC=D:\\MSYS\\mingw64\\bin\\c++.exe
+        COLLECT_LTO_WRAPPER=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/lto-wrapper.exe
+        Target: x86_64-w64-mingw32
+        Configured with: ../gcc-15.2.0/configure --prefix=/mingw64 --with-local-prefix=/mingw64/local --with-native-system-header-dir=/mingw64/include --libexecdir=/mingw64/lib --enable-bootstrap --enable-checking=release --with-arch=nocona --with-tune=generic --enable-mingw-wildcard --enable-languages=c,lto,c++,fortran,ada,objc,obj-c++,jit --enable-shared --enable-static --enable-libatomic --enable-threads=posix --enable-graphite --enable-fully-dynamic-string --enable-libstdcxx-backtrace=yes --enable-libstdcxx-filesystem-ts --enable-libstdcxx-time --disable-libstdcxx-pch --enable-lto --enable-libgomp --disable-libssp --disable-multilib --disable-rpath --disable-win32-registry --disable-nls --disable-werror --disable-symvers --with-libiconv --with-system-zlib --with-gmp=/mingw64 --with-mpfr=/mingw64 --with-mpc=/mingw64 --with-isl=/mingw64 --with-pkgversion='Rev9, Built by MSYS2 project' --with-bugurl=https://github.com/msys2/MINGW-packages/issues --with-gnu-as --with-gnu-ld --with-libstdcxx-zoneinfo=yes --disable-libstdcxx-debug --enable-plugin --with-boot-ldflags=-static-libstdc++ --with-stage1-ldflags=-static-libstdc++
+        Thread model: posix
+        Supported LTO compression algorithms: zlib zstd
+        gcc version 15.2.0 (Rev9, Built by MSYS2 project) 
+        COMPILER_PATH=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/;D:/MSYS/mingw64/bin/../lib/gcc/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/
+        LIBRARY_PATH=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/;D:/MSYS/mingw64/bin/../lib/gcc/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/;D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_68142.exe' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'cmTC_68142.'
+         D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/collect2.exe -plugin D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/liblto_plugin.dll -plugin-opt=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/lto-wrapper.exe -plugin-opt=-fresolution=D:\\MSYS\\tmp\\cc45hOEa.res -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-ladvapi32 -plugin-opt=-pass-through=-lshell32 -plugin-opt=-pass-through=-luser32 -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -m i386pep -Bdynamic -o cmTC_68142.exe D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/crt2.o D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0 -LD:/MSYS/mingw64/bin/../lib/gcc -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../.. -v CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj --out-implib libcmTC_68142.dll.a --major-image-version 0 --minor-image-version 0 -lstdc++ -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 -lpthread -ladvapi32 -lshell32 -luser32 -lkernel32 -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/default-manifest.o D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o
+        collect2 version 15.2.0
+        D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe -plugin D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/liblto_plugin.dll -plugin-opt=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/lto-wrapper.exe -plugin-opt=-fresolution=D:\\MSYS\\tmp\\cc45hOEa.res -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-ladvapi32 -plugin-opt=-pass-through=-lshell32 -plugin-opt=-pass-through=-luser32 -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -m i386pep -Bdynamic -o cmTC_68142.exe D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/crt2.o D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0 -LD:/MSYS/mingw64/bin/../lib/gcc -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../.. -v CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj --out-implib libcmTC_68142.dll.a --major-image-version 0 --minor-image-version 0 -lstdc++ -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 -lpthread -ladvapi32 -lshell32 -luser32 -lkernel32 -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/default-manifest.o D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o
+        GNU ld (GNU Binutils) 2.45.1
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_68142.exe' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'cmTC_68142.'
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:217 (message)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:2 (project)"
+    message: |
+      Parsed CXX implicit include dir info: rv=done
+        found start of include info
+        found start of implicit include info
+          add: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0]
+          add: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/x86_64-w64-mingw32]
+          add: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/backward]
+          add: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include]
+          add: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include]
+          add: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed]
+        end of search list found
+        collapse include dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0] ==> [D:/MSYS/mingw64/include/c++/15.2.0]
+        collapse include dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/x86_64-w64-mingw32] ==> [D:/MSYS/mingw64/include/c++/15.2.0/x86_64-w64-mingw32]
+        collapse include dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/backward] ==> [D:/MSYS/mingw64/include/c++/15.2.0/backward]
+        collapse include dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include] ==> [D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include]
+        collapse include dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include] ==> [D:/MSYS/mingw64/include]
+        collapse include dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed] ==> [D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed]
+        implicit include dirs: [D:/MSYS/mingw64/include/c++/15.2.0;D:/MSYS/mingw64/include/c++/15.2.0/x86_64-w64-mingw32;D:/MSYS/mingw64/include/c++/15.2.0/backward;D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include;D:/MSYS/mingw64/include;D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed]
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:253 (message)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:2 (project)"
+    message: |
+      Parsed CXX implicit link information:
+        link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)))("|,| |$)]
+        ignore line: [Change Dir: 'C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-borbi5']
+        ignore line: []
+        ignore line: [Run Build Command(s): D:/MSYS/mingw64/bin/ninja.exe -v cmTC_68142]
+        ignore line: [[1/2] D:\\MSYS\\mingw64\\bin\\c++.exe   -v -o CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj -c D:/MSYS/mingw64/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=D:\\MSYS\\mingw64\\bin\\c++.exe]
+        ignore line: [Target: x86_64-w64-mingw32]
+        ignore line: [Configured with: ../gcc-15.2.0/configure --prefix=/mingw64 --with-local-prefix=/mingw64/local --with-native-system-header-dir=/mingw64/include --libexecdir=/mingw64/lib --enable-bootstrap --enable-checking=release --with-arch=nocona --with-tune=generic --enable-mingw-wildcard --enable-languages=c,lto,c++,fortran,ada,objc,obj-c++,jit --enable-shared --enable-static --enable-libatomic --enable-threads=posix --enable-graphite --enable-fully-dynamic-string --enable-libstdcxx-backtrace=yes --enable-libstdcxx-filesystem-ts --enable-libstdcxx-time --disable-libstdcxx-pch --enable-lto --enable-libgomp --disable-libssp --disable-multilib --disable-rpath --disable-win32-registry --disable-nls --disable-werror --disable-symvers --with-libiconv --with-system-zlib --with-gmp=/mingw64 --with-mpfr=/mingw64 --with-mpc=/mingw64 --with-isl=/mingw64 --with-pkgversion='Rev9, Built by MSYS2 project' --with-bugurl=https://github.com/msys2/MINGW-packages/issues --with-gnu-as --with-gnu-ld --with-libstdcxx-zoneinfo=yes --disable-libstdcxx-debug --enable-plugin --with-boot-ldflags=-static-libstdc++ --with-stage1-ldflags=-static-libstdc++]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib zstd]
+        ignore line: [gcc version 15.2.0 (Rev9  Built by MSYS2 project) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'CMakeFiles/cmTC_68142.dir/']
+        ignore line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/cc1plus.exe -quiet -v -iprefix D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/ -D_REENTRANT D:/MSYS/mingw64/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_68142.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=nocona -version -o D:\\MSYS\\tmp\\ccmp8oTZ.s]
+        ignore line: [GNU C++17 (Rev9  Built by MSYS2 project) version 15.2.0 (x86_64-w64-mingw32)]
+        ignore line: [	compiled by GNU C version 15.2.0  GMP version 6.3.0  MPFR version 4.2.2  MPC version 1.3.1  isl version isl-0.27-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring nonexistent directory "D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/include"]
+        ignore line: [ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0"]
+        ignore line: [ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/x86_64-w64-mingw32"]
+        ignore line: [ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/backward"]
+        ignore line: [ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/include"]
+        ignore line: [ignoring nonexistent directory "D:/M/msys64/mingw64/include"]
+        ignore line: [ignoring nonexistent directory "/mingw64/include"]
+        ignore line: [ignoring duplicate directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed"]
+        ignore line: [ignoring nonexistent directory "D:/MSYS/mingw64/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/include"]
+        ignore line: [ignoring nonexistent directory "D:/M/msys64/mingw64/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0]
+        ignore line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/x86_64-w64-mingw32]
+        ignore line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include/c++/15.2.0/backward]
+        ignore line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include]
+        ignore line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include]
+        ignore line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed]
+        ignore line: [End of search list.]
+        ignore line: [Compiler executable checksum: 36f124312e4c846faa2272518edc4df1]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'CMakeFiles/cmTC_68142.dir/']
+        ignore line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/as.exe -v -o CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj D:\\MSYS\\tmp\\ccmp8oTZ.s]
+        ignore line: [GNU assembler version 2.45.1 (x86_64-w64-mingw32) using BFD version (GNU Binutils) 2.45.1]
+        ignore line: [COMPILER_PATH=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/]
+        ignore line: [LIBRARY_PATH=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.']
+        ignore line: [[2/2] C:\\Windows\\system32\\cmd.exe /C "cd . && D:\\MSYS\\mingw64\\bin\\c++.exe  -v -Wl -v CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj -o cmTC_68142.exe -Wl --out-implib libcmTC_68142.dll.a -Wl --major-image-version 0 --minor-image-version 0   && cd ."]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=D:\\MSYS\\mingw64\\bin\\c++.exe]
+        ignore line: [COLLECT_LTO_WRAPPER=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/lto-wrapper.exe]
+        ignore line: [Target: x86_64-w64-mingw32]
+        ignore line: [Configured with: ../gcc-15.2.0/configure --prefix=/mingw64 --with-local-prefix=/mingw64/local --with-native-system-header-dir=/mingw64/include --libexecdir=/mingw64/lib --enable-bootstrap --enable-checking=release --with-arch=nocona --with-tune=generic --enable-mingw-wildcard --enable-languages=c,lto,c++,fortran,ada,objc,obj-c++,jit --enable-shared --enable-static --enable-libatomic --enable-threads=posix --enable-graphite --enable-fully-dynamic-string --enable-libstdcxx-backtrace=yes --enable-libstdcxx-filesystem-ts --enable-libstdcxx-time --disable-libstdcxx-pch --enable-lto --enable-libgomp --disable-libssp --disable-multilib --disable-rpath --disable-win32-registry --disable-nls --disable-werror --disable-symvers --with-libiconv --with-system-zlib --with-gmp=/mingw64 --with-mpfr=/mingw64 --with-mpc=/mingw64 --with-isl=/mingw64 --with-pkgversion='Rev9, Built by MSYS2 project' --with-bugurl=https://github.com/msys2/MINGW-packages/issues --with-gnu-as --with-gnu-ld --with-libstdcxx-zoneinfo=yes --disable-libstdcxx-debug --enable-plugin --with-boot-ldflags=-static-libstdc++ --with-stage1-ldflags=-static-libstdc++]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib zstd]
+        ignore line: [gcc version 15.2.0 (Rev9  Built by MSYS2 project) ]
+        ignore line: [COMPILER_PATH=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/]
+        ignore line: [LIBRARY_PATH=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_68142.exe' '-shared-libgcc' '-mtune=generic' '-march=nocona' '-dumpdir' 'cmTC_68142.']
+        link line: [ D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/collect2.exe -plugin D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/liblto_plugin.dll -plugin-opt=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/lto-wrapper.exe -plugin-opt=-fresolution=D:\\MSYS\\tmp\\cc45hOEa.res -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-ladvapi32 -plugin-opt=-pass-through=-lshell32 -plugin-opt=-pass-through=-luser32 -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -m i386pep -Bdynamic -o cmTC_68142.exe D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/crt2.o D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0 -LD:/MSYS/mingw64/bin/../lib/gcc -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../.. -v CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj --out-implib libcmTC_68142.dll.a --major-image-version 0 --minor-image-version 0 -lstdc++ -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 -lpthread -ladvapi32 -lshell32 -luser32 -lkernel32 -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/default-manifest.o D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o]
+          arg [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/collect2.exe] ==> ignore
+          arg [-plugin] ==> ignore
+          arg [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/liblto_plugin.dll] ==> ignore
+          arg [-plugin-opt=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/lto-wrapper.exe] ==> ignore
+          arg [-plugin-opt=-fresolution=D:\\MSYS\\tmp\\cc45hOEa.res] ==> ignore
+          arg [-plugin-opt=-pass-through=-lmingw32] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lmingwex] ==> ignore
+          arg [-plugin-opt=-pass-through=-lmsvcrt] ==> ignore
+          arg [-plugin-opt=-pass-through=-lkernel32] ==> ignore
+          arg [-plugin-opt=-pass-through=-lpthread] ==> ignore
+          arg [-plugin-opt=-pass-through=-ladvapi32] ==> ignore
+          arg [-plugin-opt=-pass-through=-lshell32] ==> ignore
+          arg [-plugin-opt=-pass-through=-luser32] ==> ignore
+          arg [-plugin-opt=-pass-through=-lkernel32] ==> ignore
+          arg [-plugin-opt=-pass-through=-lmingw32] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lmingwex] ==> ignore
+          arg [-plugin-opt=-pass-through=-lmsvcrt] ==> ignore
+          arg [-plugin-opt=-pass-through=-lkernel32] ==> ignore
+          arg [-m] ==> ignore
+          arg [i386pep] ==> ignore
+          arg [-Bdynamic] ==> search dynamic
+          arg [-o] ==> ignore
+          arg [cmTC_68142.exe] ==> ignore
+          arg [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/crt2.o] ==> obj [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/crt2.o]
+          arg [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o] ==> obj [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o]
+          arg [-LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0] ==> dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0]
+          arg [-LD:/MSYS/mingw64/bin/../lib/gcc] ==> dir [D:/MSYS/mingw64/bin/../lib/gcc]
+          arg [-LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib] ==> dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib]
+          arg [-LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib] ==> dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib]
+          arg [-LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib] ==> dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib]
+          arg [-LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../..] ==> dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../..]
+          arg [-v] ==> ignore
+          arg [CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj] ==> ignore
+          arg [--out-implib] ==> ignore
+          arg [libcmTC_68142.dll.a] ==> ignore
+          arg [--major-image-version] ==> ignore
+          arg [0] ==> ignore
+          arg [--minor-image-version] ==> ignore
+          arg [0] ==> ignore
+          arg [-lstdc++] ==> lib [stdc++]
+          arg [-lmingw32] ==> lib [mingw32]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-lmingwex] ==> lib [mingwex]
+          arg [-lmsvcrt] ==> lib [msvcrt]
+          arg [-lkernel32] ==> lib [kernel32]
+          arg [-lpthread] ==> lib [pthread]
+          arg [-ladvapi32] ==> lib [advapi32]
+          arg [-lshell32] ==> lib [shell32]
+          arg [-luser32] ==> lib [user32]
+          arg [-lkernel32] ==> lib [kernel32]
+          arg [-lmingw32] ==> lib [mingw32]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-lmingwex] ==> lib [mingwex]
+          arg [-lmsvcrt] ==> lib [msvcrt]
+          arg [-lkernel32] ==> lib [kernel32]
+          arg [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/default-manifest.o] ==> obj [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/default-manifest.o]
+          arg [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o] ==> obj [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o]
+        ignore line: [collect2 version 15.2.0]
+        ignore line: [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe -plugin D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/liblto_plugin.dll -plugin-opt=D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/lto-wrapper.exe -plugin-opt=-fresolution=D:\\MSYS\\tmp\\cc45hOEa.res -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-ladvapi32 -plugin-opt=-pass-through=-lshell32 -plugin-opt=-pass-through=-luser32 -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -m i386pep -Bdynamic -o cmTC_68142.exe D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/crt2.o D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0 -LD:/MSYS/mingw64/bin/../lib/gcc -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib -LD:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../.. -v CMakeFiles/cmTC_68142.dir/CMakeCXXCompilerABI.cpp.obj --out-implib libcmTC_68142.dll.a --major-image-version 0 --minor-image-version 0 -lstdc++ -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 -lpthread -ladvapi32 -lshell32 -luser32 -lkernel32 -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/default-manifest.o D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o]
+        linker tool for 'CXX': D:/MSYS/mingw64/x86_64-w64-mingw32/bin/ld.exe
+        remove lib [msvcrt]
+        remove lib [msvcrt]
+        collapse obj [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/crt2.o] ==> [D:/MSYS/mingw64/lib/crt2.o]
+        collapse obj [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o] ==> [D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o]
+        collapse obj [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib/default-manifest.o] ==> [D:/MSYS/mingw64/lib/default-manifest.o]
+        collapse obj [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o] ==> [D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o]
+        collapse library dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0] ==> [D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0]
+        collapse library dir [D:/MSYS/mingw64/bin/../lib/gcc] ==> [D:/MSYS/mingw64/lib/gcc]
+        collapse library dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib/../lib] ==> [D:/MSYS/mingw64/x86_64-w64-mingw32/lib]
+        collapse library dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../lib] ==> [D:/MSYS/mingw64/lib]
+        collapse library dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/lib] ==> [D:/MSYS/mingw64/x86_64-w64-mingw32/lib]
+        collapse library dir [D:/MSYS/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../..] ==> [D:/MSYS/mingw64/lib]
+        implicit libs: [stdc++;mingw32;gcc_s;gcc;mingwex;kernel32;pthread;advapi32;shell32;user32;kernel32;mingw32;gcc_s;gcc;mingwex;kernel32]
+        implicit objs: [D:/MSYS/mingw64/lib/crt2.o;D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/crtbegin.o;D:/MSYS/mingw64/lib/default-manifest.o;D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/crtend.o]
+        implicit dirs: [D:/MSYS/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0;D:/MSYS/mingw64/lib/gcc;D:/MSYS/mingw64/x86_64-w64-mingw32/lib;D:/MSYS/mingw64/lib]
+        implicit fwks: []
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/Internal/CMakeDetermineLinkerId.cmake:38 (message)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:299 (cmake_determine_linker_id)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:2 (project)"
+    message: |
+      Running the CXX compiler's linker: "D:/MSYS/mingw64/x86_64-w64-mingw32/bin/ld.exe" "-v"
+      GNU ld (GNU Binutils) 2.45.1
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/Internal/CheckSourceCompiles.cmake:104 (try_compile)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CheckCXXSourceCompiles.cmake:103 (cmake_check_source_compiles)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/FindThreads.cmake:162 (check_cxx_source_compiles)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/FindThreads.cmake:226 (_threads_check_libc)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:36 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Dependencies.cmake:38 (_qt_internal_find_third_party_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:176 (include)"
+      - "CMakeLists.txt:10 (find_package)"
+    checks:
+      - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
+    directories:
+      source: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-vrcmi3"
+      binary: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-vrcmi3"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "D:/MSYS/mingw64/lib/cmake/Qt6;D:/MSYS/mingw64/lib/cmake/Qt6/3rdparty/extra-cmake-modules/find-modules;D:/MSYS/mingw64/lib/cmake/Qt6/3rdparty/kwin"
+    buildResult:
+      variable: "CMAKE_HAVE_LIBC_PTHREAD"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-vrcmi3'
+        
+        Run Build Command(s): D:/MSYS/mingw64/bin/ninja.exe -v cmTC_28c7a
+        [1/2] D:\\MSYS\\mingw64\\bin\\c++.exe -DCMAKE_HAVE_LIBC_PTHREAD  -std=gnu++17 -o CMakeFiles/cmTC_28c7a.dir/src.cxx.obj -c C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-vrcmi3/src.cxx
+        [2/2] C:\\Windows\\system32\\cmd.exe /C "cd . && D:\\MSYS\\mingw64\\bin\\c++.exe   CMakeFiles/cmTC_28c7a.dir/src.cxx.obj -o cmTC_28c7a.exe -Wl,--out-implib,libcmTC_28c7a.dll.a -Wl,--major-image-version,0,--minor-image-version,0  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 && cd ."
+        
+      exitCode: 0
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:100 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/Qt6WidgetsToolsDependencies.cmake:14 (_qt_internal_find_tool_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/Qt6WidgetsToolsConfig.cmake:36 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:100 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:42 (_qt_internal_find_tool_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6CoreTools"
+    configs:
+      -
+        filename: "Qt6CoreToolsConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6coretools-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "6.10.1"
+      version_complete: "6.10.1"
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6CoreTools"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/.."
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6CoreToolsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6coretools-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/Qt6CoreToolsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/qt6coretools-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6CoreTools/Qt6CoreToolsConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:100 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/Qt6WidgetsToolsDependencies.cmake:14 (_qt_internal_find_tool_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/Qt6WidgetsToolsConfig.cmake:36 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:100 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:42 (_qt_internal_find_tool_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6GuiTools"
+    configs:
+      -
+        filename: "Qt6GuiToolsConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6guitools-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "6.10.1"
+      version_complete: "6.10.1"
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6GuiTools"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/.."
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6GuiToolsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6guitools-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/Qt6GuiToolsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/qt6guitools-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiTools/Qt6GuiToolsConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:100 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:42 (_qt_internal_find_tool_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6WidgetsTools"
+    configs:
+      -
+        filename: "Qt6WidgetsToolsConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6widgetstools-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "6.10.1"
+      version_complete: "6.10.1"
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6WidgetsTools"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/.."
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6WidgetsToolsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6widgetstools-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/Qt6WidgetsToolsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/qt6widgetstools-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/Qt6WidgetsToolsConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/Internal/CheckSourceCompiles.cmake:104 (try_compile)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CheckCXXSourceCompiles.cmake:103 (cmake_check_source_compiles)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/FindWrapAtomic.cmake:36 (check_cxx_source_compiles)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:36 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6CoreDependencies.cmake:36 (_qt_internal_find_third_party_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6CoreConfig.cmake:42 (include)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    checks:
+      - "Performing Test HAVE_STDATOMIC"
+    directories:
+      source: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-b0o9a2"
+      binary: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-b0o9a2"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "D:/MSYS/mingw64/lib/cmake/Qt6;D:/MSYS/mingw64/lib/cmake/Qt6/3rdparty/extra-cmake-modules/find-modules;D:/MSYS/mingw64/lib/cmake/Qt6/3rdparty/kwin"
+    buildResult:
+      variable: "HAVE_STDATOMIC"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-b0o9a2'
+        
+        Run Build Command(s): D:/MSYS/mingw64/bin/ninja.exe -v cmTC_c74d4
+        [1/2] D:\\MSYS\\mingw64\\bin\\c++.exe -DHAVE_STDATOMIC  -std=gnu++17 -o CMakeFiles/cmTC_c74d4.dir/src.cxx.obj -c C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/CMakeScratch/TryCompile-b0o9a2/src.cxx
+        [2/2] C:\\Windows\\system32\\cmd.exe /C "cd . && D:\\MSYS\\mingw64\\bin\\c++.exe   CMakeFiles/cmTC_c74d4.dir/src.cxx.obj -o cmTC_c74d4.exe -Wl,--out-implib,libcmTC_c74d4.dll.a -Wl,--major-image-version,0,--minor-image-version,0  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 && cd ."
+        
+      exitCode: 0
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6CoreDependencies.cmake:51 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6CoreConfig.cmake:42 (include)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6EntryPointPrivate"
+    configs:
+      -
+        filename: "Qt6EntryPointPrivateConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6entrypointprivate-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "6.10.1"
+      version_complete: "6.10.1"
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6EntryPointPrivate"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6Core/.."
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: false
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6EntryPointPrivateConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6entrypointprivate-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6EntryPointPrivateConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/qt6entrypointprivate-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6EntryPointPrivate/Qt6EntryPointPrivateConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6CoreMacros.cmake:3134 (find_program)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6CoreConfigExtras.cmake:30 (_qt_internal_setup_deploy_support)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6CoreConfig.cmake:190 (include)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    mode: "program"
+    variable: "WINDEPLOYQT_EXECUTABLE"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "windeployqt"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/mingw64/sbin/"
+      - "D:/MSYS/mingw64/"
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+      - "C:/Program Files/bin/"
+      - "C:/Program Files/sbin/"
+      - "C:/Program Files/"
+      - "C:/Program Files (x86)/bin/"
+      - "C:/Program Files (x86)/sbin/"
+      - "C:/Program Files (x86)/"
+      - "C:/Program Files (x86)/GrooveBoxUI/bin/"
+      - "C:/Program Files (x86)/GrooveBoxUI/sbin/"
+      - "C:/Program Files (x86)/GrooveBoxUI/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/windeployqt.com"
+    found: "D:/MSYS/mingw64/bin/windeployqt.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6Core"
+    configs:
+      -
+        filename: "Qt6CoreConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6core-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "6.10.1"
+      version_complete: "6.10.1"
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6Core"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/.."
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: false
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6CoreConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6core-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CoreConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/qt6core-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CoreTools/Qt6CoreConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CoreTools/qt6core-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CorePrivate/Qt6CoreConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CorePrivate/qt6core-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6CoreConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/FindVulkan.cmake:392 (find_path)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/FindWrapVulkanHeaders.cmake:13 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:34 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiDependencies.cmake:36 (_qt_internal_find_third_party_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    mode: "path"
+    variable: "Vulkan_INCLUDE_DIR"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "vulkan/vulkan.h"
+    candidate_directories:
+      - "D:/MSYS/mingw64/include/"
+      - "D:/MSYS/mingw64/"
+      - "/include/"
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+      - "C:/Program Files/include/"
+      - "C:/Program Files/"
+      - "C:/Program Files (x86)/include/"
+      - "C:/Program Files (x86)/"
+      - "C:/Program Files (x86)/GrooveBoxUI/include/"
+      - "C:/Program Files (x86)/GrooveBoxUI/"
+    found: "D:/MSYS/mingw64/include/"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/FindVulkan.cmake:399 (find_library)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/FindWrapVulkanHeaders.cmake:13 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:34 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiDependencies.cmake:36 (_qt_internal_find_third_party_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    mode: "library"
+    variable: "Vulkan_LIBRARY"
+    description: "Path to a library."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "vulkan-1"
+    candidate_directories:
+      - "D:/MSYS/mingw64/lib/"
+      - "D:/MSYS/mingw64/"
+      - "/lib/"
+      - "/bin/"
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+      - "C:/Program Files/lib/"
+      - "C:/Program Files/"
+      - "C:/Program Files (x86)/lib/"
+      - "C:/Program Files (x86)/"
+      - "C:/Program Files (x86)/GrooveBoxUI/lib/"
+      - "C:/Program Files (x86)/GrooveBoxUI/"
+      - "C:/Program Files (x86)/GrooveBoxUI/bin/"
+    found: "D:/MSYS/mingw64/lib/libvulkan-1.dll.a"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_LIBRARY_PATH:
+        - "C:/Program Files (x86)/GrooveBoxUI/bin"
+        - "D:/MSYS/mingw64/bin"
+        - "/bin"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/FindVulkan.cmake:407 (find_program)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/FindWrapVulkanHeaders.cmake:13 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:34 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiDependencies.cmake:36 (_qt_internal_find_third_party_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    mode: "program"
+    variable: "Vulkan_GLSLC_EXECUTABLE"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "glslc"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/mingw64/sbin/"
+      - "D:/MSYS/mingw64/"
+      - "/bin/"
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+      - "C:/Program Files/bin/"
+      - "C:/Program Files/sbin/"
+      - "C:/Program Files/"
+      - "C:/Program Files (x86)/bin/"
+      - "C:/Program Files (x86)/sbin/"
+      - "C:/Program Files (x86)/"
+      - "C:/Program Files (x86)/GrooveBoxUI/bin/"
+      - "C:/Program Files (x86)/GrooveBoxUI/sbin/"
+      - "C:/Program Files (x86)/GrooveBoxUI/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/glslc.com"
+    found: "D:/MSYS/mingw64/bin/glslc.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/FindVulkan.cmake:415 (find_program)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/FindWrapVulkanHeaders.cmake:13 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:34 (find_package)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiDependencies.cmake:36 (_qt_internal_find_third_party_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    mode: "program"
+    variable: "Vulkan_GLSLANG_VALIDATOR_EXECUTABLE"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "glslangValidator"
+    candidate_directories:
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/mingw64/sbin/"
+      - "D:/MSYS/mingw64/"
+      - "/bin/"
+      - "D:/MSYS/mingw64/bin/"
+      - "D:/MSYS/usr/local/bin/"
+      - "D:/MSYS/usr/bin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "D:/MSYS/usr/bin/site_perl/"
+      - "D:/MSYS/usr/bin/vendor_perl/"
+      - "D:/MSYS/usr/bin/core_perl/"
+      - "C:/Program Files/bin/"
+      - "C:/Program Files/sbin/"
+      - "C:/Program Files/"
+      - "C:/Program Files (x86)/bin/"
+      - "C:/Program Files (x86)/sbin/"
+      - "C:/Program Files (x86)/"
+      - "C:/Program Files (x86)/GrooveBoxUI/bin/"
+      - "C:/Program Files (x86)/GrooveBoxUI/sbin/"
+      - "C:/Program Files (x86)/GrooveBoxUI/"
+    searched_directories:
+      - "D:/MSYS/mingw64/bin/glslangValidator.com"
+    found: "D:/MSYS/mingw64/bin/glslangValidator.exe"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6Gui"
+    configs:
+      -
+        filename: "Qt6GuiConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6gui-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "6.10.1"
+      version_complete: "6.10.1"
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6Gui"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/.."
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: false
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6GuiConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6gui-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/qt6gui-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiTools/Qt6GuiConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiTools/qt6gui-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiPrivate/Qt6GuiConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiPrivate/qt6gui-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6GuiConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6Widgets"
+    configs:
+      -
+        filename: "Qt6WidgetsConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6widgets-config.cmake"
+        kind: "cmake"
+    version_request:
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6Widgets"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: false
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6WidgetsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6widgets-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/qt6widgets-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/Qt6WidgetsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/qt6widgets-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsPrivate/Qt6WidgetsConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsPrivate/qt6widgets-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6WidgetsConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/Qt6MultimediaDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6Concurrent"
+    configs:
+      -
+        filename: "Qt6ConcurrentConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6concurrent-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "6.10.1"
+      version_complete: "6.10.1"
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6Concurrent"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/.."
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: false
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6ConcurrentConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6concurrent-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ConcurrentConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/qt6concurrent-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6Concurrent/Qt6ConcurrentConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "D:/MSYS/mingw64/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/QtPublicDependencyHelpers.cmake:142 (find_dependency)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/Qt6MultimediaDependencies.cmake:50 (_qt_internal_find_qt_dependencies)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake:40 (include)"
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6Network"
+    configs:
+      -
+        filename: "Qt6NetworkConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6network-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "6.10.1"
+      version_complete: "6.10.1"
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6Network"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/.."
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: false
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6NetworkConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6network-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6NetworkConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/qt6network-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6NetworkPrivate/Qt6NetworkConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6NetworkPrivate/qt6network-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6Network/Qt6NetworkConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake:237 (find_package)"
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6Multimedia"
+    configs:
+      -
+        filename: "Qt6MultimediaConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6multimedia-config.cmake"
+        kind: "cmake"
+    version_request:
+      exact: false
+    settings:
+      required: "optional"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6Multimedia"
+      search_paths:
+        - "D:/MSYS/mingw64/lib/cmake"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: false
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6MultimediaConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6multimedia-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/qt6multimedia-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaWidgetsPrivate/Qt6MultimediaConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaWidgetsPrivate/qt6multimedia-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaWidgets/Qt6MultimediaConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaWidgets/qt6multimedia-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaTestLibPrivate/Qt6MultimediaConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaTestLibPrivate/qt6multimedia-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaQuickPrivate/Qt6MultimediaConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaQuickPrivate/qt6multimedia-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaPrivate/Qt6MultimediaConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaPrivate/qt6multimedia-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "CMakeLists.txt:10 (find_package)"
+    name: "Qt6"
+    components:
+      -
+        name: "Widgets"
+        required: true
+        found: false
+      -
+        name: "Multimedia"
+        required: true
+        found: false
+    configs:
+      -
+        filename: "Qt6Config.cmake"
+        kind: "cmake"
+      -
+        filename: "qt6-config.cmake"
+        kind: "cmake"
+    version_request:
+      exact: false
+    settings:
+      required: "required_explicit"
+      quiet: false
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      names:
+        - "Qt6"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "C:/Users/Danya/Downloads/bum/build-mingw/CMakeFiles/pkgRedirects/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6XmlPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6XmlPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Xml/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Xml/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsTools/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6WidgetsPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Widgets/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6TestPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6TestPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6TestInternalsPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6TestInternalsPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Test/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Test/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6SqlPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6SqlPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Sql/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Sql/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6SpatialAudioPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6SpatialAudioPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6SpatialAudio/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6SpatialAudio/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ShaderToolsTools/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ShaderToolsTools/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ShaderToolsPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ShaderToolsPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ShaderTools/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ShaderTools/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Quick3DSpatialAudioPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Quick3DSpatialAudioPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Qml/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Qml/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6PrintSupportPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6PrintSupportPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6PrintSupport/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6PrintSupport/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6OpenGLWidgets/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6OpenGLWidgets/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6OpenGLPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6OpenGLPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6OpenGL/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6OpenGL/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6NetworkPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6NetworkPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Network/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Network/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaWidgetsPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaWidgetsPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaWidgets/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaWidgets/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaTestLibPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaTestLibPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaQuickPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaQuickPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6MultimediaPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Multimedia/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6HostInfo/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6HostInfo/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiTools/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiTools/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6GuiPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Gui/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Gui/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6FbSupportPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6FbSupportPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6FFmpegMediaPluginImplPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6FFmpegMediaPluginImplPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ExamplesAssetDownloaderPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ExamplesAssetDownloaderPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ExampleIconsPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6ExampleIconsPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6EntryPointPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6EntryPointPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6DeviceDiscoverySupportPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6DeviceDiscoverySupportPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6DBusTools/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6DBusTools/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6DBusPrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6DBusPrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6DBus/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6DBus/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CoreTools/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CoreTools/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CorePrivate/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6CorePrivate/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Core/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Core/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Concurrent/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6Concurrent/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6BundledResonanceAudio/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6BundledResonanceAudio/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6BuildInternals/Qt6Config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "D:/MSYS/mingw64/lib/cmake/Qt6BuildInternals/qt6-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "D:/MSYS/mingw64/lib/cmake/Qt6/Qt6Config.cmake"
+      mode: "config"
+      version: "6.10.1"
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+      ENV{PATH}:
+        - "D:\\MSYS\\mingw64\\bin"
+        - "D:\\MSYS\\usr\\local\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "D:\\MSYS\\usr\\bin"
+        - "C:\\Windows\\System32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "D:\\MSYS\\usr\\bin\\site_perl"
+        - "D:\\MSYS\\usr\\bin\\vendor_perl"
+        - "D:\\MSYS\\usr\\bin\\core_perl"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "D:/MSYS/mingw64"
+        - "C:/Program Files (x86)/GrooveBoxUI"
+      CMAKE_MODULE_PATH:
+        - "D:/MSYS/mingw64/lib/cmake/Qt6"
+        - "D:/MSYS/mingw64/lib/cmake/Qt6/3rdparty/extra-cmake-modules/find-modules"
+        - "D:/MSYS/mingw64/lib/cmake/Qt6/3rdparty/kwin"
+...
