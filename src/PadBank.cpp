@@ -267,6 +267,7 @@ std::shared_ptr<AudioEngine::Buffer> renderFluidSynth(const SynthPresetInfo &pre
     }
     return buffer;
 }
+#endif // GROOVEBOX_WITH_FLUIDSYNTH
 }  // namespace
 
 struct RenderSignature {
