@@ -57,6 +57,7 @@ private:
     void zoomBy(float factor);
     void clampScroll();
     void emitStepsChanged();
+    void setPlayheadStep(int step);
 
     PadBank *m_pads = nullptr;
     int m_activePad = 0;
@@ -67,6 +68,7 @@ private:
     int m_totalSteps = 128;
     int m_rows = 24;
     int m_baseMidi = 60;
+    int m_playheadStep = 0;
 
     bool m_deleteMode = false;
     DragMode m_dragMode = DragNone;

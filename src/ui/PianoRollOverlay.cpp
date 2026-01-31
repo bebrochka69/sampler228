@@ -296,6 +296,13 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
         p.drawText(r.adjusted(Theme::px(4), 0, -Theme::px(4), 0),
                    Qt::AlignVCenter | Qt::AlignLeft, noteLabel(note.row));
     }
+
+    // Playhead line (moves to last edited note).
+    const float playX = xFromStep(m_playheadStep);
+    if (playX >= grid.left() && playX <= grid.right()) {
+        p.setPen(QPen(QColor(250, 210, 80), 2.0));
+        p.drawLine(QPointF(playX, grid.top()), QPointF(playX, grid.bottom()));
+    }
 }
 
 void PianoRollOverlay::emitStepsChanged() {
@@ -306,6 +313,10 @@ void PianoRollOverlay::emitStepsChanged() {
         steps.push_back(qBound(0, note.start, m_totalSteps - 1));
     }
     emit stepsChanged(m_activePad, steps);
+}
+
+void PianoRollOverlay::setPlayheadStep(int step) {
+    m_playheadStep = clampStep(step);
 }
 
 void PianoRollOverlay::mousePressEvent(QMouseEvent *event) {
@@ -382,6 +393,7 @@ void PianoRollOverlay::mouseMoveEvent(QMouseEvent *event) {
         const int row = rowFromY(pos.y());
         notes[m_dragNoteIndex].start = clampStep(step - m_pressNote.length / 2);
         notes[m_dragNoteIndex].row = row;
+        setPlayheadStep(notes[m_dragNoteIndex].start);
         emitStepsChanged();
         update();
         return;
@@ -391,6 +403,7 @@ void PianoRollOverlay::mouseMoveEvent(QMouseEvent *event) {
         int length = step - m_pressNote.start;
         length = qMax(1, length);
         notes[m_dragNoteIndex].length = length;
+        setPlayheadStep(notes[m_dragNoteIndex].start);
         emitStepsChanged();
         update();
         return;
@@ -407,6 +420,7 @@ void PianoRollOverlay::mouseReleaseEvent(QMouseEvent *event) {
             note.length = 4;
             note.row = rowFromY(event->position().y());
             m_notes[static_cast<size_t>(m_activePad)].push_back(note);
+            setPlayheadStep(note.start);
             emitStepsChanged();
             update();
         }
