@@ -1,6 +1,7 @@
 #include "SeqPageWidget.h"
 
 #include <QKeyEvent>
+#include <QLineF>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QtGlobal>
@@ -45,6 +46,15 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
             startPlayback();
         }
         update();
+    });
+
+    m_longPressTimer.setSingleShot(true);
+    m_longPressTimer.setInterval(450);
+    connect(&m_longPressTimer, &QTimer::timeout, this, [this]() {
+        if (m_pressedPad >= 0 && m_pressOnLabel) {
+            m_longPressTriggered = true;
+            emit padPianoRollRequested(m_pressedPad);
+        }
     });
 
     if (m_pads) {
@@ -152,6 +162,21 @@ void SeqPageWidget::triggerStep(int step) {
     }
 }
 
+void SeqPageWidget::applyPianoSteps(int pad, const QVector<int> &steps) {
+    if (pad < 0 || pad >= 8) {
+        return;
+    }
+    for (int i = 0; i < 64; ++i) {
+        m_steps[pad][i] = false;
+    }
+    for (int step : steps) {
+        if (step >= 0 && step < 64) {
+            m_steps[pad][step] = true;
+        }
+    }
+    update();
+}
+
 void SeqPageWidget::keyPressEvent(QKeyEvent *event) {
     const int key = event->key();
     if (key == Qt::Key_Space) {
@@ -189,7 +214,7 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
     const QRectF gridArea(grid.left() + labelW, grid.top() + headerH,
                           grid.width() - labelW, grid.height() - headerH);
 
-    // Click on label column -> open edit/synth for that pad.
+    // Click on label column -> open edit/synth for that pad or long-press for piano roll.
     if (pos.x() < gridArea.left()) {
         const float cellH = gridArea.height() / rows;
         const int row = static_cast<int>((pos.y() - gridArea.top()) / cellH);
@@ -198,12 +223,11 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
             if (m_pads) {
                 m_pads->setActivePad(row);
             }
-            if (event->modifiers().testFlag(Qt::ShiftModifier)) {
-                emit padAssignRequested(row);
-            } else {
-                emit padOpenRequested(row);
-            }
-            update();
+            m_pressedPad = row;
+            m_pressOnLabel = true;
+            m_longPressTriggered = false;
+            m_pressPos = pos;
+            m_longPressTimer.start();
         }
         return;
     }
@@ -225,6 +249,10 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
         m_pads->setActivePad(row);
     }
 
+    m_pressOnLabel = false;
+    m_pressedPad = -1;
+    m_longPressTimer.stop();
+
     if (event->modifiers().testFlag(Qt::ShiftModifier)) {
         const bool nextState = !m_steps[row][step];
         for (int i = 0; i < 64; ++i) {
@@ -237,6 +265,34 @@ void SeqPageWidget::mousePressEvent(QMouseEvent *event) {
     }
 
     update();
+}
+
+void SeqPageWidget::mouseMoveEvent(QMouseEvent *event) {
+    if (!m_pressOnLabel || m_pressedPad < 0) {
+        return;
+    }
+    const QPointF pos = event->position();
+    if (QLineF(pos, m_pressPos).length() > Theme::pxF(6.0f)) {
+        m_longPressTimer.stop();
+    }
+}
+
+void SeqPageWidget::mouseReleaseEvent(QMouseEvent *event) {
+    if (!m_pressOnLabel || m_pressedPad < 0) {
+        return;
+    }
+
+    m_longPressTimer.stop();
+    if (!m_longPressTriggered) {
+        if (event->modifiers().testFlag(Qt::ShiftModifier)) {
+            emit padAssignRequested(m_pressedPad);
+        } else {
+            emit padOpenRequested(m_pressedPad);
+        }
+    }
+    m_pressOnLabel = false;
+    m_pressedPad = -1;
+    m_longPressTriggered = false;
 }
 
 

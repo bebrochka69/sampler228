@@ -7,6 +7,7 @@ class TopToolbarWidget;
 class SampleSession;
 class PadBank;
 class PadAssignOverlay;
+class PianoRollOverlay;
 class SynthPageWidget;
 
 class MainWindow : public QMainWindow {
@@ -23,5 +24,6 @@ private:
     SampleSession *m_sampleSession = nullptr;
     PadBank *m_padBank = nullptr;
     PadAssignOverlay *m_assignOverlay = nullptr;
+    PianoRollOverlay *m_pianoRoll = nullptr;
     SynthPageWidget *m_synthPage = nullptr;
 };

@@ -34,6 +34,7 @@ set(SOURCES
     src/ui/FxPageWidget.cpp
     src/ui/SynthPageWidget.cpp
     src/ui/PadAssignOverlay.cpp
+    src/ui/PianoRollOverlay.cpp
     src/ui/SimplePageWidget.cpp
     src/ui/SystemStats.cpp
     src/ui/SampleBrowserModel.cpp
@@ -56,6 +57,7 @@ set(HEADERS
     src/ui/FxPageWidget.h
     src/ui/SynthPageWidget.h
     src/ui/PadAssignOverlay.h
+    src/ui/PianoRollOverlay.h
     src/ui/SimplePageWidget.h
     src/ui/SystemStats.h
     src/ui/SampleBrowserModel.h

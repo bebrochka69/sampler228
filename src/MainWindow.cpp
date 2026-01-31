@@ -8,6 +8,7 @@
 #include "ui/EditPageWidget.h"
 #include "ui/FxPageWidget.h"
 #include "ui/PadAssignOverlay.h"
+#include "ui/PianoRollOverlay.h"
 #include "ui/SeqPageWidget.h"
 #include "ui/SimplePageWidget.h"
 #include "ui/SynthPageWidget.h"
@@ -66,6 +67,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Overlay for choosing sample/synth
     m_assignOverlay = new PadAssignOverlay(m_sampleSession, m_padBank, central);
     m_assignOverlay->hide();
+
+    // Overlay for piano roll editor
+    m_pianoRoll = new PianoRollOverlay(m_padBank, central);
+    m_pianoRoll->hide();
     connect(seqPage, &SeqPageWidget::padOpenRequested, this, [this, editPage](int pad) {
         if (m_padBank && m_padBank->isSynth(pad)) {
             m_stack->setCurrentIndex(4);
@@ -81,9 +86,21 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             m_assignOverlay->showForPad(pad);
         }
     });
+    connect(seqPage, &SeqPageWidget::padPianoRollRequested, this, [this](int pad) {
+        if (m_pianoRoll) {
+            m_pianoRoll->showForPad(pad);
+        }
+    });
     connect(m_assignOverlay, &PadAssignOverlay::closed, this, [this]() {
         m_stack->setCurrentIndex(0);
     });
+    connect(m_pianoRoll, &PianoRollOverlay::closed, this, [this]() {
+        m_stack->setCurrentIndex(0);
+    });
+    connect(m_pianoRoll, &PianoRollOverlay::stepsChanged, this,
+            [seqPage](int pad, const QVector<int> &steps) {
+                seqPage->applyPianoSteps(pad, steps);
+            });
 
 }
 
