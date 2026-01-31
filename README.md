@@ -13,6 +13,20 @@ cmake ..
 cmake --build .
 ```
 
+## FluidSynth (optional synth presets)
+
+If FluidSynth is installed, synth pads render SoundFont instruments.
+
+```sh
+sudo apt install -y libfluidsynth-dev fluid-soundfont-gm
+```
+
+Optional custom SoundFont:
+
+```sh
+export GROOVEBOX_SF2=/path/to/your.sf2
+```
+
 ## Run
 
 ```sh

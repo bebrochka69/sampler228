@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <array>
 #include <memory>
 
@@ -75,6 +76,8 @@ public:
     static QString stretchLabel(int index);
     static int sliceCountForIndex(int index);
     static QString fxBusLabel(int index);
+    static QStringList synthPresets();
+    static bool hasFluidSynth();
     void setBusEffects(int bus, const QVector<BusEffect> &effects);
     float busMeter(int bus) const;
     float busGain(int bus) const;

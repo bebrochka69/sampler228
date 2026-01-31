@@ -13,6 +13,11 @@ if(UNIX AND NOT APPLE)
     find_package(ALSA)
 endif()
 
+find_package(PkgConfig)
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(FLUIDSYNTH QUIET fluidsynth)
+endif()
+
 set(SOURCES
     src/main.cpp
     src/MainWindow.cpp
@@ -66,4 +71,10 @@ if(ALSA_FOUND)
     target_include_directories(GrooveBoxUI PRIVATE ${ALSA_INCLUDE_DIRS})
     target_link_libraries(GrooveBoxUI PRIVATE ${ALSA_LIBRARIES})
     target_compile_definitions(GrooveBoxUI PRIVATE GROOVEBOX_WITH_ALSA=1)
+endif()
+
+if(FLUIDSYNTH_FOUND)
+    target_include_directories(GrooveBoxUI PRIVATE ${FLUIDSYNTH_INCLUDE_DIRS})
+    target_link_libraries(GrooveBoxUI PRIVATE ${FLUIDSYNTH_LIBRARIES})
+    target_compile_definitions(GrooveBoxUI PRIVATE GROOVEBOX_WITH_FLUIDSYNTH=1)
 endif()

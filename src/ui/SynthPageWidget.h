@@ -26,6 +26,6 @@ private:
     PadBank *m_pads = nullptr;
     int m_activePad = 0;
     int m_selectedParam = 0;
-    QStringList m_waveforms;
+    QStringList m_presets;
     QVector<QRectF> m_paramRects;
 };

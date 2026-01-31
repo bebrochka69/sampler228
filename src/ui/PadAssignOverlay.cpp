@@ -16,7 +16,12 @@ public:
         : QWidget(parent), m_pads(pads) {
         setAutoFillBackground(false);
         setFocusPolicy(Qt::StrongFocus);
-        m_items << "SINE" << "SAW" << "SQUARE";
+        if (m_pads) {
+            m_items = PadBank::synthPresets();
+        }
+        if (m_items.isEmpty()) {
+            m_items << "SINE" << "SAW" << "SQUARE";
+        }
     }
 
     void setActivePad(int pad) { m_activePad = pad; }

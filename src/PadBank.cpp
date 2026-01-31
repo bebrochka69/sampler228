@@ -16,6 +16,11 @@
 #include <QtMath>
 #include <cmath>
 #include <cstdint>
+#include <mutex>
+
+#ifdef GROOVEBOX_WITH_FLUIDSYNTH
+#include <fluidsynth.h>
+#endif
 
 namespace {
 constexpr int kPadCount = 8;
@@ -36,6 +41,24 @@ constexpr const char *kFxBusLabels[] = {
     "C",
     "D",
     "E",
+};
+
+struct SynthPresetInfo {
+    const char *name;
+    int bank;
+    int program;
+    int note;
+};
+
+constexpr SynthPresetInfo kSynthPresets[] = {
+    {"PIANO", 0, 0, 60},
+    {"E.PIANO", 0, 4, 60},
+    {"ORGAN", 0, 16, 60},
+    {"BASS", 0, 32, 36},
+    {"LEAD", 0, 80, 72},
+    {"PAD", 0, 88, 60},
+    {"STRINGS", 0, 48, 60},
+    {"BRASS", 0, 56, 60},
 };
 
 float clamp01(float value) {
@@ -120,6 +143,131 @@ QString buildRenderFilter(double tempoFactor, double pitchRate) {
     filters.append(buildAtempoFilters(atempoFactor));
     return filters.join(',');
 }
+
+const SynthPresetInfo *findSynthPreset(const QString &name) {
+    const QString key = name.trimmed().toUpper();
+    for (const auto &preset : kSynthPresets) {
+        if (key == QString::fromLatin1(preset.name)) {
+            return &preset;
+        }
+    }
+    return &kSynthPresets[0];
+}
+
+#ifdef GROOVEBOX_WITH_FLUIDSYNTH
+struct FluidContext {
+    fluid_settings_t *settings = nullptr;
+    fluid_synth_t *synth = nullptr;
+    int sfid = -1;
+    int sampleRate = 0;
+};
+
+FluidContext *getFluidContext(int sampleRate) {
+    static std::mutex mutex;
+    static std::unique_ptr<FluidContext> context;
+    std::lock_guard<std::mutex> lock(mutex);
+
+    if (context && context->synth && context->sfid >= 0 &&
+        context->sampleRate == sampleRate) {
+        return context.get();
+    }
+
+    if (context && context->synth) {
+        delete_fluid_synth(context->synth);
+    }
+    if (context && context->settings) {
+        delete_fluid_settings(context->settings);
+    }
+    context = std::make_unique<FluidContext>();
+    context->sampleRate = sampleRate;
+    context->settings = new_fluid_settings();
+    fluid_settings_setnum(context->settings, "synth.sample-rate",
+                          static_cast<double>(sampleRate));
+    fluid_settings_setint(context->settings, "synth.threadsafe-api", 0);
+    fluid_settings_setint(context->settings, "synth.chorus.active", 0);
+    fluid_settings_setint(context->settings, "synth.reverb.active", 0);
+
+    context->synth = new_fluid_synth(context->settings);
+    if (!context->synth) {
+        return nullptr;
+    }
+
+    QString sf2 = qEnvironmentVariable("GROOVEBOX_SF2");
+    QStringList candidates;
+    if (!sf2.isEmpty()) {
+        candidates << sf2;
+    }
+    candidates << "/usr/share/sounds/sf2/FluidR3_GM.sf2"
+               << "/usr/share/sounds/sf2/TimGM6mb.sf2"
+               << "/usr/share/sounds/sf2/FluidR3_GS.sf2";
+
+    QString chosen;
+    for (const QString &path : candidates) {
+        if (QFileInfo::exists(path)) {
+            chosen = path;
+            break;
+        }
+    }
+
+    if (chosen.isEmpty()) {
+        delete_fluid_synth(context->synth);
+        delete_fluid_settings(context->settings);
+        context.reset();
+        return nullptr;
+    }
+
+    context->sfid = fluid_synth_sfload(context->synth, chosen.toLocal8Bit().constData(), 1);
+    if (context->sfid < 0) {
+        delete_fluid_synth(context->synth);
+        delete_fluid_settings(context->settings);
+        context.reset();
+        return nullptr;
+    }
+    return context.get();
+}
+
+std::shared_ptr<AudioEngine::Buffer> renderFluidSynth(const SynthPresetInfo &preset,
+                                                      int sampleRate) {
+    FluidContext *ctx = getFluidContext(sampleRate);
+    if (!ctx || !ctx->synth || ctx->sfid < 0) {
+        return nullptr;
+    }
+
+    const int totalFrames = sampleRate * 2;
+    const int noteFrames = static_cast<int>(sampleRate * 0.85f);
+    std::vector<float> left(totalFrames, 0.0f);
+    std::vector<float> right(totalFrames, 0.0f);
+
+    fluid_synth_all_notes_off(ctx->synth, 0);
+    fluid_synth_program_select(ctx->synth, 0, ctx->sfid, preset.bank, preset.program);
+    fluid_synth_noteon(ctx->synth, 0, preset.note, 96);
+
+    fluid_synth_write_float(ctx->synth, noteFrames,
+                            left.data(), 0, 1, right.data(), 0, 1);
+    fluid_synth_noteoff(ctx->synth, 0, preset.note);
+    fluid_synth_write_float(ctx->synth, totalFrames - noteFrames,
+                            left.data() + noteFrames, 0, 1,
+                            right.data() + noteFrames, 0, 1);
+
+    auto buffer = std::make_shared<AudioEngine::Buffer>();
+    buffer->channels = 2;
+    buffer->sampleRate = sampleRate;
+    buffer->samples.resize(totalFrames * 2);
+
+    const int fadeFrames = std::min(sampleRate / 200, totalFrames / 2);
+    for (int i = 0; i < totalFrames; ++i) {
+        float gain = 1.0f;
+        if (i < fadeFrames) {
+            gain = static_cast<float>(i) / static_cast<float>(fadeFrames);
+        } else if (i > totalFrames - fadeFrames) {
+            gain = static_cast<float>(totalFrames - i) / static_cast<float>(fadeFrames);
+        }
+        buffer->samples[i * 2] = left[i] * gain;
+        buffer->samples[i * 2 + 1] = right[i] * gain;
+    }
+    return buffer;
+}
+#endif
 }  // namespace
 
 struct RenderSignature {
@@ -378,6 +526,16 @@ QString PadBank::synthName(int index) const {
 }
 
 static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name, int sampleRate) {
+#ifdef GROOVEBOX_WITH_FLUIDSYNTH
+    const SynthPresetInfo *preset = findSynthPreset(name);
+    if (preset) {
+        auto rendered = renderFluidSynth(*preset, sampleRate);
+        if (rendered && rendered->isValid()) {
+            return rendered;
+        }
+    }
+#endif
+
     const int frames = sampleRate;
     auto buffer = std::make_shared<AudioEngine::Buffer>();
     buffer->channels = 2;
@@ -416,7 +574,12 @@ void PadBank::setSynth(int index, const QString &name) {
         rt->processedReady = true;
         rt->pendingProcessed = false;
         rt->rawPath = QString("synth:%1").arg(name);
-        rt->rawDurationMs = 1000;
+        if (rt->rawBuffer && rt->rawBuffer->isValid()) {
+            rt->rawDurationMs =
+                static_cast<qint64>((rt->rawBuffer->frames() * 1000) / rt->rawBuffer->sampleRate);
+        } else {
+            rt->rawDurationMs = 1000;
+        }
         rt->durationMs = rt->rawDurationMs;
         rt->normalizeGain = 1.0f;
     }
@@ -1370,6 +1533,28 @@ QString PadBank::stretchLabel(int index) {
     const int maxIndex = stretchCount() - 1;
     const int idx = qBound(0, index, maxIndex);
     return QString::fromLatin1(kStretchLabels[idx]);
+}
+
+QStringList PadBank::synthPresets() {
+    QStringList list;
+    for (const auto &preset : kSynthPresets) {
+        list << QString::fromLatin1(preset.name);
+    }
+#ifdef GROOVEBOX_WITH_FLUIDSYNTH
+    return list;
+#else
+    list.clear();
+    list << "SINE" << "SAW" << "SQUARE";
+    return list;
+#endif
+}
+
+bool PadBank::hasFluidSynth() {
+#ifdef GROOVEBOX_WITH_FLUIDSYNTH
+    return true;
+#else
+    return false;
+#endif
 }
 
 int PadBank::sliceCountForIndex(int index) {

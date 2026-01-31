@@ -11,7 +11,12 @@
 SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_pads(pads) {
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
-    m_waveforms << "SINE" << "SAW" << "SQUARE";
+    if (m_pads) {
+        m_presets = PadBank::synthPresets();
+    }
+    if (m_presets.isEmpty()) {
+        m_presets << "SINE" << "SAW" << "SQUARE";
+    }
 
     if (m_pads) {
         m_activePad = m_pads->activePad();
@@ -46,12 +51,12 @@ void SynthPageWidget::keyPressEvent(QKeyEvent *event) {
         }
         const int idx = (key == Qt::Key_Up) ? 1 : -1;
         QString current = m_pads->synthName(m_activePad);
-        int waveIndex = m_waveforms.indexOf(current);
+        int waveIndex = m_presets.indexOf(current);
         if (waveIndex < 0) {
             waveIndex = 0;
         }
-        waveIndex = (waveIndex + idx + m_waveforms.size()) % m_waveforms.size();
-        m_pads->setSynth(m_activePad, m_waveforms[waveIndex]);
+        waveIndex = (waveIndex + idx + m_presets.size()) % m_presets.size();
+        m_pads->setSynth(m_activePad, m_presets[waveIndex]);
         update();
         return;
     }
