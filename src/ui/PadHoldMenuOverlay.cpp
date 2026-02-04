@@ -34,7 +34,7 @@ void PadHoldMenuOverlay::paintEvent(QPaintEvent *) {
     p.drawRect(rect());
 
     const float panelW = Theme::pxF(360.0f);
-    const float panelH = Theme::pxF(260.0f);
+    const float panelH = Theme::pxF(200.0f);
     m_panelRect = QRectF((width() - panelW) * 0.5f, (height() - panelH) * 0.5f,
                          panelW, panelH);
     p.setBrush(Theme::bg1());
@@ -79,8 +79,7 @@ void PadHoldMenuOverlay::paintEvent(QPaintEvent *) {
     };
 
     drawRow(m_pianoRect, "PIANO ROLL", Theme::accentAlt());
-    drawRow(m_assignSampleRect, "ASSIGN SAMPLE", Theme::accent());
-    drawRow(m_assignSynthRect, "ASSIGN SYNTH", Theme::accentAlt().darker(110));
+    drawRow(m_replaceRect, "REPLACE", Theme::accent());
     drawRow(m_cancelRect, "CANCEL", Theme::bg2());
 }
 
@@ -96,14 +95,9 @@ void PadHoldMenuOverlay::mousePressEvent(QMouseEvent *event) {
         emit pianoRollRequested(m_activePad);
         return;
     }
-    if (m_assignSampleRect.contains(pos)) {
+    if (m_replaceRect.contains(pos)) {
         setVisible(false);
-        emit assignSampleRequested(m_activePad);
-        return;
-    }
-    if (m_assignSynthRect.contains(pos)) {
-        setVisible(false);
-        emit assignSynthRequested(m_activePad);
+        emit replaceRequested(m_activePad);
         return;
     }
 }

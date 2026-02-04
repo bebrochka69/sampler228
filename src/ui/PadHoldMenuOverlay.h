@@ -13,8 +13,7 @@ public:
 
 signals:
     void pianoRollRequested(int pad);
-    void assignSampleRequested(int pad);
-    void assignSynthRequested(int pad);
+    void replaceRequested(int pad);
     void closed();
 
 protected:
@@ -27,7 +26,6 @@ private:
     QRectF m_panelRect;
     QRectF m_closeRect;
     QRectF m_pianoRect;
-    QRectF m_assignSampleRect;
-    QRectF m_assignSynthRect;
+    QRectF m_replaceRect;
     QRectF m_cancelRect;
 };

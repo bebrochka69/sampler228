@@ -20,12 +20,32 @@ public:
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
+    enum Mode {
+        ModeFluid,
+        ModeSerum
+    };
+
+    struct PresetRow {
+        QString label;
+        QString presetId;
+        bool header = false;
+        QRectF rect;
+    };
+
     PadBank *m_pads = nullptr;
     int m_activePad = 0;
     int m_selectedParam = 0;
-    QStringList m_presets;
-    QVector<QRectF> m_paramRects;
+    int m_dragParam = -1;
+    Mode m_mode = ModeFluid;
+    QStringList m_fluidPresets;
+    QStringList m_serumWaves;
+    QVector<PresetRow> m_presetRows;
+    QVector<QRectF> m_adsrRects;
+    QVector<QRectF> m_waveRects;
+    QVector<QRectF> m_serumParamRects;
 };

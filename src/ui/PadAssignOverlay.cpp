@@ -17,10 +17,10 @@ public:
         setAutoFillBackground(false);
         setFocusPolicy(Qt::StrongFocus);
         if (m_pads) {
-            m_items = PadBank::synthPresets();
+            m_items = PadBank::synthTypes();
         }
         if (m_items.isEmpty()) {
-            m_items << "SINE" << "SAW" << "SQUARE";
+            m_items << "FLUIDSYNTH" << "SERUM";
         }
     }
 
@@ -71,7 +71,14 @@ protected:
         const QPointF pos = event->position();
         for (int i = 0; i < m_rows.size(); ++i) {
             if (m_rows[i].contains(pos) && m_pads) {
-                m_pads->setSynth(m_activePad, m_items[i]);
+                const QString item = m_items[i].toUpper();
+                if (item.contains("SERUM")) {
+                    m_pads->setSynth(m_activePad, "SERUM:SAW");
+                } else {
+                    const QStringList presets = PadBank::synthPresets();
+                    const QString preset = presets.isEmpty() ? QString("KEYS/PIANO 1") : presets.first();
+                    m_pads->setSynth(m_activePad, QString("FS:%1").arg(preset));
+                }
                 emit synthAssigned();
                 return;
             }

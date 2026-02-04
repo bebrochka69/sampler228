@@ -24,6 +24,7 @@ public:
     bool isLoaded(int index) const;
     bool isSynth(int index) const;
     QString synthName(int index) const;
+    QString synthId(int index) const;
     void setSynth(int index, const QString &name);
 
     struct PadParams {
@@ -40,6 +41,17 @@ public:
         bool normalize = false;
     };
 
+    struct SynthParams {
+        float attack = 0.15f;
+        float decay = 0.25f;
+        float sustain = 0.7f;
+        float release = 0.25f;
+        int wave = 0;
+        int voices = 1;
+        float detune = 0.12f;
+        int octave = 0;
+    };
+
     struct BusEffect {
         int type = 0;
         float p1 = 0.5f;
@@ -50,6 +62,7 @@ public:
     };
 
     PadParams params(int index) const;
+    SynthParams synthParams(int index) const;
     void setVolume(int index, float value);
     void setPan(int index, float value);
     void setPitch(int index, float semitones);
@@ -60,6 +73,11 @@ public:
     void setSliceIndex(int index, int sliceIndex);
     void setLoop(int index, bool loop);
     void setNormalize(int index, bool enabled);
+    void setSynthAdsr(int index, float attack, float decay, float sustain, float release);
+    void setSynthWave(int index, int wave);
+    void setSynthVoices(int index, int voices);
+    void setSynthDetune(int index, float detune);
+    void setSynthOctave(int index, int octave);
     int fxBus(int index) const;
     void setFxBus(int index, int bus);
 
@@ -78,6 +96,8 @@ public:
     static int sliceCountForIndex(int index);
     static QString fxBusLabel(int index);
     static QStringList synthPresets();
+    static QStringList serumWaves();
+    static QStringList synthTypes();
     static bool hasFluidSynth();
     void setBusEffects(int bus, const QVector<BusEffect> &effects);
     float busMeter(int bus) const;
@@ -101,6 +121,7 @@ private:
     std::array<bool, 8> m_isSynth{};
     std::array<QString, 8> m_synthNames;
     std::array<int, 8> m_synthBaseMidi{};
+    std::array<SynthParams, 8> m_synthParams;
     std::array<PadParams, 8> m_params;
     std::array<PadRuntime *, 8> m_runtime;
     int m_activePad = 0;

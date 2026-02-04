@@ -43,6 +43,38 @@ constexpr const char *kFxBusLabels[] = {
     "E",
 };
 
+QString synthTypeFromName(const QString &name) {
+    const QString upper = name.trimmed().toUpper();
+    if (upper.startsWith("SERUM")) {
+        return "SERUM";
+    }
+    if (upper.startsWith("FS:") || upper.startsWith("FLUID") || upper.startsWith("FLUIDSYNTH")) {
+        return "FS";
+    }
+    if (upper.contains(":")) {
+        const int colon = upper.indexOf(':');
+        return upper.left(colon);
+    }
+    return "FS";
+}
+
+QString synthPresetFromName(const QString &name) {
+    QString value = name.trimmed();
+    const int colon = value.indexOf(':');
+    if (colon >= 0) {
+        value = value.mid(colon + 1);
+    }
+    return value.trimmed();
+}
+
+QString makeSynthName(const QString &type, const QString &preset) {
+    const QString t = type.trimmed().toUpper();
+    if (t == "SERUM") {
+        return QString("SERUM:%1").arg(preset);
+    }
+    return QString("FS:%1").arg(preset);
+}
+
 struct SynthPresetInfo {
     const char *name;
     int bank;
@@ -51,14 +83,15 @@ struct SynthPresetInfo {
 };
 
 constexpr SynthPresetInfo kSynthPresets[] = {
-    {"PIANO", 0, 0, 60},
-    {"E.PIANO", 0, 4, 60},
-    {"ORGAN", 0, 16, 60},
-    {"BASS", 0, 32, 60},
-    {"LEAD", 0, 80, 60},
-    {"PAD", 0, 88, 60},
-    {"STRINGS", 0, 48, 60},
-    {"BRASS", 0, 56, 60},
+    {"KEYS/PIANO 1", 0, 0, 60},
+    {"KEYS/PIANO 2", 0, 1, 60},
+    {"KEYS/E.PIANO", 0, 4, 60},
+    {"ORGANS/DRAWBAR", 0, 16, 60},
+    {"BASS/FINGER", 0, 32, 48},
+    {"LEADS/SAW", 0, 80, 72},
+    {"PADS/WARM", 0, 89, 60},
+    {"STRINGS/ENSEMBLE", 0, 48, 60},
+    {"BRASS/SECTION", 0, 56, 60},
 };
 
 float clamp01(float value) {
@@ -145,7 +178,7 @@ QString buildRenderFilter(double tempoFactor, double pitchRate) {
 }
 
 const SynthPresetInfo *findSynthPreset(const QString &name) {
-    const QString key = name.trimmed().toUpper();
+    const QString key = synthPresetFromName(name).trimmed().toUpper();
     for (const auto &preset : kSynthPresets) {
         if (key == QString::fromLatin1(preset.name)) {
             return &preset;
@@ -524,72 +557,190 @@ QString PadBank::synthName(int index) const {
     if (!isSynth(index)) {
         return QString();
     }
+    const QString raw = m_synthNames[static_cast<size_t>(index)];
+    const QString type = synthTypeFromName(raw);
+    if (type == "SERUM") {
+        return QString("SERUM");
+    }
+    const QString preset = synthPresetFromName(raw);
+    return preset.isEmpty() ? QString("FLUID") : preset;
+}
+
+QString PadBank::synthId(int index) const {
+    if (!isSynth(index)) {
+        return QString();
+    }
     return m_synthNames[static_cast<size_t>(index)];
 }
 
-static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name, int sampleRate, int baseMidi) {
+static void applyAdsr(AudioEngine::Buffer &buffer, float attack, float decay, float sustain, float release) {
+    const int totalFrames = buffer.frames();
+    if (totalFrames <= 0) {
+        return;
+    }
+    attack = qBound(0.0f, attack, 1.0f);
+    decay = qBound(0.0f, decay, 1.0f);
+    sustain = qBound(0.0f, sustain, 1.0f);
+    release = qBound(0.0f, release, 1.0f);
+
+    const float attackSec = 0.005f + attack * 1.2f;
+    const float decaySec = 0.01f + decay * 1.2f;
+    const float releaseSec = 0.02f + release * 1.6f;
+    int aFrames = qMax(1, static_cast<int>(attackSec * buffer.sampleRate));
+    int dFrames = qMax(1, static_cast<int>(decaySec * buffer.sampleRate));
+    int rFrames = qMax(1, static_cast<int>(releaseSec * buffer.sampleRate));
+    if (aFrames + dFrames + rFrames >= totalFrames) {
+        const float scale = static_cast<float>(totalFrames) /
+                            static_cast<float>(aFrames + dFrames + rFrames + 1);
+        aFrames = qMax(1, static_cast<int>(aFrames * scale));
+        dFrames = qMax(1, static_cast<int>(dFrames * scale));
+        rFrames = qMax(1, static_cast<int>(rFrames * scale));
+    }
+    const int sustainStart = aFrames + dFrames;
+    const int sustainEnd = qMax(sustainStart, totalFrames - rFrames);
+
+    for (int i = 0; i < totalFrames; ++i) {
+        float env = 1.0f;
+        if (i < aFrames) {
+            env = static_cast<float>(i) / static_cast<float>(aFrames);
+        } else if (i < sustainStart) {
+            const float t = static_cast<float>(i - aFrames) / static_cast<float>(dFrames);
+            env = 1.0f + (sustain - 1.0f) * t;
+        } else if (i < sustainEnd) {
+            env = sustain;
+        } else {
+            const float t = static_cast<float>(i - sustainEnd) / static_cast<float>(rFrames);
+            env = sustain * (1.0f - qBound(0.0f, t, 1.0f));
+        }
+        const int idx = i * buffer.channels;
+        for (int ch = 0; ch < buffer.channels; ++ch) {
+            buffer.samples[idx + ch] *= env;
+        }
+    }
+}
+
+static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name, int sampleRate,
+                                                            int baseMidi, const PadBank::SynthParams &params) {
+    const QString type = synthTypeFromName(name);
+    const QString preset = synthPresetFromName(name);
+
 #ifdef GROOVEBOX_WITH_FLUIDSYNTH
-    const SynthPresetInfo *preset = findSynthPreset(name);
-    if (preset) {
-        auto rendered = renderFluidSynth(*preset, sampleRate, baseMidi);
-        if (rendered && rendered->isValid()) {
-            return rendered;
+    if (type == "FS") {
+        const SynthPresetInfo *presetInfo = findSynthPreset(preset);
+        if (presetInfo) {
+            auto rendered = renderFluidSynth(*presetInfo, sampleRate, baseMidi);
+            if (rendered && rendered->isValid()) {
+                applyAdsr(*rendered, params.attack, params.decay, params.sustain, params.release);
+                return rendered;
+            }
         }
     }
 #endif
 
-    const int frames = sampleRate;
+    const QStringList waves = {"SINE", "SAW", "SQUARE", "TRI", "NOISE"};
+    int waveIndex = qBound(0, params.wave, waves.size() - 1);
+    const QString waveName = preset.isEmpty() ? waves[waveIndex] : preset;
+
+    const int frames = sampleRate * 2;
     auto buffer = std::make_shared<AudioEngine::Buffer>();
     buffer->channels = 2;
     buffer->sampleRate = sampleRate;
     buffer->samples.resize(frames * 2);
 
-    const QString wave = name.toLower();
-    const float baseFreq = 440.0f * std::pow(2.0f, (static_cast<float>(baseMidi) - 69.0f) / 12.0f);
+    const int voices = qBound(1, params.voices, 8);
+    const float detune = qBound(0.0f, params.detune, 0.9f);
+    const int octave = qBound(-2, params.octave, 2);
+    const float baseFreq =
+        440.0f * std::pow(2.0f, (static_cast<float>(baseMidi + octave * 12) - 69.0f) / 12.0f);
+
+    uint32_t noiseSeed = 0x1234567u;
+    auto nextNoise = [&noiseSeed]() {
+        noiseSeed = 1664525u * noiseSeed + 1013904223u;
+        return (static_cast<int>(noiseSeed >> 8) & 0xFFFF) / 32768.0f - 1.0f;
+    };
+
     for (int i = 0; i < frames; ++i) {
         const float t = static_cast<float>(i) / static_cast<float>(sampleRate);
-        float v = 0.0f;
-        if (wave.contains("saw")) {
-            v = 2.0f * (t - std::floor(t + 0.5f));
-        } else if (wave.contains("square")) {
-            v = (std::sin(2.0f * static_cast<float>(M_PI) * baseFreq * t) >= 0.0f) ? 0.7f : -0.7f;
-        } else {
-            v = std::sin(2.0f * static_cast<float>(M_PI) * baseFreq * t);
+        float sum = 0.0f;
+        for (int v = 0; v < voices; ++v) {
+            const float det = (static_cast<float>(v) - (voices - 1) * 0.5f) * detune * 0.6f;
+            const float freq = baseFreq * std::pow(2.0f, det / 12.0f);
+            float vout = 0.0f;
+            const QString wav = waveName.toLower();
+            if (wav.contains("saw")) {
+                const float phase = std::fmod(freq * t, 1.0f);
+                vout = 2.0f * (phase - 0.5f);
+            } else if (wav.contains("square")) {
+                vout = (std::sin(2.0f * static_cast<float>(M_PI) * freq * t) >= 0.0f) ? 0.8f : -0.8f;
+            } else if (wav.contains("tri")) {
+                const float phase = std::fmod(freq * t, 1.0f);
+                vout = 1.0f - 4.0f * std::fabs(phase - 0.5f);
+            } else if (wav.contains("noise")) {
+                vout = nextNoise() * 0.6f;
+            } else {
+                vout = std::sin(2.0f * static_cast<float>(M_PI) * freq * t);
+            }
+            sum += vout;
         }
+        float v = sum / static_cast<float>(voices);
         buffer->samples[i * 2] = v;
         buffer->samples[i * 2 + 1] = v;
     }
+
+    applyAdsr(*buffer, params.attack, params.decay, params.sustain, params.release);
     return buffer;
+}
+
+static void rebuildSynthRuntime(PadBank::PadRuntime *rt, const QString &name, int sampleRate,
+                                int baseMidi, const PadBank::SynthParams &params) {
+    if (!rt) {
+        return;
+    }
+    rt->rawBuffer = buildSynthBuffer(name, sampleRate, baseMidi, params);
+    rt->processedBuffer = rt->rawBuffer;
+    rt->processedReady = true;
+    rt->pendingProcessed = false;
+    rt->rawPath = QString("synth:%1").arg(name);
+    if (rt->rawBuffer && rt->rawBuffer->isValid()) {
+        rt->rawDurationMs =
+            static_cast<qint64>((rt->rawBuffer->frames() * 1000) / rt->rawBuffer->sampleRate);
+    } else {
+        rt->rawDurationMs = 1000;
+    }
+    rt->durationMs = rt->rawDurationMs;
 }
 
 void PadBank::setSynth(int index, const QString &name) {
     if (index < 0 || index >= padCount()) {
         return;
     }
+    QString synthName = name;
+    const QString type = synthTypeFromName(name);
+    if (type == "SERUM" && !name.contains(":")) {
+        synthName = makeSynthName("SERUM", "SAW");
+    } else if (type == "FS" && !name.contains(":")) {
+        synthName = makeSynthName("FS", QString::fromLatin1(kSynthPresets[0].name));
+    }
+
     m_isSynth[static_cast<size_t>(index)] = true;
-    m_synthNames[static_cast<size_t>(index)] = name;
+    m_synthNames[static_cast<size_t>(index)] = synthName;
     m_paths[static_cast<size_t>(index)].clear();
-    const SynthPresetInfo *preset = findSynthPreset(name);
-    if (preset) {
-        m_synthBaseMidi[static_cast<size_t>(index)] = preset->note;
+    if (synthTypeFromName(synthName) == "FS") {
+        const SynthPresetInfo *preset = findSynthPreset(synthName);
+        if (preset) {
+            m_synthBaseMidi[static_cast<size_t>(index)] = preset->note;
+        } else {
+            m_synthBaseMidi[static_cast<size_t>(index)] = 60;
+        }
     } else {
         m_synthBaseMidi[static_cast<size_t>(index)] = 60;
     }
 
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (rt) {
-        rt->rawBuffer = buildSynthBuffer(name, m_engineRate, m_synthBaseMidi[static_cast<size_t>(index)]);
-        rt->processedBuffer = rt->rawBuffer;
-        rt->processedReady = true;
-        rt->pendingProcessed = false;
-        rt->rawPath = QString("synth:%1").arg(name);
-        if (rt->rawBuffer && rt->rawBuffer->isValid()) {
-            rt->rawDurationMs =
-                static_cast<qint64>((rt->rawBuffer->frames() * 1000) / rt->rawBuffer->sampleRate);
-        } else {
-            rt->rawDurationMs = 1000;
-        }
-        rt->durationMs = rt->rawDurationMs;
+        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                            m_synthBaseMidi[static_cast<size_t>(index)],
+                            m_synthParams[static_cast<size_t>(index)]);
         rt->normalizeGain = 1.0f;
     }
     emit padChanged(index);
@@ -601,6 +752,13 @@ PadBank::PadParams PadBank::params(int index) const {
         return PadParams();
     }
     return m_params[static_cast<size_t>(index)];
+}
+
+PadBank::SynthParams PadBank::synthParams(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return SynthParams();
+    }
+    return m_synthParams[static_cast<size_t>(index)];
 }
 
 void PadBank::setVolume(int index, float value) {
@@ -729,6 +887,79 @@ void PadBank::setNormalize(int index, bool enabled) {
         } else {
             rt->normalizeGain = 1.0f;
         }
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthAdsr(int index, float attack, float decay, float sustain, float release) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.attack = clamp01(attack);
+    sp.decay = clamp01(decay);
+    sp.sustain = clamp01(sustain);
+    sp.release = clamp01(release);
+    if (isSynth(index)) {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthWave(int index, int wave) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.wave = qBound(0, wave, 4);
+    if (isSynth(index)) {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthVoices(int index, int voices) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.voices = qBound(1, voices, 8);
+    if (isSynth(index)) {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthDetune(int index, float detune) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.detune = qBound(0.0f, detune, 1.0f);
+    if (isSynth(index)) {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthOctave(int index, int octave) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.octave = qBound(-2, octave, 2);
+    if (isSynth(index)) {
+        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
     }
     emit padParamsChanged(index);
 }
@@ -1252,7 +1483,8 @@ void PadBank::triggerPad(int index) {
         if (!buffer || !buffer->isValid()) {
             if (synthPad) {
                 const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
-                buffer = buildSynthBuffer(m_synthNames[static_cast<size_t>(index)], m_engineRate, baseMidi);
+                buffer = buildSynthBuffer(m_synthNames[static_cast<size_t>(index)], m_engineRate, baseMidi,
+                                          m_synthParams[static_cast<size_t>(index)]);
                 rt->rawBuffer = buffer;
                 rt->processedBuffer = buffer;
                 rt->processedReady = true;
@@ -1455,7 +1687,8 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
     const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
     const QString name = m_synthNames[static_cast<size_t>(index)];
     if (!rt->rawBuffer || !rt->rawBuffer->isValid()) {
-        rt->rawBuffer = buildSynthBuffer(name, m_engineRate, baseMidi);
+        rt->rawBuffer = buildSynthBuffer(name, m_engineRate, baseMidi,
+                                         m_synthParams[static_cast<size_t>(index)]);
         rt->processedBuffer = rt->rawBuffer;
         rt->processedReady = true;
     }
@@ -1624,13 +1857,15 @@ QStringList PadBank::synthPresets() {
     for (const auto &preset : kSynthPresets) {
         list << QString::fromLatin1(preset.name);
     }
-#ifdef GROOVEBOX_WITH_FLUIDSYNTH
     return list;
-#else
-    list.clear();
-    list << "SINE" << "SAW" << "SQUARE";
-    return list;
-#endif
+}
+
+QStringList PadBank::serumWaves() {
+    return {"SINE", "SAW", "SQUARE", "TRI", "NOISE"};
+}
+
+QStringList PadBank::synthTypes() {
+    return {"FLUIDSYNTH", "SERUM"};
 }
 
 bool PadBank::hasFluidSynth() {

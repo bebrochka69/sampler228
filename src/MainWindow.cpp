@@ -118,14 +118,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             m_pianoRoll->showForPad(pad);
         }
     });
-    connect(m_holdMenu, &PadHoldMenuOverlay::assignSampleRequested, this, [this](int pad) {
+    connect(m_holdMenu, &PadHoldMenuOverlay::replaceRequested, this, [this](int pad) {
         if (m_assignOverlay) {
-            m_assignOverlay->showForPad(pad, 0);
-        }
-    });
-    connect(m_holdMenu, &PadHoldMenuOverlay::assignSynthRequested, this, [this](int pad) {
-        if (m_assignOverlay) {
-            m_assignOverlay->showForPad(pad, 1);
+            m_assignOverlay->showForPad(pad);
         }
     });
 
