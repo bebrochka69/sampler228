@@ -113,6 +113,8 @@ signals:
 
 private:
     struct PadRuntime;
+    static void rebuildSynthRuntime(PadRuntime *rt, const QString &name, int sampleRate,
+                                    int baseMidi, const SynthParams &params);
     void scheduleRawRender(int index);
     void scheduleProcessedRender(int index);
     bool needsProcessing(const PadParams &params) const;

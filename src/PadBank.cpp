@@ -691,8 +691,8 @@ static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name
     return buffer;
 }
 
-static void rebuildSynthRuntime(PadBank::PadRuntime *rt, const QString &name, int sampleRate,
-                                int baseMidi, const PadBank::SynthParams &params) {
+void PadBank::rebuildSynthRuntime(PadRuntime *rt, const QString &name, int sampleRate,
+                                  int baseMidi, const PadBank::SynthParams &params) {
     if (!rt) {
         return;
     }
