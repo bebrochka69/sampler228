@@ -27,7 +27,7 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
     connect(&m_playTimer, &QTimer::timeout, this, &SeqPageWidget::advancePlayhead);
 
     m_animTimer.setTimerType(Qt::PreciseTimer);
-    m_animTimer.setInterval(qMax(12, stepIntervalMs() / 4));
+    m_animTimer.setInterval(33);
     connect(&m_animTimer, &QTimer::timeout, this, [this]() {
         if (m_playing || m_waiting) {
             update();
@@ -66,7 +66,7 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
         connect(m_pads, &PadBank::bpmChanged, this, [this](int) {
             if (m_playing) {
                 m_playTimer.setInterval(stepIntervalMs());
-                m_animTimer.setInterval(qMax(12, stepIntervalMs() / 4));
+                m_animTimer.setInterval(33);
             }
             update();
         });
@@ -119,7 +119,7 @@ void SeqPageWidget::startPlayback() {
         m_playClock.restart();
     }
     m_lastStepMs = 0;
-    m_animTimer.setInterval(qMax(12, stepIntervalMs() / 4));
+    m_animTimer.setInterval(33);
     m_animTimer.start();
     update();
 }

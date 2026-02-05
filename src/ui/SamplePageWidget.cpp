@@ -18,7 +18,7 @@ SamplePageWidget::SamplePageWidget(SampleSession *session, PadBank *pads, QWidge
     setFocusPolicy(Qt::StrongFocus);
 
     if (!Theme::liteMode()) {
-        m_ambientTimer.setInterval(120);
+        m_ambientTimer.setInterval(33);
         connect(&m_ambientTimer, &QTimer::timeout, this, [this]() {
             if (isVisible()) {
                 update();
