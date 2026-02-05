@@ -8,7 +8,7 @@
 #include <QGuiApplication>
 #include <QMediaPlayer>
 #include <QProcess>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QSoundEffect>
 #include <QStandardPaths>
 #include <QStringList>
@@ -143,7 +143,7 @@ static void scanZynPresets() {
                 break;
             }
         }
-        QStringList parts = rel.split(QRegExp("[/\\\\]"), Qt::SkipEmptyParts);
+        QStringList parts = rel.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
         QString category = parts.isEmpty() ? QString("MISC") : parts.first().toUpper();
         QString name = parts.isEmpty() ? QFileInfo(path).baseName()
                                        : QFileInfo(parts.last()).completeBaseName();
