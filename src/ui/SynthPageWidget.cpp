@@ -11,21 +11,21 @@
 namespace {
 QString synthIdOrDefault(PadBank *pads, int pad) {
     if (!pads) {
-        return QString("FS:KEYS/PIANO 1");
+        return QString("ZYN:KEYS/PIANO 1");
     }
     const QString id = pads->synthId(pad);
     if (!id.isEmpty()) {
         return id;
     }
-    return QString("FS:KEYS/PIANO 1");
+    return QString("ZYN:KEYS/PIANO 1");
 }
 
 QString synthType(const QString &id) {
     const QString up = id.trimmed().toUpper();
-    if (up.startsWith("SERUM")) {
-        return "SERUM";
+    if (up.startsWith("ZYN")) {
+        return "ZYN";
     }
-    return "FS";
+    return "ZYN";
 }
 
 QString synthPreset(const QString &id) {
@@ -44,10 +44,6 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
 
     if (m_pads) {
         m_fluidPresets = PadBank::synthPresets();
-        m_serumWaves = PadBank::serumWaves();
-    }
-    if (m_serumWaves.isEmpty()) {
-        m_serumWaves << "SINE" << "SAW" << "SQUARE" << "TRI" << "NOISE";
     }
 
     if (m_pads) {
@@ -78,13 +74,11 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
 
-    if (m_mode == ModeFluid) {
-        for (const PresetRow &row : m_presetRows) {
-            if (!row.header && row.rect.contains(pos) && m_pads) {
-                m_pads->setSynth(m_activePad, QString("FS:%1").arg(row.presetId));
-                update();
-                return;
-            }
+    for (const PresetRow &row : m_presetRows) {
+        if (!row.header && row.rect.contains(pos) && m_pads) {
+            m_pads->setSynth(m_activePad, QString("ZYN:%1").arg(row.presetId));
+            update();
+            return;
         }
     }
 
@@ -104,33 +98,7 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
         }
     }
 
-    if (m_mode == ModeSerum) {
-        for (int i = 0; i < m_waveRects.size(); ++i) {
-            if (m_waveRects[i].contains(pos) && m_pads) {
-                m_pads->setSynthWave(m_activePad, i);
-                update();
-                return;
-            }
-        }
-        for (int i = 0; i < m_serumParamRects.size(); ++i) {
-            if (m_serumParamRects[i].contains(pos) && m_pads) {
-                auto sp = m_pads->synthParams(m_activePad);
-                const bool inc = pos.x() > m_serumParamRects[i].center().x();
-                if (i == 0) {
-                    sp.voices = qBound(1, sp.voices + (inc ? 1 : -1), 8);
-                    m_pads->setSynthVoices(m_activePad, sp.voices);
-                } else if (i == 1) {
-                    sp.detune = qBound(0.0f, sp.detune + (inc ? 0.05f : -0.05f), 1.0f);
-                    m_pads->setSynthDetune(m_activePad, sp.detune);
-                } else if (i == 2) {
-                    sp.octave = qBound(-2, sp.octave + (inc ? 1 : -1), 2);
-                    m_pads->setSynthOctave(m_activePad, sp.octave);
-                }
-                update();
-                return;
-            }
-        }
-    }
+    return;
 }
 
 void SynthPageWidget::mouseMoveEvent(QMouseEvent *event) {
@@ -171,13 +139,11 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(header, Qt::AlignLeft | Qt::AlignVCenter, "SYNTH");
 
     const QString id = synthIdOrDefault(m_pads, m_activePad);
-    const QString type = synthType(id);
-    m_mode = (type == "SERUM") ? ModeSerum : ModeFluid;
     const QString preset = synthPreset(id);
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(10, QFont::DemiBold));
     p.drawText(header, Qt::AlignRight | Qt::AlignVCenter,
-               QString("PAD %1  %2").arg(m_activePad + 1).arg(m_mode == ModeSerum ? "SERUM" : preset));
+               QString("PAD %1  %2").arg(m_activePad + 1).arg(preset));
 
     auto sp = m_pads ? m_pads->synthParams(m_activePad) : PadBank::SynthParams();
 
@@ -242,102 +208,52 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         p.drawText(rRect.adjusted(0, Theme::px(4), 0, 0), Qt::AlignTop | Qt::AlignHCenter, labels[i]);
     }
 
-    if (m_mode == ModeFluid) {
-        // Preset list with categories
-        p.setBrush(QColor(24, 24, 30));
-        p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(left, Theme::px(10), Theme::px(10));
-
-        const float rowH = Theme::pxF(30.0f);
-        float y = left.top() + Theme::px(8);
-        m_presetRows.clear();
-        QString currentGroup;
-        for (const QString &item : m_fluidPresets) {
-            const QStringList parts = item.split('/');
-            const QString group = parts.value(0, "MISC").toUpper();
-            if (group != currentGroup) {
-                PresetRow headerRow;
-                headerRow.header = true;
-                headerRow.label = group;
-                headerRow.rect = QRectF(left.left() + Theme::px(8), y,
-                                        left.width() - Theme::px(16), rowH);
-                m_presetRows.push_back(headerRow);
-                y += rowH;
-                currentGroup = group;
-            }
-            PresetRow row;
-            row.header = false;
-            row.label = parts.size() > 1 ? parts[1] : item;
-            row.presetId = item;
-            row.rect = QRectF(left.left() + Theme::px(12), y,
-                              left.width() - Theme::px(20), rowH - Theme::px(4));
-            m_presetRows.push_back(row);
-            y += rowH - Theme::px(2);
-        }
-
-        for (const PresetRow &row : m_presetRows) {
-            if (row.header) {
-                p.setPen(Theme::textMuted());
-                p.setFont(Theme::condensedFont(11, QFont::Bold));
-                p.drawText(row.rect, Qt::AlignLeft | Qt::AlignVCenter, row.label);
-            } else {
-                const bool active = preset.toUpper() == row.presetId.toUpper();
-                p.setBrush(active ? Theme::accentAlt() : Theme::bg2());
-                p.setPen(QPen(Theme::stroke(), 1.0));
-                p.drawRoundedRect(row.rect, Theme::px(6), Theme::px(6));
-                p.setPen(active ? Theme::bg0() : Theme::text());
-                p.setFont(Theme::baseFont(10, QFont::DemiBold));
-                p.drawText(row.rect.adjusted(Theme::px(8), 0, -Theme::px(4), 0),
-                           Qt::AlignLeft | Qt::AlignVCenter, row.label);
-            }
-        }
-        return;
-    }
-
-    // Serum mode UI
+    // Preset list with categories (Zyn)
     p.setBrush(QColor(24, 24, 30));
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.drawRoundedRect(left, Theme::px(10), Theme::px(10));
 
-    // Wave buttons
-    const QRectF wavesRect(left.left() + Theme::px(10), left.top() + Theme::px(10),
-                           left.width() - Theme::px(20), Theme::px(40));
-    m_waveRects.clear();
-    const float wGap = Theme::pxF(8.0f);
-    const float wW = (wavesRect.width() - wGap * (m_serumWaves.size() - 1)) / m_serumWaves.size();
-    for (int i = 0; i < m_serumWaves.size(); ++i) {
-        QRectF r(wavesRect.left() + i * (wW + wGap), wavesRect.top(), wW, wavesRect.height());
-        m_waveRects.push_back(r);
-        const bool active = (sp.wave == i);
-        p.setBrush(active ? Theme::accent() : Theme::bg2());
-        p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(r, Theme::px(6), Theme::px(6));
-        p.setPen(active ? Theme::bg0() : Theme::text());
-        p.setFont(Theme::baseFont(9, QFont::DemiBold));
-        p.drawText(r, Qt::AlignCenter, m_serumWaves[i]);
+    const float rowH = Theme::pxF(30.0f);
+    float y = left.top() + Theme::px(8);
+    m_presetRows.clear();
+    QString currentGroup;
+    for (const QString &item : m_fluidPresets) {
+        const QStringList parts = item.split('/');
+        const QString group = parts.value(0, "MISC").toUpper();
+        if (group != currentGroup) {
+            PresetRow headerRow;
+            headerRow.header = true;
+            headerRow.label = group;
+            headerRow.rect = QRectF(left.left() + Theme::px(8), y,
+                                    left.width() - Theme::px(16), rowH);
+            m_presetRows.push_back(headerRow);
+            y += rowH;
+            currentGroup = group;
+        }
+        PresetRow row;
+        row.header = false;
+        row.label = parts.size() > 1 ? parts[1] : item;
+        row.presetId = item;
+        row.rect = QRectF(left.left() + Theme::px(12), y,
+                          left.width() - Theme::px(20), rowH - Theme::px(4));
+        m_presetRows.push_back(row);
+        y += rowH - Theme::px(2);
     }
 
-    // Serum params
-    const QRectF paramsRect(left.left() + Theme::px(10), wavesRect.bottom() + Theme::px(14),
-                            left.width() - Theme::px(20), left.height() - wavesRect.height() - Theme::px(26));
-    m_serumParamRects.clear();
-    const QStringList paramLabels = {"VOICES", "DETUNE", "OCTAVE"};
-    for (int i = 0; i < 3; ++i) {
-        QRectF r(paramsRect.left(), paramsRect.top() + i * (Theme::px(54) + Theme::px(8)),
-                 paramsRect.width(), Theme::px(54));
-        m_serumParamRects.push_back(r);
-        p.setBrush(Theme::bg2());
-        p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
-        p.setPen(Theme::text());
-        p.setFont(Theme::baseFont(10, QFont::DemiBold));
-        p.drawText(r.adjusted(Theme::px(10), 0, 0, 0), Qt::AlignVCenter | Qt::AlignLeft,
-                   paramLabels[i]);
-        QString value;
-        if (i == 0) value = QString::number(sp.voices);
-        if (i == 1) value = QString::number(sp.detune, 'f', 2);
-        if (i == 2) value = QString::number(sp.octave);
-        p.setPen(Theme::accent());
-        p.drawText(r.adjusted(0, 0, -Theme::px(12), 0), Qt::AlignVCenter | Qt::AlignRight, value);
+    for (const PresetRow &row : m_presetRows) {
+        if (row.header) {
+            p.setPen(Theme::textMuted());
+            p.setFont(Theme::condensedFont(11, QFont::Bold));
+            p.drawText(row.rect, Qt::AlignLeft | Qt::AlignVCenter, row.label);
+        } else {
+            const bool active = preset.toUpper() == row.presetId.toUpper();
+            p.setBrush(active ? Theme::accentAlt() : Theme::bg2());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(row.rect, Theme::px(6), Theme::px(6));
+            p.setPen(active ? Theme::bg0() : Theme::text());
+            p.setFont(Theme::baseFont(10, QFont::DemiBold));
+            p.drawText(row.rect.adjusted(Theme::px(8), 0, -Theme::px(4), 0),
+                       Qt::AlignLeft | Qt::AlignVCenter, row.label);
+        }
     }
 }

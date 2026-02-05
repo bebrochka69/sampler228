@@ -43,9 +43,6 @@ private:
     int m_dragParam = -1;
     Mode m_mode = ModeFluid;
     QStringList m_fluidPresets;
-    QStringList m_serumWaves;
     QVector<PresetRow> m_presetRows;
     QVector<QRectF> m_adsrRects;
-    QVector<QRectF> m_waveRects;
-    QVector<QRectF> m_serumParamRects;
 };

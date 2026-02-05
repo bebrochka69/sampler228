@@ -45,17 +45,14 @@ constexpr const char *kFxBusLabels[] = {
 
 QString synthTypeFromName(const QString &name) {
     const QString upper = name.trimmed().toUpper();
-    if (upper.startsWith("SERUM")) {
-        return "SERUM";
-    }
-    if (upper.startsWith("FS:") || upper.startsWith("FLUID") || upper.startsWith("FLUIDSYNTH")) {
-        return "FS";
+    if (upper.startsWith("ZYN") || upper.startsWith("ZYNADDSUBFX")) {
+        return "ZYN";
     }
     if (upper.contains(":")) {
         const int colon = upper.indexOf(':');
         return upper.left(colon);
     }
-    return "FS";
+    return "ZYN";
 }
 
 QString synthPresetFromName(const QString &name) {
@@ -69,10 +66,7 @@ QString synthPresetFromName(const QString &name) {
 
 QString makeSynthName(const QString &type, const QString &preset) {
     const QString t = type.trimmed().toUpper();
-    if (t == "SERUM") {
-        return QString("SERUM:%1").arg(preset);
-    }
-    return QString("FS:%1").arg(preset);
+    return QString("%1:%2").arg(t, preset);
 }
 
 struct SynthPresetInfo {
@@ -594,12 +588,8 @@ QString PadBank::synthName(int index) const {
         return QString();
     }
     const QString raw = m_synthNames[static_cast<size_t>(index)];
-    const QString type = synthTypeFromName(raw);
-    if (type == "SERUM") {
-        return QString("SERUM");
-    }
     const QString preset = synthPresetFromName(raw);
-    return preset.isEmpty() ? QString("FLUID") : preset;
+    return preset.isEmpty() ? QString("ZYN") : preset;
 }
 
 QString PadBank::synthId(int index) const {
@@ -611,24 +601,23 @@ QString PadBank::synthId(int index) const {
 
 static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name, int sampleRate,
                                                             int baseMidi, const PadBank::SynthParams &params) {
-    const QString type = synthTypeFromName(name);
     const QString preset = synthPresetFromName(name);
-
-#ifdef GROOVEBOX_WITH_FLUIDSYNTH
-    if (type == "FS") {
-        const SynthPresetInfo *presetInfo = findSynthPreset(preset);
-        if (presetInfo) {
-            auto rendered = renderFluidSynth(*presetInfo, sampleRate, baseMidi);
-            if (rendered && rendered->isValid()) {
-                return rendered;
-            }
-        }
-    }
-#endif
 
     const QStringList waves = {"SINE", "SAW", "SQUARE", "TRI", "NOISE"};
     int waveIndex = qBound(0, params.wave, waves.size() - 1);
-    const QString waveName = preset.isEmpty() ? waves[waveIndex] : preset;
+    QString waveName = preset.isEmpty() ? waves[waveIndex] : preset;
+    const QString wavLower = waveName.toLower();
+    if (wavLower.contains("saw")) {
+        waveName = "SAW";
+    } else if (wavLower.contains("square")) {
+        waveName = "SQUARE";
+    } else if (wavLower.contains("tri")) {
+        waveName = "TRI";
+    } else if (wavLower.contains("noise")) {
+        waveName = "NOISE";
+    } else if (wavLower.contains("sine") || wavLower.contains("piano") || wavLower.contains("keys")) {
+        waveName = "SINE";
+    }
 
     const int frames = sampleRate * 2;
     auto buffer = std::make_shared<AudioEngine::Buffer>();
@@ -704,22 +693,16 @@ void PadBank::setSynth(int index, const QString &name) {
     }
     QString synthName = name;
     const QString type = synthTypeFromName(name);
-    if (type == "SERUM" && !name.contains(":")) {
-        synthName = makeSynthName("SERUM", "SAW");
-    } else if (type == "FS" && !name.contains(":")) {
-        synthName = makeSynthName("FS", QString::fromLatin1(kSynthPresets[0].name));
+    if (!name.contains(":")) {
+        synthName = makeSynthName("ZYN", QString::fromLatin1(kSynthPresets[0].name));
     }
 
     m_isSynth[static_cast<size_t>(index)] = true;
     m_synthNames[static_cast<size_t>(index)] = synthName;
     m_paths[static_cast<size_t>(index)].clear();
-    if (synthTypeFromName(synthName) == "FS") {
-        const SynthPresetInfo *preset = findSynthPreset(synthName);
-        if (preset) {
-            m_synthBaseMidi[static_cast<size_t>(index)] = preset->note;
-        } else {
-            m_synthBaseMidi[static_cast<size_t>(index)] = 60;
-        }
+    const SynthPresetInfo *preset = findSynthPreset(synthName);
+    if (preset) {
+        m_synthBaseMidi[static_cast<size_t>(index)] = preset->note;
     } else {
         m_synthBaseMidi[static_cast<size_t>(index)] = 60;
     }
@@ -1855,7 +1838,7 @@ QStringList PadBank::serumWaves() {
 }
 
 QStringList PadBank::synthTypes() {
-    return {"FLUIDSYNTH", "SERUM"};
+    return {"ZYNADDSUBFX"};
 }
 
 bool PadBank::hasFluidSynth() {

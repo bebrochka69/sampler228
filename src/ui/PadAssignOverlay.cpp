@@ -20,7 +20,7 @@ public:
             m_items = PadBank::synthTypes();
         }
         if (m_items.isEmpty()) {
-            m_items << "FLUIDSYNTH" << "SERUM";
+            m_items << "ZYNADDSUBFX";
         }
     }
 
@@ -71,14 +71,9 @@ protected:
         const QPointF pos = event->position();
         for (int i = 0; i < m_rows.size(); ++i) {
             if (m_rows[i].contains(pos) && m_pads) {
-                const QString item = m_items[i].toUpper();
-                if (item.contains("SERUM")) {
-                    m_pads->setSynth(m_activePad, "SERUM:SAW");
-                } else {
-                    const QStringList presets = PadBank::synthPresets();
-                    const QString preset = presets.isEmpty() ? QString("KEYS/PIANO 1") : presets.first();
-                    m_pads->setSynth(m_activePad, QString("FS:%1").arg(preset));
-                }
+                const QStringList presets = PadBank::synthPresets();
+                const QString preset = presets.isEmpty() ? QString("KEYS/PIANO 1") : presets.first();
+                m_pads->setSynth(m_activePad, QString("ZYN:%1").arg(preset));
                 emit synthAssigned();
                 return;
             }
