@@ -8,6 +8,7 @@
 #include <QGuiApplication>
 #include <QMediaPlayer>
 #include <QProcess>
+#include <QRegExp>
 #include <QSoundEffect>
 #include <QStandardPaths>
 #include <QStringList>
