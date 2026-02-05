@@ -117,7 +117,9 @@ static void scanZynPresets() {
     QStringList roots;
 #ifdef Q_OS_LINUX
     roots << "/usr/share/zynaddsubfx/instruments"
-          << "/usr/local/share/zynaddsubfx/instruments";
+          << "/usr/local/share/zynaddsubfx/instruments"
+          << "/usr/share/zynaddsubfx/banks"
+          << "/usr/local/share/zynaddsubfx/banks";
 #endif
     roots << QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../zynaddsubfx-master/instruments");
 
