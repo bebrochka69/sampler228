@@ -138,4 +138,6 @@ private:
     std::array<std::atomic<float>, 8> m_padDecay{};
     std::array<std::atomic<float>, 8> m_padSustain{};
     std::array<std::atomic<float>, 8> m_padRelease{};
+    std::vector<float> m_lastOut;
+    bool m_lastOutValid = false;
 };

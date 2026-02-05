@@ -332,7 +332,15 @@ void AudioEngine::run() {
 }
 
 void AudioEngine::mix(float *out, int frames) {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex, std::try_to_lock);
+    if (!lock.owns_lock()) {
+        if (m_lastOutValid && static_cast<int>(m_lastOut.size()) == frames * m_channels) {
+            std::copy(m_lastOut.begin(), m_lastOut.end(), out);
+        } else {
+            std::fill(out, out + frames * m_channels, 0.0f);
+        }
+        return;
+    }
     for (auto &buffer : m_busBuffers) {
         buffer.assign(frames * m_channels, 0.0f);
     }
@@ -476,6 +484,11 @@ void AudioEngine::mix(float *out, int frames) {
     m_busMeters[0].store(computePeak(master.data(), frames));
 
     std::copy(master.begin(), master.end(), out);
+    if (static_cast<int>(m_lastOut.size()) != frames * m_channels) {
+        m_lastOut.resize(frames * m_channels);
+    }
+    std::copy(master.begin(), master.end(), m_lastOut.begin());
+    m_lastOutValid = true;
 }
 
 float AudioEngine::computeEnv(const float *buffer, int frames) const {
