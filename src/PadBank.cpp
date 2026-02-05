@@ -227,6 +227,16 @@ static bool findZynPort(snd_seq_t *seq, int &clientOut, int &portOut) {
     return false;
 }
 
+static void ensureAlsaSequencerLoaded() {
+#ifdef Q_OS_LINUX
+    QProcess proc;
+    proc.start("modprobe", QStringList() << "snd_seq");
+    proc.waitForFinished(2000);
+    proc.start("modprobe", QStringList() << "snd_seq_midi");
+    proc.waitForFinished(2000);
+#endif
+}
+
 static QString detectHeadphoneCard() {
 #ifdef Q_OS_LINUX
     QFile file("/proc/asound/cards");
@@ -311,7 +321,10 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
 
     if (!g_zynEngine.seq) {
         if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
-            return false;
+            ensureAlsaSequencerLoaded();
+            if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
+                return false;
+            }
         }
         snd_seq_set_client_name(g_zynEngine.seq, "GrooveBox");
         g_zynEngine.outPort = snd_seq_create_simple_port(
@@ -1716,17 +1729,16 @@ void PadBank::triggerPad(int index) {
         const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
         const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
         const QString presetPath = zynPathForPreset(presetName);
-        if (!ensureZynRunning(presetName, presetPath, m_engineRate)) {
+        if (ensureZynRunning(presetName, presetPath, m_engineRate)) {
+            const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
+            const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+            sendZynNote(baseMidi, velocity, true);
+            const int lengthMs =
+                qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
+            QTimer::singleShot(lengthMs, this, [baseMidi]() { sendZynNote(baseMidi, 0, false); });
             return;
         }
-        const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
-        const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-        sendZynNote(baseMidi, velocity, true);
-        const int lengthMs =
-            qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
-        QTimer::singleShot(lengthMs, this, [baseMidi]() { sendZynNote(baseMidi, 0, false); });
 #endif
-        return;
     }
 
     const double pitchRate = pitchToRate(params.pitch);
@@ -1951,19 +1963,18 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
 #ifdef GROOVEBOX_WITH_ALSA
         const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
         const QString presetPath = zynPathForPreset(presetName);
-        if (!ensureZynRunning(presetName, presetPath, m_engineRate)) {
+        if (ensureZynRunning(presetName, presetPath, m_engineRate)) {
+            PadParams &params = m_params[static_cast<size_t>(index)];
+            const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+            sendZynNote(midiNote, velocity, true);
+            const int bpm = m_bpm;
+            const int stepMs = 60000 / qMax(1, bpm) / 4;
+            const int steps = qMax(1, lengthSteps);
+            const int lengthMs = qBound(60, steps * stepMs, 4000);
+            QTimer::singleShot(lengthMs, this, [midiNote]() { sendZynNote(midiNote, 0, false); });
             return;
         }
-        PadParams &params = m_params[static_cast<size_t>(index)];
-        const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-        sendZynNote(midiNote, velocity, true);
-        const int bpm = m_bpm;
-        const int stepMs = 60000 / qMax(1, bpm) / 4;
-        const int steps = qMax(1, lengthSteps);
-        const int lengthMs = qBound(60, steps * stepMs, 4000);
-        QTimer::singleShot(lengthMs, this, [midiNote]() { sendZynNote(midiNote, 0, false); });
 #endif
-        return;
     }
     if (!rt->useEngine || !m_engineAvailable || !m_engine) {
         return;
