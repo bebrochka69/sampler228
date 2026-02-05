@@ -45,4 +45,7 @@ private:
     QStringList m_fluidPresets;
     QVector<PresetRow> m_presetRows;
     QVector<QRectF> m_adsrRects;
+    QStringList m_categories;
+    QVector<QRectF> m_categoryRects;
+    int m_selectedCategory = 0;
 };

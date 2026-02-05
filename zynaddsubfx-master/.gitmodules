@@ -1,0 +1,9 @@
+[submodule "instruments"]
+	path = instruments
+	url = https://github.com/zynaddsubfx/instruments
+[submodule "rtosc"]
+	path = rtosc
+	url = https://github.com/fundamental/rtosc
+[submodule "DPF"]
+	path = DPF
+	url = https://github.com/DISTRHO/DPF

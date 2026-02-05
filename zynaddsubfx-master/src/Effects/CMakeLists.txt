@@ -1,0 +1,17 @@
+set(zynaddsubfx_effect_SRCS
+    Effects/Alienwah.cpp
+	Effects/Chorus.cpp
+	Effects/Distortion.cpp
+	Effects/CombFilterBank.cpp
+	Effects/DynamicFilter.cpp
+	Effects/Echo.cpp
+	Effects/Effect.cpp
+	Effects/EffectLFO.cpp
+	Effects/EffectMgr.cpp
+	Effects/EQ.cpp
+	Effects/Phaser.cpp
+	Effects/Reverb.cpp
+	Effects/Sympathetic.cpp
+	Effects/Reverse.cpp
+    PARENT_SCOPE
+)

@@ -45,6 +45,18 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
     if (m_pads) {
         m_fluidPresets = PadBank::synthPresets();
     }
+    if (m_fluidPresets.isEmpty()) {
+        m_fluidPresets << "KEYS/PIANO 1" << "KEYS/PIANO 2" << "LEADS/SAW" << "BASS/FINGER"
+                       << "PADS/WARM";
+    }
+    m_categories.clear();
+    for (const QString &item : m_fluidPresets) {
+        const QStringList parts = item.split('/');
+        const QString group = parts.value(0, "MISC").toUpper();
+        if (!m_categories.contains(group)) {
+            m_categories << group;
+        }
+    }
 
     if (m_pads) {
         m_activePad = m_pads->activePad();
@@ -73,6 +85,14 @@ void SynthPageWidget::keyPressEvent(QKeyEvent *event) {
 void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
+
+    for (int i = 0; i < m_categoryRects.size(); ++i) {
+        if (m_categoryRects[i].contains(pos)) {
+            m_selectedCategory = i;
+            update();
+            return;
+        }
+    }
 
     for (const PresetRow &row : m_presetRows) {
         if (!row.header && row.rect.contains(pos) && m_pads) {
@@ -149,7 +169,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
 
     const float gap = Theme::pxF(14.0f);
     QRectF left(panel.left() + Theme::px(12), header.bottom() + Theme::px(10),
-                panel.width() * 0.42f, panel.height() - header.height() - Theme::px(20));
+                panel.width() * 0.32f, panel.height() - header.height() - Theme::px(20));
     QRectF right(left.right() + gap, left.top(), panel.right() - left.right() - Theme::px(16),
                  left.height());
 
@@ -208,52 +228,63 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         p.drawText(rRect.adjusted(0, Theme::px(4), 0, 0), Qt::AlignTop | Qt::AlignHCenter, labels[i]);
     }
 
-    // Preset list with categories (Zyn)
+    // Left categories
     p.setBrush(QColor(24, 24, 30));
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.drawRoundedRect(left, Theme::px(10), Theme::px(10));
 
+    m_categoryRects.clear();
+    const float catRowH = Theme::pxF(34.0f);
+    float cy = left.top() + Theme::px(10);
+    for (int i = 0; i < m_categories.size(); ++i) {
+        QRectF r(left.left() + Theme::px(10), cy,
+                 left.width() - Theme::px(20), catRowH - Theme::px(4));
+        m_categoryRects.push_back(r);
+        const bool active = (i == m_selectedCategory);
+        p.setBrush(active ? Theme::accentAlt() : Theme::bg2());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+        p.setPen(active ? Theme::bg0() : Theme::text());
+        p.setFont(Theme::baseFont(11, QFont::DemiBold));
+        p.drawText(r, Qt::AlignCenter, m_categories[i]);
+        cy += catRowH;
+    }
+
+    // Right presets filtered by category
+    p.setBrush(QColor(24, 24, 30));
+    p.setPen(QPen(Theme::stroke(), 1.0));
+    p.drawRoundedRect(right, Theme::px(10), Theme::px(10));
+
+    const QString activeCat =
+        m_categories.isEmpty() ? QString("MISC")
+                               : m_categories[qBound(0, m_selectedCategory, m_categories.size() - 1)];
     const float rowH = Theme::pxF(30.0f);
-    float y = left.top() + Theme::px(8);
+    float y = right.top() + Theme::px(8);
     m_presetRows.clear();
-    QString currentGroup;
     for (const QString &item : m_fluidPresets) {
         const QStringList parts = item.split('/');
         const QString group = parts.value(0, "MISC").toUpper();
-        if (group != currentGroup) {
-            PresetRow headerRow;
-            headerRow.header = true;
-            headerRow.label = group;
-            headerRow.rect = QRectF(left.left() + Theme::px(8), y,
-                                    left.width() - Theme::px(16), rowH);
-            m_presetRows.push_back(headerRow);
-            y += rowH;
-            currentGroup = group;
+        if (group != activeCat) {
+            continue;
         }
         PresetRow row;
         row.header = false;
         row.label = parts.size() > 1 ? parts[1] : item;
         row.presetId = item;
-        row.rect = QRectF(left.left() + Theme::px(12), y,
-                          left.width() - Theme::px(20), rowH - Theme::px(4));
+        row.rect = QRectF(right.left() + Theme::px(12), y,
+                          right.width() - Theme::px(20), rowH - Theme::px(4));
         m_presetRows.push_back(row);
         y += rowH - Theme::px(2);
     }
 
     for (const PresetRow &row : m_presetRows) {
-        if (row.header) {
-            p.setPen(Theme::textMuted());
-            p.setFont(Theme::condensedFont(11, QFont::Bold));
-            p.drawText(row.rect, Qt::AlignLeft | Qt::AlignVCenter, row.label);
-        } else {
-            const bool active = preset.toUpper() == row.presetId.toUpper();
-            p.setBrush(active ? Theme::accentAlt() : Theme::bg2());
-            p.setPen(QPen(Theme::stroke(), 1.0));
-            p.drawRoundedRect(row.rect, Theme::px(6), Theme::px(6));
-            p.setPen(active ? Theme::bg0() : Theme::text());
-            p.setFont(Theme::baseFont(10, QFont::DemiBold));
-            p.drawText(row.rect.adjusted(Theme::px(8), 0, -Theme::px(4), 0),
-                       Qt::AlignLeft | Qt::AlignVCenter, row.label);
-        }
+        const bool active = preset.toUpper() == row.presetId.toUpper();
+        p.setBrush(active ? Theme::accentAlt() : Theme::bg2());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRoundedRect(row.rect, Theme::px(6), Theme::px(6));
+        p.setPen(active ? Theme::bg0() : Theme::text());
+        p.setFont(Theme::baseFont(10, QFont::DemiBold));
+        p.drawText(row.rect.adjusted(Theme::px(8), 0, -Theme::px(4), 0),
+                   Qt::AlignLeft | Qt::AlignVCenter, row.label);
     }
 }
