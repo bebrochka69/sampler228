@@ -52,6 +52,13 @@ AudioEngine::AudioEngine(QObject *parent) : QObject(parent) {
     }
     start();
 #endif
+
+    for (size_t i = 0; i < m_padAttack.size(); ++i) {
+        m_padAttack[i].store(0.0f);
+        m_padDecay[i].store(0.0f);
+        m_padSustain[i].store(1.0f);
+        m_padRelease[i].store(0.0f);
+    }
 }
 
 AudioEngine::~AudioEngine() {
@@ -199,6 +206,9 @@ void AudioEngine::trigger(int padId, const std::shared_ptr<Buffer> &buffer, int 
     voice.gainL = gainL;
     voice.gainR = gainR;
     voice.rate = rate;
+    voice.env = 0.0f;
+    voice.envStage = EnvStage::Attack;
+    voice.releaseRequested = false;
     m_voices.push_back(std::move(voice));
 }
 
@@ -207,9 +217,12 @@ void AudioEngine::stopPad(int padId) {
         return;
     }
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_voices.erase(std::remove_if(m_voices.begin(), m_voices.end(),
-                                  [padId](const Voice &voice) { return voice.padId == padId; }),
-                   m_voices.end());
+    for (Voice &voice : m_voices) {
+        if (voice.padId == padId) {
+            voice.releaseRequested = true;
+            voice.loop = false;
+        }
+    }
 }
 
 void AudioEngine::stopAll() {
@@ -267,6 +280,16 @@ void AudioEngine::setBusGain(int bus, float gain) {
         return;
     }
     m_busGains[static_cast<size_t>(bus)].store(qBound(0.0f, gain, 1.2f));
+}
+
+void AudioEngine::setPadAdsr(int padId, float attack, float decay, float sustain, float release) {
+    if (padId < 0 || padId >= static_cast<int>(m_padAttack.size())) {
+        return;
+    }
+    m_padAttack[static_cast<size_t>(padId)].store(qBound(0.0f, attack, 1.0f));
+    m_padDecay[static_cast<size_t>(padId)].store(qBound(0.0f, decay, 1.0f));
+    m_padSustain[static_cast<size_t>(padId)].store(qBound(0.0f, sustain, 1.0f));
+    m_padRelease[static_cast<size_t>(padId)].store(qBound(0.0f, release, 1.0f));
 }
 
 void AudioEngine::run() {
@@ -327,10 +350,28 @@ void AudioEngine::mix(float *out, int frames) {
 
         double pos = voice.position;
         bool done = false;
+        const int padIndex = qBound(0, voice.padId, static_cast<int>(m_padAttack.size()) - 1);
+        const float attack = m_padAttack[static_cast<size_t>(padIndex)].load();
+        const float decay = m_padDecay[static_cast<size_t>(padIndex)].load();
+        const float sustain = m_padSustain[static_cast<size_t>(padIndex)].load();
+        const float release = m_padRelease[static_cast<size_t>(padIndex)].load();
+
+        const float attackSec = 0.005f + attack * 1.2f;
+        const float decaySec = 0.01f + decay * 1.2f;
+        const float releaseSec = 0.02f + release * 1.6f;
+        const float attackStep = attackSec > 0.0f ? 1.0f / (attackSec * m_sampleRate) : 1.0f;
+        const float decayStep =
+            decaySec > 0.0f ? (1.0f - sustain) / (decaySec * m_sampleRate) : 1.0f;
+        const float releaseStep =
+            releaseSec > 0.0f ? 1.0f / (releaseSec * m_sampleRate) : 1.0f;
+
         const int busIndex =
             std::max(0, std::min(static_cast<int>(m_busBuffers.size() - 1), voice.bus));
         float *busOut = m_busBuffers[static_cast<size_t>(busIndex)].data();
         for (int i = 0; i < frames; ++i) {
+            if (voice.releaseRequested && voice.envStage != EnvStage::Release) {
+                voice.envStage = EnvStage::Release;
+            }
             if (pos >= voice.endFrame) {
                 if (voice.loop) {
                     pos = static_cast<double>(voice.startFrame);
@@ -359,8 +400,36 @@ void AudioEngine::mix(float *out, int frames) {
                                : leftB;
             float left = leftA + static_cast<float>((leftB - leftA) * frac);
             float right = rightA + static_cast<float>((rightB - rightA) * frac);
-            busOut[i * m_channels] += left * voice.gainL;
-            busOut[i * m_channels + 1] += right * voice.gainR;
+            float env = voice.env;
+            switch (voice.envStage) {
+                case EnvStage::Attack:
+                    env += attackStep;
+                    if (env >= 1.0f) {
+                        env = 1.0f;
+                        voice.envStage = EnvStage::Decay;
+                    }
+                    break;
+                case EnvStage::Decay:
+                    env -= decayStep;
+                    if (env <= sustain || decaySec <= 0.0f) {
+                        env = sustain;
+                        voice.envStage = EnvStage::Sustain;
+                    }
+                    break;
+                case EnvStage::Sustain:
+                    env = sustain;
+                    break;
+                case EnvStage::Release:
+                    env -= releaseStep * std::max(0.1f, env);
+                    if (env <= 0.0005f || releaseSec <= 0.0f) {
+                        env = 0.0f;
+                        done = true;
+                    }
+                    break;
+            }
+            voice.env = env;
+            busOut[i * m_channels] += left * voice.gainL * env;
+            busOut[i * m_channels + 1] += right * voice.gainR * env;
             pos += voice.rate;
         }
 

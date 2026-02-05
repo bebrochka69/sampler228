@@ -48,11 +48,20 @@ public:
     void stopAll();
     bool isPadActive(int padId) const;
 
+    void setPadAdsr(int padId, float attack, float decay, float sustain, float release);
+
     void setBusEffects(int bus, const std::vector<EffectSettings> &effects);
     float busMeter(int bus) const;
     void setBusGain(int bus, float gain);
 
 private:
+    enum class EnvStage {
+        Attack,
+        Decay,
+        Sustain,
+        Release
+    };
+
     struct Voice {
         int padId = -1;
         int bus = 0;
@@ -64,6 +73,9 @@ private:
         float gainL = 1.0f;
         float gainR = 1.0f;
         float rate = 1.0f;
+        float env = 0.0f;
+        EnvStage envStage = EnvStage::Attack;
+        bool releaseRequested = false;
     };
 
     struct EffectState {
@@ -121,4 +133,9 @@ private:
     std::array<std::atomic<float>, 6> m_busMeters{};
     std::array<std::atomic<float>, 6> m_busGains{};
     void *m_pcmHandle = nullptr;
+
+    std::array<std::atomic<float>, 8> m_padAttack{};
+    std::array<std::atomic<float>, 8> m_padDecay{};
+    std::array<std::atomic<float>, 8> m_padSustain{};
+    std::array<std::atomic<float>, 8> m_padRelease{};
 };

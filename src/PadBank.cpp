@@ -440,6 +440,9 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
                         }
                     });
         }
+        if (m_engineAvailable && m_engine) {
+            m_engine->setPadAdsr(i, 0.0f, 0.0f, 1.0f, 0.0f);
+        }
     }
 }
 
@@ -518,6 +521,9 @@ void PadBank::setPadPath(int index, const QString &path) {
         }
     }
     scheduleRawRender(index);
+    if (m_engineAvailable && m_engine) {
+        m_engine->setPadAdsr(index, 0.0f, 0.0f, 1.0f, 0.0f);
+    }
     emit padChanged(index);
     emit padParamsChanged(index);
 }
@@ -603,52 +609,6 @@ QString PadBank::synthId(int index) const {
     return m_synthNames[static_cast<size_t>(index)];
 }
 
-static void applyAdsr(AudioEngine::Buffer &buffer, float attack, float decay, float sustain, float release) {
-    const int totalFrames = buffer.frames();
-    if (totalFrames <= 0) {
-        return;
-    }
-    attack = qBound(0.0f, attack, 1.0f);
-    decay = qBound(0.0f, decay, 1.0f);
-    sustain = qBound(0.0f, sustain, 1.0f);
-    release = qBound(0.0f, release, 1.0f);
-
-    const float attackSec = 0.005f + attack * 1.2f;
-    const float decaySec = 0.01f + decay * 1.2f;
-    const float releaseSec = 0.02f + release * 1.6f;
-    int aFrames = qMax(1, static_cast<int>(attackSec * buffer.sampleRate));
-    int dFrames = qMax(1, static_cast<int>(decaySec * buffer.sampleRate));
-    int rFrames = qMax(1, static_cast<int>(releaseSec * buffer.sampleRate));
-    if (aFrames + dFrames + rFrames >= totalFrames) {
-        const float scale = static_cast<float>(totalFrames) /
-                            static_cast<float>(aFrames + dFrames + rFrames + 1);
-        aFrames = qMax(1, static_cast<int>(aFrames * scale));
-        dFrames = qMax(1, static_cast<int>(dFrames * scale));
-        rFrames = qMax(1, static_cast<int>(rFrames * scale));
-    }
-    const int sustainStart = aFrames + dFrames;
-    const int sustainEnd = qMax(sustainStart, totalFrames - rFrames);
-
-    for (int i = 0; i < totalFrames; ++i) {
-        float env = 1.0f;
-        if (i < aFrames) {
-            env = static_cast<float>(i) / static_cast<float>(aFrames);
-        } else if (i < sustainStart) {
-            const float t = static_cast<float>(i - aFrames) / static_cast<float>(dFrames);
-            env = 1.0f + (sustain - 1.0f) * t;
-        } else if (i < sustainEnd) {
-            env = sustain;
-        } else {
-            const float t = static_cast<float>(i - sustainEnd) / static_cast<float>(rFrames);
-            env = sustain * (1.0f - qBound(0.0f, t, 1.0f));
-        }
-        const int idx = i * buffer.channels;
-        for (int ch = 0; ch < buffer.channels; ++ch) {
-            buffer.samples[idx + ch] *= env;
-        }
-    }
-}
-
 static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name, int sampleRate,
                                                             int baseMidi, const PadBank::SynthParams &params) {
     const QString type = synthTypeFromName(name);
@@ -660,7 +620,6 @@ static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name
         if (presetInfo) {
             auto rendered = renderFluidSynth(*presetInfo, sampleRate, baseMidi);
             if (rendered && rendered->isValid()) {
-                applyAdsr(*rendered, params.attack, params.decay, params.sustain, params.release);
                 return rendered;
             }
         }
@@ -717,7 +676,6 @@ static std::shared_ptr<AudioEngine::Buffer> buildSynthBuffer(const QString &name
         buffer->samples[i * 2 + 1] = v;
     }
 
-    applyAdsr(*buffer, params.attack, params.decay, params.sustain, params.release);
     return buffer;
 }
 
@@ -772,6 +730,10 @@ void PadBank::setSynth(int index, const QString &name) {
                             m_synthBaseMidi[static_cast<size_t>(index)],
                             m_synthParams[static_cast<size_t>(index)]);
         rt->normalizeGain = 1.0f;
+    }
+    if (m_engineAvailable && m_engine) {
+        const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+        m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
     }
     emit padChanged(index);
     emit padParamsChanged(index);
@@ -930,10 +892,8 @@ void PadBank::setSynthAdsr(int index, float attack, float decay, float sustain, 
     sp.decay = clamp01(decay);
     sp.sustain = clamp01(sustain);
     sp.release = clamp01(release);
-    if (isSynth(index)) {
-        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
-        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
-                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+    if (m_engineAvailable && m_engine) {
+        m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
     }
     emit padParamsChanged(index);
 }
