@@ -522,6 +522,36 @@ void PadBank::setPadPath(int index, const QString &path) {
     emit padParamsChanged(index);
 }
 
+void PadBank::copyPad(int from, int to) {
+    if (from < 0 || from >= padCount() || to < 0 || to >= padCount() || from == to) {
+        return;
+    }
+    const PadParams srcParams = m_params[static_cast<size_t>(from)];
+    if (isSynth(from)) {
+        const QString synthId = m_synthNames[static_cast<size_t>(from)];
+        setSynth(to, synthId);
+        m_synthParams[static_cast<size_t>(to)] = m_synthParams[static_cast<size_t>(from)];
+        m_synthBaseMidi[static_cast<size_t>(to)] = m_synthBaseMidi[static_cast<size_t>(from)];
+        m_params[static_cast<size_t>(to)] = srcParams;
+        if (PadRuntime *rt = m_runtime[static_cast<size_t>(to)]) {
+            rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(to)], m_engineRate,
+                                m_synthBaseMidi[static_cast<size_t>(to)],
+                                m_synthParams[static_cast<size_t>(to)]);
+        }
+    } else {
+        const QString path = m_paths[static_cast<size_t>(from)];
+        setPadPath(to, path);
+        m_params[static_cast<size_t>(to)] = srcParams;
+        if (needsProcessing(srcParams)) {
+            scheduleProcessedRender(to);
+        } else {
+            scheduleRawRender(to);
+        }
+    }
+    emit padChanged(to);
+    emit padParamsChanged(to);
+}
+
 QString PadBank::padPath(int index) const {
     if (index < 0 || index >= padCount()) {
         return QString();

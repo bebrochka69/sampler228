@@ -19,6 +19,7 @@ public:
     void setActivePad(int index);
 
     void setPadPath(int index, const QString &path);
+    void copyPad(int from, int to);
     QString padPath(int index) const;
     QString padName(int index) const;
     bool isLoaded(int index) const;

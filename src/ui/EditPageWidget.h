@@ -46,6 +46,8 @@ private:
     QHash<int, QPixmap> m_iconCache;
     QRectF m_fxBusRect;
     QRectF m_normalizeRect;
+    QRectF m_deleteRect;
+    QRectF m_copyRect;
     QVector<QRectF> m_paramRects;
 
     void syncWaveSource();

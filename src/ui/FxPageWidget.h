@@ -90,5 +90,6 @@ private:
     QSize m_compGraphCacheSize;
     QRectF m_makeupRect;
     QRectF m_closeRect;
+    QRectF m_synthBusRect;
     int m_dragFaderTrack = -1;
 };

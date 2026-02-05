@@ -367,6 +367,15 @@ void EditPageWidget::mousePressEvent(QMouseEvent *event) {
         return;
     }
 
+    if (m_copyRect.contains(pos) && m_pads) {
+        const int from = m_pads->activePad();
+        const int to = (from + 1) % m_pads->padCount();
+        m_pads->copyPad(from, to);
+        m_pads->setActivePad(to);
+        update();
+        return;
+    }
+
     for (int i = 0; i < m_paramRects.size(); ++i) {
         if (m_paramRects[i].contains(pos)) {
             m_selectedParam = i;
@@ -389,9 +398,10 @@ void EditPageWidget::syncWaveSource() {
     if (padPath.isEmpty()) {
         return;
     }
-    if (padPath != m_session->sourcePath() ||
-        m_session->decodeMode() != SampleSession::DecodeMode::Full) {
-        m_session->setSource(padPath, SampleSession::DecodeMode::Full);
+    const SampleSession::DecodeMode mode =
+        Theme::liteMode() ? SampleSession::DecodeMode::Fast : SampleSession::DecodeMode::Full;
+    if (padPath != m_session->sourcePath() || m_session->decodeMode() != mode) {
+        m_session->setSource(padPath, mode);
     }
 }
 
@@ -586,6 +596,8 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
                             buttonsRect.width() * 0.45f, Theme::px(40));
     const QRectF copyRect(buttonsRect.right() - buttonsRect.width() * 0.45f,
                           buttonsRect.top(), buttonsRect.width() * 0.45f, Theme::px(40));
+    m_deleteRect = deleteRect;
+    m_copyRect = copyRect;
 
     p.setFont(Theme::condensedFont(12, QFont::DemiBold));
 

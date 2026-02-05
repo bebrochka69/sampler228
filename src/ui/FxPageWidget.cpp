@@ -316,6 +316,16 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
     setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
 
+    if (m_synthBusRect.contains(pos) && m_pads) {
+        const int pad = m_pads->activePad();
+        if (m_pads->isSynth(pad)) {
+            const int nextBus = (m_pads->fxBus(pad) + 1) % 6;
+            m_pads->setFxBus(pad, nextBus);
+            update();
+            return;
+        }
+    }
+
     if (m_showEditor && m_closeRect.contains(pos)) {
         m_showEditor = false;
         update();
@@ -914,10 +924,28 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
     p.setFont(Theme::condensedFont(12, QFont::Bold));
     p.setPen(Theme::accent());
     p.drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, "FX / MIXER");
-    p.setPen(Theme::textMuted());
-    p.setFont(Theme::baseFont(9));
-    p.drawText(headerRect, Qt::AlignRight | Qt::AlignVCenter,
-               "Enter = plugin menu  |  Ctrl+Up/Down = reorder  Del = clear");
+    m_synthBusRect = QRectF();
+    if (m_pads && m_pads->isSynth(m_pads->activePad())) {
+        const int pad = m_pads->activePad();
+        const int bus = m_pads->fxBus(pad);
+        const QString label = QString("SYNTH PAD %1 BUS: %2")
+                                  .arg(pad + 1)
+                                  .arg(PadBank::fxBusLabel(bus));
+        const float w = Theme::pxF(200.0f);
+        m_synthBusRect = QRectF(headerRect.right() - w, headerRect.top(),
+                                w, headerRect.height());
+        p.setBrush(Theme::bg1());
+        p.setPen(QPen(Theme::accentAlt(), 1.1));
+        p.drawRoundedRect(m_synthBusRect, Theme::px(6), Theme::px(6));
+        p.setPen(Theme::accentAlt());
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.drawText(m_synthBusRect, Qt::AlignCenter, label);
+    } else {
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(9));
+        p.drawText(headerRect, Qt::AlignRight | Qt::AlignVCenter,
+                   "Enter = plugin menu  |  Ctrl+Up/Down = reorder  Del = clear");
+    }
 
     const QRectF stripsRect(margin, headerRect.bottom() + Theme::px(8),
                             width() - 2 * margin,
