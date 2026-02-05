@@ -254,6 +254,24 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     if (!presetPath.isEmpty()) {
         args << "-L" << presetPath;
     }
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString device = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
+    if (!device.isEmpty()) {
+        QString dev = device.trimmed();
+        if (dev.startsWith("hw:")) {
+            dev = dev.mid(3);
+        }
+        const QStringList parts = dev.split(',', Qt::SkipEmptyParts);
+        if (!parts.isEmpty()) {
+            const QString card = parts.value(0);
+            const QString sub = parts.value(1, "0");
+            env.insert("ALSA_CARD", card);
+            env.insert("ALSA_CTL_CARD", card);
+            env.insert("ALSA_PCM_CARD", card);
+            env.insert("ALSA_PCM_DEVICE", sub);
+        }
+    }
+    g_zynEngine.proc->setProcessEnvironment(env);
     g_zynEngine.proc->start(exe, args);
     if (!g_zynEngine.proc->waitForStarted(3000)) {
         return false;
@@ -1189,6 +1207,9 @@ bool PadBank::isPadReady(int index) const {
         return true;
     }
     if (isSynth(index)) {
+        if (synthTypeFromName(m_synthNames[static_cast<size_t>(index)]) == "ZYN") {
+            return true;
+        }
         return rt->rawBuffer && rt->rawBuffer->isValid();
     }
     if (padPath(index).isEmpty()) {
