@@ -9,6 +9,7 @@
 #include <QMediaPlayer>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QFile>
 #include <QSoundEffect>
 #include <QStandardPaths>
 #include <QStringList>
@@ -208,7 +209,7 @@ static bool findZynPort(snd_seq_t *seq, int &clientOut, int &portOut) {
             continue;
         }
         QString qname = QString::fromLocal8Bit(name).toUpper();
-        if (!qname.contains("ZYNADDSUBFX")) {
+        if (!qname.contains("ZYN")) {
             continue;
         }
         snd_seq_port_info_set_client(pinfo, client);
@@ -226,6 +227,28 @@ static bool findZynPort(snd_seq_t *seq, int &clientOut, int &portOut) {
     return false;
 }
 
+static QString detectHeadphoneCard() {
+#ifdef Q_OS_LINUX
+    QFile file("/proc/asound/cards");
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return QString();
+    }
+    while (!file.atEnd()) {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty()) {
+            continue;
+        }
+        if (line.contains("Headphones", Qt::CaseInsensitive)) {
+            const QString index = line.section(' ', 0, 0).trimmed();
+            if (!index.isEmpty() && index[0].isDigit()) {
+                return index;
+            }
+        }
+    }
+#endif
+    return QString();
+}
+
 static bool ensureZynRunning(const QString &presetName, const QString &presetPath, int sampleRate) {
     if (!g_zynEngine.proc) {
         g_zynEngine.proc = new QProcess();
@@ -241,9 +264,6 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     }
 
     QString exe = QStandardPaths::findExecutable("zynaddsubfx");
-    if (exe.isEmpty()) {
-        return false;
-    }
 
     QStringList args;
     args << "--no-gui" << "-I" << "alsa" << "-O" << "alsa";
@@ -255,7 +275,13 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         args << "-L" << presetPath;
     }
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString device = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
+    QString device = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
+    if (device.isEmpty()) {
+        const QString card = detectHeadphoneCard();
+        if (!card.isEmpty()) {
+            device = QString("hw:%1,0").arg(card);
+        }
+    }
     if (!device.isEmpty()) {
         QString dev = device.trimmed();
         if (dev.startsWith("hw:")) {
@@ -272,9 +298,12 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         }
     }
     g_zynEngine.proc->setProcessEnvironment(env);
-    g_zynEngine.proc->start(exe, args);
-    if (!g_zynEngine.proc->waitForStarted(3000)) {
-        return false;
+    if (!exe.isEmpty()) {
+        g_zynEngine.proc->start(exe, args);
+        if (!g_zynEngine.proc->waitForStarted(3000)) {
+            g_zynEngine.proc->kill();
+            g_zynEngine.proc->waitForFinished(1000);
+        }
     }
 
     g_zynEngine.presetPath = presetPath;
@@ -293,7 +322,7 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
 
     g_zynEngine.destClient = -1;
     g_zynEngine.destPort = -1;
-    for (int i = 0; i < 25; ++i) {
+    for (int i = 0; i < 35; ++i) {
         if (findZynPort(g_zynEngine.seq, g_zynEngine.destClient, g_zynEngine.destPort)) {
             break;
         }
@@ -303,7 +332,7 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         snd_seq_connect_to(g_zynEngine.seq, g_zynEngine.outPort,
                            g_zynEngine.destClient, g_zynEngine.destPort);
     }
-    return true;
+    return g_zynEngine.destClient >= 0 && g_zynEngine.destPort >= 0;
 }
 
 static void sendZynNote(int note, int vel, bool on) {
