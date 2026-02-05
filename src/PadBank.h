@@ -100,6 +100,7 @@ public:
     static QStringList serumWaves();
     static QStringList synthTypes();
     static bool hasFluidSynth();
+    static bool hasZyn();
     void setBusEffects(int bus, const QVector<BusEffect> &effects);
     float busMeter(int bus) const;
     float busGain(int bus) const;

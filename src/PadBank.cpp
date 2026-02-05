@@ -3,6 +3,7 @@
 #include "AudioEngine.h"
 
 #include <QAudioOutput>
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QMediaPlayer>
@@ -10,16 +11,22 @@
 #include <QSoundEffect>
 #include <QStandardPaths>
 #include <QStringList>
+#include <QThread>
 #include <QTimer>
 #include <QUrl>
 #include <QtGlobal>
 #include <QtMath>
+#include <QDirIterator>
 #include <cmath>
 #include <cstdint>
 #include <mutex>
 
 #ifdef GROOVEBOX_WITH_FLUIDSYNTH
 #include <fluidsynth.h>
+#endif
+
+#ifdef GROOVEBOX_WITH_ALSA
+#include <alsa/asoundlib.h>
 #endif
 
 namespace {
@@ -91,6 +98,211 @@ constexpr SynthPresetInfo kSynthPresets[] = {
 float clamp01(float value) {
     return qBound(0.0f, value, 1.0f);
 }
+
+struct ZynPreset {
+    QString display;
+    QString category;
+    QString path;
+};
+
+static QVector<ZynPreset> g_zynPresets;
+static bool g_zynScanned = false;
+
+static void scanZynPresets() {
+    if (g_zynScanned) {
+        return;
+    }
+    g_zynScanned = true;
+    QStringList roots;
+#ifdef Q_OS_LINUX
+    roots << "/usr/share/zynaddsubfx/instruments"
+          << "/usr/local/share/zynaddsubfx/instruments";
+#endif
+    roots << QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../zynaddsubfx-master/instruments");
+
+    QStringList found;
+    for (const QString &root : roots) {
+        if (!QFileInfo::exists(root)) {
+            continue;
+        }
+        QDirIterator it(root, QStringList() << "*.xiz", QDir::Files, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            found << it.next();
+        }
+    }
+
+    for (const QString &path : found) {
+        QString rel = path;
+        for (const QString &root : roots) {
+            if (path.startsWith(root)) {
+                rel = path.mid(root.length());
+                if (rel.startsWith('/') || rel.startsWith('\\')) {
+                    rel.remove(0, 1);
+                }
+                break;
+            }
+        }
+        QStringList parts = rel.split(QRegExp("[/\\\\]"), Qt::SkipEmptyParts);
+        QString category = parts.isEmpty() ? QString("MISC") : parts.first().toUpper();
+        QString name = parts.isEmpty() ? QFileInfo(path).baseName()
+                                       : QFileInfo(parts.last()).completeBaseName();
+        ZynPreset preset;
+        preset.category = category;
+        preset.display = category + "/" + name.toUpper();
+        preset.path = path;
+        g_zynPresets.push_back(preset);
+    }
+
+    if (g_zynPresets.isEmpty()) {
+        // Fallback list if no preset files are found
+        QStringList fallback = {"KEYS/PIANO 1", "KEYS/PIANO 2", "LEADS/SAW",
+                                "BASS/FINGER", "PADS/WARM"};
+        for (const QString &name : fallback) {
+            ZynPreset preset;
+            preset.category = name.split('/').value(0, "MISC").toUpper();
+            preset.display = name.toUpper();
+            preset.path = QString();
+            g_zynPresets.push_back(preset);
+        }
+    }
+}
+
+static QString zynPathForPreset(const QString &display) {
+    scanZynPresets();
+    const QString key = display.trimmed().toUpper();
+    for (const auto &preset : g_zynPresets) {
+        if (preset.display.toUpper() == key) {
+            return preset.path;
+        }
+    }
+    return QString();
+}
+
+#ifdef GROOVEBOX_WITH_ALSA
+struct ZynEngine {
+    QProcess *proc = nullptr;
+    QString presetPath;
+    QString presetName;
+    snd_seq_t *seq = nullptr;
+    int outPort = -1;
+    int destClient = -1;
+    int destPort = -1;
+};
+
+static ZynEngine g_zynEngine;
+
+static bool findZynPort(snd_seq_t *seq, int &clientOut, int &portOut) {
+    snd_seq_client_info_t *cinfo;
+    snd_seq_port_info_t *pinfo;
+    snd_seq_client_info_alloca(&cinfo);
+    snd_seq_port_info_alloca(&pinfo);
+
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        const int client = snd_seq_client_info_get_client(cinfo);
+        const char *name = snd_seq_client_info_get_name(cinfo);
+        if (!name) {
+            continue;
+        }
+        QString qname = QString::fromLocal8Bit(name).toUpper();
+        if (!qname.contains("ZYNADDSUBFX")) {
+            continue;
+        }
+        snd_seq_port_info_set_client(pinfo, client);
+        snd_seq_port_info_set_port(pinfo, -1);
+        while (snd_seq_query_next_port(seq, pinfo) >= 0) {
+            const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if (!(caps & SND_SEQ_PORT_CAP_WRITE) || !(caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
+                continue;
+            }
+            clientOut = client;
+            portOut = snd_seq_port_info_get_port(pinfo);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool ensureZynRunning(const QString &presetName, const QString &presetPath, int sampleRate) {
+    if (!g_zynEngine.proc) {
+        g_zynEngine.proc = new QProcess();
+    }
+    if (g_zynEngine.proc->state() == QProcess::Running &&
+        g_zynEngine.presetPath == presetPath) {
+        return true;
+    }
+
+    if (g_zynEngine.proc->state() != QProcess::NotRunning) {
+        g_zynEngine.proc->kill();
+        g_zynEngine.proc->waitForFinished(2000);
+    }
+
+    QString exe = QStandardPaths::findExecutable("zynaddsubfx");
+    if (exe.isEmpty()) {
+        return false;
+    }
+
+    QStringList args;
+    args << "--no-gui" << "-I" << "alsa" << "-O" << "alsa";
+    if (sampleRate > 0) {
+        args << "-r" << QString::number(sampleRate);
+    }
+    args << "-b" << "256";
+    if (!presetPath.isEmpty()) {
+        args << "-L" << presetPath;
+    }
+    g_zynEngine.proc->start(exe, args);
+    if (!g_zynEngine.proc->waitForStarted(3000)) {
+        return false;
+    }
+
+    g_zynEngine.presetPath = presetPath;
+    g_zynEngine.presetName = presetName;
+
+    if (!g_zynEngine.seq) {
+        if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
+            return false;
+        }
+        snd_seq_set_client_name(g_zynEngine.seq, "GrooveBox");
+        g_zynEngine.outPort = snd_seq_create_simple_port(
+            g_zynEngine.seq, "GrooveBox MIDI",
+            SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
+            SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
+    }
+
+    g_zynEngine.destClient = -1;
+    g_zynEngine.destPort = -1;
+    for (int i = 0; i < 25; ++i) {
+        if (findZynPort(g_zynEngine.seq, g_zynEngine.destClient, g_zynEngine.destPort)) {
+            break;
+        }
+        QThread::msleep(80);
+    }
+    if (g_zynEngine.destClient >= 0 && g_zynEngine.outPort >= 0) {
+        snd_seq_connect_to(g_zynEngine.seq, g_zynEngine.outPort,
+                           g_zynEngine.destClient, g_zynEngine.destPort);
+    }
+    return true;
+}
+
+static void sendZynNote(int note, int vel, bool on) {
+    if (!g_zynEngine.seq || g_zynEngine.outPort < 0 ||
+        g_zynEngine.destClient < 0 || g_zynEngine.destPort < 0) {
+        return;
+    }
+    snd_seq_event_t ev;
+    snd_seq_ev_clear(&ev);
+    snd_seq_ev_set_source(&ev, g_zynEngine.outPort);
+    snd_seq_ev_set_dest(&ev, g_zynEngine.destClient, g_zynEngine.destPort);
+    snd_seq_ev_set_direct(&ev);
+    if (on) {
+        snd_seq_ev_set_noteon(&ev, 0, note, vel);
+    } else {
+        snd_seq_ev_set_noteoff(&ev, 0, note, vel);
+    }
+    snd_seq_event_output_direct(g_zynEngine.seq, &ev);
+}
+#endif
 
 double pitchToRate(float semitones) {
     return std::pow(2.0, static_cast<double>(semitones) / 12.0);
@@ -709,10 +921,21 @@ void PadBank::setSynth(int index, const QString &name) {
 
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (rt) {
-        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
-                            m_synthBaseMidi[static_cast<size_t>(index)],
-                            m_synthParams[static_cast<size_t>(index)]);
-        rt->normalizeGain = 1.0f;
+        if (type == "ZYN") {
+            rt->rawBuffer.reset();
+            rt->processedBuffer.reset();
+            rt->processedReady = false;
+            rt->pendingProcessed = false;
+            rt->rawPath = QString("synth:%1").arg(synthName);
+            rt->rawDurationMs = 0;
+            rt->durationMs = 0;
+            rt->normalizeGain = 1.0f;
+        } else {
+            rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                                m_synthBaseMidi[static_cast<size_t>(index)],
+                                m_synthParams[static_cast<size_t>(index)]);
+            rt->normalizeGain = 1.0f;
+        }
     }
     if (m_engineAvailable && m_engine) {
         const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
@@ -1435,6 +1658,24 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
+    if (synthPad && synthTypeFromName(m_synthNames[static_cast<size_t>(index)]) == "ZYN") {
+#ifdef GROOVEBOX_WITH_ALSA
+        const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+        const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
+        const QString presetPath = zynPathForPreset(presetName);
+        if (!ensureZynRunning(presetName, presetPath, m_engineRate)) {
+            return;
+        }
+        const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
+        const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+        sendZynNote(baseMidi, velocity, true);
+        const int lengthMs =
+            qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
+        QTimer::singleShot(lengthMs, this, [baseMidi]() { sendZynNote(baseMidi, 0, false); });
+#endif
+        return;
+    }
+
     const double pitchRate = pitchToRate(params.pitch);
     const bool wantsProcessing = !synthPad && needsProcessing(params);
     const bool stretchEnabled = params.stretchIndex > 0;
@@ -1653,6 +1894,24 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
     if (!rt) {
         return;
     }
+    if (synthTypeFromName(m_synthNames[static_cast<size_t>(index)]) == "ZYN") {
+#ifdef GROOVEBOX_WITH_ALSA
+        const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
+        const QString presetPath = zynPathForPreset(presetName);
+        if (!ensureZynRunning(presetName, presetPath, m_engineRate)) {
+            return;
+        }
+        PadParams &params = m_params[static_cast<size_t>(index)];
+        const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+        sendZynNote(midiNote, velocity, true);
+        const int bpm = m_bpm;
+        const int stepMs = 60000 / qMax(1, bpm) / 4;
+        const int steps = qMax(1, lengthSteps);
+        const int lengthMs = qBound(60, steps * stepMs, 4000);
+        QTimer::singleShot(lengthMs, this, [midiNote]() { sendZynNote(midiNote, 0, false); });
+#endif
+        return;
+    }
     if (!rt->useEngine || !m_engineAvailable || !m_engine) {
         return;
     }
@@ -1826,7 +2085,14 @@ QString PadBank::stretchLabel(int index) {
 }
 
 QStringList PadBank::synthPresets() {
+    scanZynPresets();
     QStringList list;
+    for (const auto &preset : g_zynPresets) {
+        list << preset.display;
+    }
+    if (!list.isEmpty()) {
+        return list;
+    }
     for (const auto &preset : kSynthPresets) {
         list << QString::fromLatin1(preset.name);
     }
@@ -1844,6 +2110,14 @@ QStringList PadBank::synthTypes() {
 bool PadBank::hasFluidSynth() {
 #ifdef GROOVEBOX_WITH_FLUIDSYNTH
     return true;
+#else
+    return false;
+#endif
+}
+
+bool PadBank::hasZyn() {
+#ifdef Q_OS_LINUX
+    return !QStandardPaths::findExecutable("zynaddsubfx").isEmpty();
 #else
     return false;
 #endif
