@@ -100,6 +100,9 @@ bool SeqPageWidget::padsReady() const {
         if (!used && !m_pianoNotes[pad].isEmpty()) {
             used = true;
         }
+        if (used && !m_pads->isLoaded(pad)) {
+            continue;
+        }
         if (used && !m_pads->isPadReady(pad)) {
             return false;
         }
