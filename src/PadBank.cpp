@@ -713,6 +713,28 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
             m_engine->setPadAdsr(i, 0.0f, 0.0f, 1.0f, 0.0f);
         }
     }
+
+#ifdef GROOVEBOX_WITH_ALSA
+    m_zynConnectTimer = new QTimer(this);
+    m_zynConnectTimer->setInterval(1200);
+    connect(m_zynConnectTimer, &QTimer::timeout, this, [this]() {
+        int padIndex = -1;
+        for (int i = 0; i < kPadCount; ++i) {
+            if (m_isSynth[static_cast<size_t>(i)] &&
+                synthTypeFromName(m_synthNames[static_cast<size_t>(i)]) == "ZYN") {
+                padIndex = i;
+                break;
+            }
+        }
+        if (padIndex < 0) {
+            return;
+        }
+        const QString preset = synthPresetFromName(m_synthNames[static_cast<size_t>(padIndex)]);
+        const QString presetPath = zynPathForPreset(preset);
+        ensureZynRunning(preset, presetPath, m_engineRate);
+    });
+    m_zynConnectTimer->start();
+#endif
 }
 
 PadBank::~PadBank() {
@@ -993,6 +1015,11 @@ void PadBank::setSynth(int index, const QString &name) {
             rt->rawDurationMs = 0;
             rt->durationMs = 0;
             rt->normalizeGain = 1.0f;
+#ifdef GROOVEBOX_WITH_ALSA
+            const QString preset = synthPresetFromName(synthName);
+            const QString presetPath = zynPathForPreset(preset);
+            ensureZynRunning(preset, presetPath, m_engineRate);
+#endif
         } else {
             rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
                                 m_synthBaseMidi[static_cast<size_t>(index)],

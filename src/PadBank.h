@@ -7,6 +7,7 @@
 #include <memory>
 
 class AudioEngine;
+class QTimer;
 
 class PadBank : public QObject {
     Q_OBJECT
@@ -136,4 +137,5 @@ private:
     QString m_ffmpegPath;
     std::unique_ptr<class AudioEngine> m_engine;
     std::array<float, 6> m_busGain{};
+    QTimer *m_zynConnectTimer = nullptr;
 };
