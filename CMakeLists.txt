@@ -10,7 +10,7 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia)
 
 if(UNIX AND NOT APPLE)
-    find_package(ALSA)
+    find_package(ALSA REQUIRED)
 endif()
 
 find_package(PkgConfig)
