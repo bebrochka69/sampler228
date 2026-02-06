@@ -357,6 +357,9 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         snd_seq_connect_to(g_zynEngine.seq, g_zynEngine.outPort,
                            g_zynEngine.destClient, g_zynEngine.destPort);
     }
+    if (g_zynEngine.destClient < 0) {
+        tryAconnectZyn();
+    }
     return g_zynEngine.destClient >= 0 && g_zynEngine.destPort >= 0;
 }
 
@@ -376,6 +379,52 @@ static void sendZynNote(int note, int vel, bool on) {
         snd_seq_ev_set_noteoff(&ev, 0, note, vel);
     }
     snd_seq_event_output_direct(g_zynEngine.seq, &ev);
+}
+#endif
+
+#ifdef GROOVEBOX_WITH_ALSA
+static int parseAlsaClientId(const QString &text, const QString &token) {
+    const QStringList lines = text.split('\n');
+    for (const QString &line : lines) {
+        if (!line.contains(token, Qt::CaseInsensitive)) {
+            continue;
+        }
+        // line format: "client 129: 'ZynAddSubFX' [type=user,pid=...]"
+        const int idx = line.indexOf("client");
+        if (idx < 0) {
+            continue;
+        }
+        const int colon = line.indexOf(':', idx);
+        if (colon < 0) {
+            continue;
+        }
+        const QString num = line.mid(idx + 6, colon - (idx + 6)).trimmed();
+        bool ok = false;
+        const int id = num.toInt(&ok);
+        if (ok) {
+            return id;
+        }
+    }
+    return -1;
+}
+
+static void tryAconnectZyn() {
+#ifdef Q_OS_LINUX
+    QProcess list;
+    list.start("aconnect", QStringList() << "-l");
+    if (!list.waitForFinished(1500)) {
+        return;
+    }
+    const QString out = QString::fromUtf8(list.readAllStandardOutput());
+    const int zynClient = parseAlsaClientId(out, "ZynAddSubFX");
+    const int gbClient = parseAlsaClientId(out, "GrooveBox");
+    if (zynClient < 0 || gbClient < 0) {
+        return;
+    }
+    QProcess::startDetached("aconnect",
+                            QStringList() << QString("%1:0").arg(gbClient)
+                                          << QString("%1:0").arg(zynClient));
+#endif
 }
 #endif
 
@@ -738,6 +787,7 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
     m_zynConnectTimer->setInterval(1200);
     connect(m_zynConnectTimer, &QTimer::timeout, this, [this]() {
         ensureZynMidiReady();
+        tryAconnectZyn();
         int padIndex = -1;
         for (int i = 0; i < kPadCount; ++i) {
             if (m_isSynth[static_cast<size_t>(i)] &&
