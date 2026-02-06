@@ -195,6 +195,8 @@ struct ZynEngine {
 
 static ZynEngine g_zynEngine;
 
+static void tryAconnectZyn();
+
 static bool findZynPort(snd_seq_t *seq, int &clientOut, int &portOut) {
     snd_seq_client_info_t *cinfo;
     snd_seq_port_info_t *pinfo;
