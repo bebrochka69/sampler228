@@ -101,43 +101,13 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
             return;
         }
     }
-
-    for (int i = 0; i < m_adsrRects.size(); ++i) {
-        if (m_adsrRects[i].contains(pos) && m_pads) {
-            m_dragParam = i;
-            const QRectF r = m_adsrRects[i];
-            float value = 1.0f - qBound(0.0f, static_cast<float>((pos.y() - r.top()) / r.height()), 1.0f);
-            auto sp = m_pads->synthParams(m_activePad);
-            if (i == 0) sp.attack = value;
-            if (i == 1) sp.decay = value;
-            if (i == 2) sp.sustain = value;
-            if (i == 3) sp.release = value;
-            m_pads->setSynthAdsr(m_activePad, sp.attack, sp.decay, sp.sustain, sp.release);
-            update();
-            return;
-        }
-    }
-
-    return;
 }
 
 void SynthPageWidget::mouseMoveEvent(QMouseEvent *event) {
-    if (!(event->buttons() & Qt::LeftButton) || m_dragParam < 0 || !m_pads) {
-        return;
-    }
-    const QRectF r = m_adsrRects[m_dragParam];
-    float value = 1.0f - qBound(0.0f, static_cast<float>((event->position().y() - r.top()) / r.height()), 1.0f);
-    auto sp = m_pads->synthParams(m_activePad);
-    if (m_dragParam == 0) sp.attack = value;
-    if (m_dragParam == 1) sp.decay = value;
-    if (m_dragParam == 2) sp.sustain = value;
-    if (m_dragParam == 3) sp.release = value;
-    m_pads->setSynthAdsr(m_activePad, sp.attack, sp.decay, sp.sustain, sp.release);
-    update();
+    Q_UNUSED(event);
 }
 
 void SynthPageWidget::mouseReleaseEvent(QMouseEvent *) {
-    m_dragParam = -1;
 }
 
 void SynthPageWidget::paintEvent(QPaintEvent *event) {
@@ -165,68 +135,11 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(header, Qt::AlignRight | Qt::AlignVCenter,
                QString("PAD %1  %2").arg(m_activePad + 1).arg(preset));
 
-    auto sp = m_pads ? m_pads->synthParams(m_activePad) : PadBank::SynthParams();
-
     const float gap = Theme::pxF(14.0f);
     QRectF left(panel.left() + Theme::px(12), header.bottom() + Theme::px(10),
                 panel.width() * 0.32f, panel.height() - header.height() - Theme::px(20));
     QRectF right(left.right() + gap, left.top(), panel.right() - left.right() - Theme::px(16),
                  left.height());
-
-    // ADSR section (right side)
-    const QRectF adsrArea(right.left(), right.top(), right.width(), right.height() * 0.62f);
-    p.setBrush(QColor(20, 18, 26));
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    p.drawRoundedRect(adsrArea, Theme::px(10), Theme::px(10));
-
-    const float a = sp.attack;
-    const float d = sp.decay;
-    const float s = sp.sustain;
-    const float r = sp.release;
-
-    QPainterPath env;
-    const float x0 = adsrArea.left() + Theme::px(10);
-    const float y0 = adsrArea.bottom() - Theme::px(12);
-    const float width = adsrArea.width() - Theme::px(20);
-    const float height = adsrArea.height() - Theme::px(24);
-
-    const float aX = x0 + width * (0.12f + a * 0.18f);
-    const float dX = aX + width * (0.12f + d * 0.18f);
-    const float sY = y0 - height * (0.15f + s * 0.75f);
-    const float rX = dX + width * (0.34f + r * 0.25f);
-
-    env.moveTo(QPointF(x0, y0));
-    env.lineTo(QPointF(aX, adsrArea.top() + Theme::px(10)));
-    env.lineTo(QPointF(dX, sY));
-    env.lineTo(QPointF(rX, sY));
-    env.lineTo(QPointF(x0 + width, y0));
-
-    p.setPen(QPen(Theme::accentAlt(), 2.0));
-    p.drawPath(env);
-
-    // ADSR sliders
-    const QRectF adsrStrip(right.left(), adsrArea.bottom() + Theme::px(10),
-                           right.width(), right.height() - adsrArea.height() - Theme::px(10));
-    const QStringList labels = {"A", "D", "S", "R"};
-    m_adsrRects.clear();
-    for (int i = 0; i < 4; ++i) {
-        const float w = (adsrStrip.width() - gap * 3) / 4.0f;
-        QRectF rRect(adsrStrip.left() + i * (w + gap), adsrStrip.top(), w, adsrStrip.height());
-        m_adsrRects.push_back(rRect);
-        p.setBrush(Theme::bg2());
-        p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(rRect, Theme::px(8), Theme::px(8));
-        const float value = (i == 0) ? a : (i == 1) ? d : (i == 2) ? s : r;
-        const float fillH = rRect.height() * value;
-        QRectF fill(rRect.left() + Theme::px(4), rRect.bottom() - fillH,
-                    rRect.width() - Theme::px(8), fillH);
-        p.setBrush(Theme::accent());
-        p.setPen(Qt::NoPen);
-        p.drawRoundedRect(fill, Theme::px(6), Theme::px(6));
-        p.setPen(Theme::text());
-        p.setFont(Theme::baseFont(10, QFont::DemiBold));
-        p.drawText(rRect.adjusted(0, Theme::px(4), 0, 0), Qt::AlignTop | Qt::AlignHCenter, labels[i]);
-    }
 
     // Left categories
     p.setBrush(QColor(24, 24, 30));

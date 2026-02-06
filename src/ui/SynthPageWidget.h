@@ -25,11 +25,6 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
-    enum Mode {
-        ModeFluid,
-        ModeSerum
-    };
-
     struct PresetRow {
         QString label;
         QString presetId;
@@ -39,12 +34,8 @@ private:
 
     PadBank *m_pads = nullptr;
     int m_activePad = 0;
-    int m_selectedParam = 0;
-    int m_dragParam = -1;
-    Mode m_mode = ModeFluid;
     QStringList m_fluidPresets;
     QVector<PresetRow> m_presetRows;
-    QVector<QRectF> m_adsrRects;
     QStringList m_categories;
     QVector<QRectF> m_categoryRects;
     int m_selectedCategory = 0;
