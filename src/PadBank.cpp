@@ -237,6 +237,24 @@ static void ensureAlsaSequencerLoaded() {
 #endif
 }
 
+static bool ensureZynMidiReady() {
+    if (g_zynEngine.seq) {
+        return true;
+    }
+    if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
+        ensureAlsaSequencerLoaded();
+        if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
+            return false;
+        }
+    }
+    snd_seq_set_client_name(g_zynEngine.seq, "GrooveBox");
+    g_zynEngine.outPort = snd_seq_create_simple_port(
+        g_zynEngine.seq, "GrooveBox MIDI",
+        SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
+        SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
+    return g_zynEngine.outPort >= 0;
+}
+
 static QString detectHeadphoneCard() {
 #ifdef Q_OS_LINUX
     QFile file("/proc/asound/cards");
@@ -319,18 +337,8 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     g_zynEngine.presetPath = presetPath;
     g_zynEngine.presetName = presetName;
 
-    if (!g_zynEngine.seq) {
-        if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
-            ensureAlsaSequencerLoaded();
-            if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
-                return false;
-            }
-        }
-        snd_seq_set_client_name(g_zynEngine.seq, "GrooveBox");
-        g_zynEngine.outPort = snd_seq_create_simple_port(
-            g_zynEngine.seq, "GrooveBox MIDI",
-            SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
-            SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
+    if (!ensureZynMidiReady()) {
+        return false;
     }
 
     g_zynEngine.destClient = -1;
@@ -718,6 +726,7 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
     m_zynConnectTimer = new QTimer(this);
     m_zynConnectTimer->setInterval(1200);
     connect(m_zynConnectTimer, &QTimer::timeout, this, [this]() {
+        ensureZynMidiReady();
         int padIndex = -1;
         for (int i = 0; i < kPadCount; ++i) {
             if (m_isSynth[static_cast<size_t>(i)] &&
