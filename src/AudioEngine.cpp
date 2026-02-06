@@ -8,6 +8,7 @@
 #include <QString>
 #include <QStringList>
 #include <QtGlobal>
+#include <QFile>
 
 #ifdef GROOVEBOX_WITH_ALSA
 #include <alsa/asoundlib.h>
@@ -72,6 +73,27 @@ void AudioEngine::start() {
     }
 
     auto deviceList = []() {
+        auto detectHeadphones = []() -> QString {
+#ifdef Q_OS_LINUX
+            QFile file("/proc/asound/cards");
+            if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                return QString();
+            }
+            while (!file.atEnd()) {
+                const QString line = QString::fromUtf8(file.readLine()).trimmed();
+                if (line.isEmpty()) {
+                    continue;
+                }
+                if (line.contains("Headphones", Qt::CaseInsensitive)) {
+                    const QString index = line.section(' ', 0, 0).trimmed();
+                    if (!index.isEmpty() && index[0].isDigit()) {
+                        return index;
+                    }
+                }
+            }
+#endif
+            return QString();
+        };
         QStringList list;
         const QString envSingle = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
         const QString envList = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICES");
@@ -86,12 +108,17 @@ void AudioEngine::start() {
                 }
             }
         }
+        const QString card = detectHeadphones();
+        if (!card.isEmpty()) {
+            list << QString("hw:%1,0").arg(card) << QString("plughw:%1,0").arg(card);
+        }
         if (list.isEmpty()) {
             list << "default"
                  << "plughw:0,0"
                  << "hw:0,0"
                  << "sysdefault"
-                 << "plughw:1,0";
+                 << "plughw:1,0"
+                 << "hw:1,0";
         }
         list.removeDuplicates();
         return list;
