@@ -728,6 +728,12 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
 
 #ifdef GROOVEBOX_WITH_ALSA
     ensureZynMidiReady();
+    scanZynPresets();
+    if (!g_zynPresets.isEmpty()) {
+        const QString preset = g_zynPresets.first().display;
+        const QString presetPath = g_zynPresets.first().path;
+        ensureZynRunning(preset, presetPath, m_engineRate);
+    }
     m_zynConnectTimer = new QTimer(this);
     m_zynConnectTimer->setInterval(1200);
     connect(m_zynConnectTimer, &QTimer::timeout, this, [this]() {
