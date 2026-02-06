@@ -292,6 +292,9 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     }
 
     QString exe = QStandardPaths::findExecutable("zynaddsubfx");
+    if (exe.isEmpty()) {
+        exe = "/usr/bin/zynaddsubfx";
+    }
 
     QStringList args;
     args << "--no-gui" << "-I" << "alsa" << "-O" << "alsa";
@@ -331,6 +334,7 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         if (!g_zynEngine.proc->waitForStarted(3000)) {
             g_zynEngine.proc->kill();
             g_zynEngine.proc->waitForFinished(1000);
+            QProcess::startDetached(exe, args);
         }
     }
 
@@ -723,6 +727,7 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
     }
 
 #ifdef GROOVEBOX_WITH_ALSA
+    ensureZynMidiReady();
     m_zynConnectTimer = new QTimer(this);
     m_zynConnectTimer->setInterval(1200);
     connect(m_zynConnectTimer, &QTimer::timeout, this, [this]() {
