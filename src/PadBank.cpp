@@ -222,7 +222,8 @@ static void sendZynOscLoad(const QString &path) {
     if (path.isEmpty()) {
         return;
     }
-    const int port = (g_zynEngine.oscPort > 0) ? g_zynEngine.oscPort : 12221;
+    const int envPort = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_OSC_PORT");
+    const int port = envPort > 0 ? envPort : (g_zynEngine.oscPort > 0 ? g_zynEngine.oscPort : 12221);
     const QByteArray addr = "/load_xiz";
     const QByteArray str = path.toUtf8();
 
@@ -373,6 +374,9 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     }
     if (g_zynEngine.proc->state() == QProcess::Running &&
         g_zynEngine.presetPath == presetPath) {
+        if (!presetPath.isEmpty()) {
+            sendZynOscLoad(presetPath);
+        }
         return true;
     }
 
@@ -397,7 +401,7 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     }
     args << "-b" << QString::number(buffer);
     if (!presetPath.isEmpty()) {
-        args << "--load-instrument" << presetPath;
+        args << "-L" << presetPath;
     }
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     QString device = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
@@ -427,7 +431,7 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         }
     }
     g_zynEngine.proc->setProcessEnvironment(env);
-    g_zynEngine.oscPort = 0;
+    g_zynEngine.oscPort = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_OSC_PORT");
     g_zynEngine.stdoutBuffer.clear();
     QObject::disconnect(g_zynEngine.proc, nullptr, nullptr, nullptr);
     g_zynEngine.proc->setProcessChannelMode(QProcess::SeparateChannels);
