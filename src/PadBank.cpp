@@ -324,7 +324,7 @@ static bool ensureZynMidiReady() {
     snd_seq_set_client_name(g_zynEngine.seq, "GrooveBox");
     g_zynEngine.outPort = snd_seq_create_simple_port(
         g_zynEngine.seq, "GrooveBox MIDI",
-        SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
+        SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
         SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
     return g_zynEngine.outPort >= 0;
 }
