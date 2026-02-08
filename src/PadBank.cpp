@@ -412,7 +412,11 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         }
     }
     if (!device.isEmpty()) {
-        const QString dev = device.trimmed();
+        QString dev = device.trimmed();
+        const int colon = dev.indexOf(':');
+        if (colon >= 0) {
+            dev = dev.mid(colon + 1);
+        }
         QRegularExpression re("(\\d+)(?:,(\\d+))?");
         const QRegularExpressionMatch m = re.match(dev);
         if (m.hasMatch()) {

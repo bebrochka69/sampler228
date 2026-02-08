@@ -199,7 +199,9 @@ void SampleBrowserModel::refresh() {
     scanMountRoot("/run/media");
     scanMountRoot("/mnt");
     addRootIfExists("/mnt/usb", "USB", true, true);
+    addRootIfExists("/mnt/usb/samples", "USB SAMPLES", true, true);
     addRootIfExists("/media/usb", "USB", true, true);
+    addRootIfExists("/media/usb/samples", "USB SAMPLES", true, true);
 
     // If no audio files found, do a deeper recursive scan on mounted roots.
     if (!hasAudioNodes(m_roots)) {
@@ -208,7 +210,7 @@ void SampleBrowserModel::refresh() {
                 continue;
             }
             root->expanded = true;
-            scanAudioRecursive(root.get(), 0, 6);
+            scanAudioRecursive(root.get(), 0, 12);
         }
     }
 
@@ -230,7 +232,7 @@ void SampleBrowserModel::refresh() {
             node->expanded = true;
             node->scanned = false;
             node->name = QFileInfo(root).fileName().isEmpty() ? "USB" : QFileInfo(root).fileName();
-            scanAudioRecursive(node.get(), 0, 6);
+            scanAudioRecursive(node.get(), 0, 12);
             if (!node->children.empty()) {
                 m_roots.push_back(std::move(node));
                 break;
