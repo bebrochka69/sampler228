@@ -955,9 +955,15 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
 #ifdef GROOVEBOX_WITH_ALSA
     ensureZynMidiReady();
     scanZynPresets();
-    if (!g_zynPresets.isEmpty()) {
-        const QString preset = g_zynPresets.first().display;
-        const QString presetPath = g_zynPresets.first().path;
+    if (hasZyn()) {
+        QString preset;
+        QString presetPath;
+        if (!g_zynPresets.isEmpty()) {
+            preset = g_zynPresets.first().display;
+            presetPath = g_zynPresets.first().path;
+        } else {
+            preset = QStringLiteral("ZYN");
+        }
         ensureZynRunning(preset, presetPath, m_engineRate);
     }
     m_zynConnectTimer = new QTimer(this);
