@@ -397,7 +397,7 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     }
     int buffer = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_BUFFER");
     if (buffer <= 0) {
-        buffer = 2048;
+        buffer = 4096;
     }
     args << "-b" << QString::number(buffer);
     if (!presetPath.isEmpty()) {
@@ -412,19 +412,17 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         }
     }
     if (!device.isEmpty()) {
-        QString dev = device.trimmed();
-        if (dev.startsWith("hw:")) {
-            dev = dev.mid(3);
-        }
-        const QStringList parts = dev.split(',', Qt::SkipEmptyParts);
-        if (!parts.isEmpty()) {
-            const QString card = parts.value(0);
-            const QString sub = parts.value(1, "0");
+        const QString dev = device.trimmed();
+        QRegularExpression re("(\\d+)(?:,(\\d+))?");
+        const QRegularExpressionMatch m = re.match(dev);
+        if (m.hasMatch()) {
+            const QString card = m.captured(1);
+            const QString sub = m.captured(2).isEmpty() ? QString("0") : m.captured(2);
             env.insert("ALSA_CARD", card);
             env.insert("ALSA_CTL_CARD", card);
             env.insert("ALSA_PCM_CARD", card);
             const QString pcmDevice = qEnvironmentVariable("GROOVEBOX_ZYN_PCM_DEVICE");
-            env.insert("ALSA_PCM_DEVICE", pcmDevice.isEmpty() ? QString("0") : pcmDevice);
+            env.insert("ALSA_PCM_DEVICE", pcmDevice.isEmpty() ? sub : pcmDevice);
             if (!sub.isEmpty()) {
                 env.insert("ALSA_PCM_SUBDEVICE", sub);
             }
