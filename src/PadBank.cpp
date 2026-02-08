@@ -19,6 +19,8 @@
 #include <QtGlobal>
 #include <QtMath>
 #include <QDirIterator>
+#include <QHostAddress>
+#include <QUdpSocket>
 #include <cmath>
 #include <cstdint>
 #include <mutex>
@@ -187,6 +189,8 @@ struct ZynEngine {
     QProcess *proc = nullptr;
     QString presetPath;
     QString presetName;
+    int oscPort = 0;
+    QByteArray stdoutBuffer;
     snd_seq_t *seq = nullptr;
     int outPort = -1;
     int destClient = -1;
@@ -196,6 +200,73 @@ struct ZynEngine {
 static ZynEngine g_zynEngine;
 
 static void tryAconnectZyn();
+
+static void appendOscString(QByteArray &buf, const QByteArray &value) {
+    buf.append(value);
+    buf.append('\0');
+    while (buf.size() % 4) {
+        buf.append('\0');
+    }
+}
+
+static void appendOscInt(QByteArray &buf, int value) {
+    unsigned char bytes[4];
+    bytes[0] = static_cast<unsigned char>((value >> 24) & 0xFF);
+    bytes[1] = static_cast<unsigned char>((value >> 16) & 0xFF);
+    bytes[2] = static_cast<unsigned char>((value >> 8) & 0xFF);
+    bytes[3] = static_cast<unsigned char>(value & 0xFF);
+    buf.append(reinterpret_cast<const char *>(bytes), 4);
+}
+
+static void sendZynOscLoad(const QString &path) {
+    if (path.isEmpty()) {
+        return;
+    }
+    const int port = (g_zynEngine.oscPort > 0) ? g_zynEngine.oscPort : 12221;
+    const QByteArray addr = "/load_xiz";
+    const QByteArray str = path.toUtf8();
+
+    QByteArray msgSi;
+    appendOscString(msgSi, addr);
+    appendOscString(msgSi, QByteArray(",si"));
+    appendOscString(msgSi, str);
+    appendOscInt(msgSi, 0);
+
+    QByteArray msgIs;
+    appendOscString(msgIs, addr);
+    appendOscString(msgIs, QByteArray(",is"));
+    appendOscInt(msgIs, 0);
+    appendOscString(msgIs, str);
+
+    QUdpSocket sock;
+    sock.writeDatagram(msgSi, QHostAddress::LocalHost, port);
+    sock.writeDatagram(msgIs, QHostAddress::LocalHost, port);
+}
+
+static void parseZynOutput(const QByteArray &chunk) {
+    if (chunk.isEmpty()) {
+        return;
+    }
+    g_zynEngine.stdoutBuffer.append(chunk);
+    int idx = 0;
+    while ((idx = g_zynEngine.stdoutBuffer.indexOf('\n')) >= 0) {
+        const QByteArray lineBytes = g_zynEngine.stdoutBuffer.left(idx);
+        g_zynEngine.stdoutBuffer.remove(0, idx + 1);
+        const QString line = QString::fromUtf8(lineBytes).trimmed();
+        if (line.contains("lo server running on", Qt::CaseInsensitive)) {
+            const QRegularExpression re("lo server running on\\s+(\\d+)");
+            const QRegularExpressionMatch m = re.match(line);
+            if (m.hasMatch()) {
+                bool ok = false;
+                const int port = m.captured(1).toInt(&ok);
+                if (ok) {
+                    g_zynEngine.oscPort = port;
+                    sendZynOscLoad(g_zynEngine.presetPath);
+                }
+            }
+        }
+    }
+}
 
 static bool findZynPort(snd_seq_t *seq, int &clientOut, int &portOut) {
     snd_seq_client_info_t *cinfo;
@@ -316,13 +387,17 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     }
 
     QStringList args;
-    args << "--no-gui" << "-I" << "alsa" << "-O" << "alsa";
+    args << "--no-gui" << "-U" << "-I" << "alsa" << "-O" << "alsa";
     if (sampleRate > 0) {
         args << "-r" << QString::number(sampleRate);
     }
-    args << "-b" << "256";
+    int buffer = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_BUFFER");
+    if (buffer <= 0) {
+        buffer = 2048;
+    }
+    args << "-b" << QString::number(buffer);
     if (!presetPath.isEmpty()) {
-        args << "-L" << presetPath;
+        args << "--load-instrument" << presetPath;
     }
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     QString device = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
@@ -344,10 +419,24 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
             env.insert("ALSA_CARD", card);
             env.insert("ALSA_CTL_CARD", card);
             env.insert("ALSA_PCM_CARD", card);
-            env.insert("ALSA_PCM_DEVICE", sub);
+            const QString pcmDevice = qEnvironmentVariable("GROOVEBOX_ZYN_PCM_DEVICE");
+            env.insert("ALSA_PCM_DEVICE", pcmDevice.isEmpty() ? QString("0") : pcmDevice);
+            if (!sub.isEmpty()) {
+                env.insert("ALSA_PCM_SUBDEVICE", sub);
+            }
         }
     }
     g_zynEngine.proc->setProcessEnvironment(env);
+    g_zynEngine.oscPort = 0;
+    g_zynEngine.stdoutBuffer.clear();
+    QObject::disconnect(g_zynEngine.proc, nullptr, nullptr, nullptr);
+    g_zynEngine.proc->setProcessChannelMode(QProcess::SeparateChannels);
+    QObject::connect(g_zynEngine.proc, &QProcess::readyReadStandardOutput, []() {
+        parseZynOutput(g_zynEngine.proc->readAllStandardOutput());
+    });
+    QObject::connect(g_zynEngine.proc, &QProcess::readyReadStandardError, []() {
+        parseZynOutput(g_zynEngine.proc->readAllStandardError());
+    });
     if (!exe.isEmpty()) {
         g_zynEngine.proc->start(exe, args);
         if (!g_zynEngine.proc->waitForStarted(3000)) {
@@ -378,6 +467,9 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     }
     if (g_zynEngine.destClient < 0) {
         tryAconnectZyn();
+    }
+    if (!presetPath.isEmpty()) {
+        sendZynOscLoad(presetPath);
     }
     return g_zynEngine.destClient >= 0 && g_zynEngine.destPort >= 0;
 }
