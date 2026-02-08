@@ -190,16 +190,27 @@ struct ZynEngine {
     QString presetPath;
     QString presetName;
     int oscPort = 0;
+    QString lastLoadedPath;
+    bool ready = false;
     QByteArray stdoutBuffer;
     snd_seq_t *seq = nullptr;
     int outPort = -1;
     int destClient = -1;
     int destPort = -1;
+    int pendingNote = -1;
+    int pendingVelocity = 0;
+    int pendingLengthMs = 0;
 };
 
 static ZynEngine g_zynEngine;
 
 static void tryAconnectZyn();
+
+static void queueZynNote(int note, int velocity, int lengthMs) {
+    g_zynEngine.pendingNote = note;
+    g_zynEngine.pendingVelocity = velocity;
+    g_zynEngine.pendingLengthMs = lengthMs;
+}
 
 static void appendOscString(QByteArray &buf, const QByteArray &value) {
     buf.append(value);
@@ -262,7 +273,6 @@ static void parseZynOutput(const QByteArray &chunk) {
                 const int port = m.captured(1).toInt(&ok);
                 if (ok) {
                     g_zynEngine.oscPort = port;
-                    sendZynOscLoad(g_zynEngine.presetPath);
                 }
             }
         }
@@ -372,17 +382,25 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     if (!g_zynEngine.proc) {
         g_zynEngine.proc = new QProcess();
     }
-    if (g_zynEngine.proc->state() == QProcess::Running &&
-        g_zynEngine.presetPath == presetPath) {
-        if (!presetPath.isEmpty()) {
+    if (g_zynEngine.proc->state() == QProcess::Running) {
+        g_zynEngine.presetPath = presetPath;
+        g_zynEngine.presetName = presetName;
+        if (g_zynEngine.ready && !presetPath.isEmpty() &&
+            g_zynEngine.lastLoadedPath != presetPath) {
             sendZynOscLoad(presetPath);
+            g_zynEngine.lastLoadedPath = presetPath;
         }
-        return true;
+        return g_zynEngine.ready;
     }
 
     if (g_zynEngine.proc->state() != QProcess::NotRunning) {
         g_zynEngine.proc->kill();
         g_zynEngine.proc->waitForFinished(2000);
+    }
+
+    const QString killOthers = qEnvironmentVariable("GROOVEBOX_ZYN_KILL_OTHERS");
+    if (killOthers.isEmpty() || killOthers != "0") {
+        QProcess::execute("killall", QStringList() << "-q" << "zynaddsubfx");
     }
 
     QString exe = QStandardPaths::findExecutable("zynaddsubfx");
@@ -400,9 +418,11 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         buffer = 4096;
     }
     args << "-b" << QString::number(buffer);
-    if (!presetPath.isEmpty()) {
-        args << "-L" << presetPath;
+    int preferredPort = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_OSC_PORT");
+    if (preferredPort <= 0) {
+        preferredPort = 12221;
     }
+    args << "-P" << QString::number(preferredPort);
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     QString device = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
     if (device.isEmpty()) {
@@ -433,8 +453,10 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
         }
     }
     g_zynEngine.proc->setProcessEnvironment(env);
-    g_zynEngine.oscPort = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_OSC_PORT");
+    g_zynEngine.oscPort = preferredPort;
     g_zynEngine.stdoutBuffer.clear();
+    g_zynEngine.ready = false;
+    g_zynEngine.lastLoadedPath.clear();
     QObject::disconnect(g_zynEngine.proc, nullptr, nullptr, nullptr);
     g_zynEngine.proc->setProcessChannelMode(QProcess::SeparateChannels);
     QObject::connect(g_zynEngine.proc, &QProcess::readyReadStandardOutput, []() {
@@ -454,13 +476,13 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
 
     g_zynEngine.presetPath = presetPath;
     g_zynEngine.presetName = presetName;
+    g_zynEngine.destClient = -1;
+    g_zynEngine.destPort = -1;
 
     if (!ensureZynMidiReady()) {
         return false;
     }
 
-    g_zynEngine.destClient = -1;
-    g_zynEngine.destPort = -1;
     for (int i = 0; i < 35; ++i) {
         if (findZynPort(g_zynEngine.seq, g_zynEngine.destClient, g_zynEngine.destPort)) {
             break;
@@ -474,10 +496,12 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     if (g_zynEngine.destClient < 0) {
         tryAconnectZyn();
     }
-    if (!presetPath.isEmpty()) {
+    g_zynEngine.ready = (g_zynEngine.destClient >= 0 && g_zynEngine.destPort >= 0);
+    if (g_zynEngine.ready && !presetPath.isEmpty()) {
         sendZynOscLoad(presetPath);
+        g_zynEngine.lastLoadedPath = presetPath;
     }
-    return g_zynEngine.destClient >= 0 && g_zynEngine.destPort >= 0;
+    return g_zynEngine.ready;
 }
 
 static void sendZynNote(int note, int vel, bool on) {
@@ -496,6 +520,42 @@ static void sendZynNote(int note, int vel, bool on) {
         snd_seq_ev_set_noteoff(&ev, 0, note, vel);
     }
     snd_seq_event_output_direct(g_zynEngine.seq, &ev);
+}
+
+static void pollZynState() {
+    if (!g_zynEngine.proc || g_zynEngine.proc->state() != QProcess::Running) {
+        g_zynEngine.ready = false;
+        return;
+    }
+    if (!ensureZynMidiReady()) {
+        return;
+    }
+    if (g_zynEngine.destClient < 0 || g_zynEngine.destPort < 0) {
+        if (findZynPort(g_zynEngine.seq, g_zynEngine.destClient, g_zynEngine.destPort)) {
+            if (g_zynEngine.outPort >= 0) {
+                snd_seq_connect_to(g_zynEngine.seq, g_zynEngine.outPort,
+                                   g_zynEngine.destClient, g_zynEngine.destPort);
+            }
+        }
+    }
+    g_zynEngine.ready = (g_zynEngine.destClient >= 0 && g_zynEngine.destPort >= 0);
+    if (g_zynEngine.ready && !g_zynEngine.presetPath.isEmpty() &&
+        g_zynEngine.lastLoadedPath != g_zynEngine.presetPath) {
+        sendZynOscLoad(g_zynEngine.presetPath);
+        g_zynEngine.lastLoadedPath = g_zynEngine.presetPath;
+    }
+    if (g_zynEngine.ready && g_zynEngine.pendingNote >= 0) {
+        const int note = g_zynEngine.pendingNote;
+        const int vel = g_zynEngine.pendingVelocity;
+        const int lengthMs = g_zynEngine.pendingLengthMs;
+        g_zynEngine.pendingNote = -1;
+        g_zynEngine.pendingVelocity = 0;
+        g_zynEngine.pendingLengthMs = 0;
+        sendZynNote(note, vel, true);
+        if (lengthMs > 0) {
+            QTimer::singleShot(lengthMs, [note]() { sendZynNote(note, 0, false); });
+        }
+    }
 }
 #endif
 
@@ -901,10 +961,10 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
         ensureZynRunning(preset, presetPath, m_engineRate);
     }
     m_zynConnectTimer = new QTimer(this);
-    m_zynConnectTimer->setInterval(1200);
+    m_zynConnectTimer->setInterval(300);
     connect(m_zynConnectTimer, &QTimer::timeout, this, [this]() {
         ensureZynMidiReady();
-        tryAconnectZyn();
+        pollZynState();
         int padIndex = -1;
         for (int i = 0; i < kPadCount; ++i) {
             if (m_isSynth[static_cast<size_t>(i)] &&
@@ -919,6 +979,7 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
         const QString preset = synthPresetFromName(m_synthNames[static_cast<size_t>(padIndex)]);
         const QString presetPath = zynPathForPreset(preset);
         ensureZynRunning(preset, presetPath, m_engineRate);
+        pollZynState();
     });
     m_zynConnectTimer->start();
 #endif
@@ -1952,6 +2013,12 @@ void PadBank::triggerPad(int index) {
             QTimer::singleShot(lengthMs, this, [baseMidi]() { sendZynNote(baseMidi, 0, false); });
             return;
         }
+        const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
+        const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+        const int lengthMs =
+            qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
+        queueZynNote(baseMidi, velocity, lengthMs);
+        return;
 #endif
     }
 
@@ -2188,6 +2255,14 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
             QTimer::singleShot(lengthMs, this, [midiNote]() { sendZynNote(midiNote, 0, false); });
             return;
         }
+        PadParams &params = m_params[static_cast<size_t>(index)];
+        const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+        const int bpm = m_bpm;
+        const int stepMs = 60000 / qMax(1, bpm) / 4;
+        const int steps = qMax(1, lengthSteps);
+        const int lengthMs = qBound(60, steps * stepMs, 4000);
+        queueZynNote(midiNote, velocity, lengthMs);
+        return;
 #endif
     }
     if (!rt->useEngine || !m_engineAvailable || !m_engine) {
