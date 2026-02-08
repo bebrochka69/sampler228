@@ -73,23 +73,40 @@ void AudioEngine::start() {
     }
 
     auto deviceList = []() {
-        auto detectHeadphones = []() -> QString {
+        auto detectPreferred = []() -> QString {
 #ifdef Q_OS_LINUX
             QFile file("/proc/asound/cards");
             if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
                 return QString();
             }
+            QString usbCard;
+            QString phonesCard;
             while (!file.atEnd()) {
                 const QString line = QString::fromUtf8(file.readLine()).trimmed();
                 if (line.isEmpty()) {
                     continue;
                 }
+                if (line.contains("USB Audio", Qt::CaseInsensitive) ||
+                    line.contains("CODEC", Qt::CaseInsensitive) ||
+                    line.contains("UMC", Qt::CaseInsensitive) ||
+                    line.contains("BEHRINGER", Qt::CaseInsensitive)) {
+                    const QString index = line.section(' ', 0, 0).trimmed();
+                    if (!index.isEmpty() && index[0].isDigit()) {
+                        usbCard = index;
+                    }
+                }
                 if (line.contains("Headphones", Qt::CaseInsensitive)) {
                     const QString index = line.section(' ', 0, 0).trimmed();
                     if (!index.isEmpty() && index[0].isDigit()) {
-                        return index;
+                        phonesCard = index;
                     }
                 }
+            }
+            if (!usbCard.isEmpty()) {
+                return usbCard;
+            }
+            if (!phonesCard.isEmpty()) {
+                return phonesCard;
             }
 #endif
             return QString();
@@ -108,7 +125,7 @@ void AudioEngine::start() {
                 }
             }
         }
-        const QString card = detectHeadphones();
+        const QString card = detectPreferred();
         if (!card.isEmpty()) {
             list << QString("hw:%1,0").arg(card) << QString("plughw:%1,0").arg(card);
         }
