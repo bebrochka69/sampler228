@@ -20,7 +20,7 @@ public:
             m_items = PadBank::synthTypes();
         }
         if (m_items.isEmpty()) {
-            m_items << "ZYNADDSUBFX";
+            m_items << "YOSHIMI";
         }
     }
 
@@ -73,7 +73,8 @@ protected:
             if (m_rows[i].contains(pos) && m_pads) {
                 const QStringList presets = PadBank::synthPresets();
                 const QString preset = presets.isEmpty() ? QString("KEYS/PIANO 1") : presets.first();
-                m_pads->setSynth(m_activePad, QString("ZYN:%1").arg(preset));
+                const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("YOSHIMI");
+                m_pads->setSynth(m_activePad, QString("%1:%2").arg(type).arg(preset));
                 emit synthAssigned();
                 return;
             }

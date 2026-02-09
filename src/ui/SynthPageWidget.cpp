@@ -10,22 +10,27 @@
 
 namespace {
 QString synthIdOrDefault(PadBank *pads, int pad) {
+    const QString defaultType =
+        PadBank::synthTypes().isEmpty() ? QString("YOSHIMI") : PadBank::synthTypes().first();
     if (!pads) {
-        return QString("ZYN:KEYS/PIANO 1");
+        return QString("%1:KEYS/PIANO 1").arg(defaultType);
     }
     const QString id = pads->synthId(pad);
     if (!id.isEmpty()) {
         return id;
     }
-    return QString("ZYN:KEYS/PIANO 1");
+    return QString("%1:KEYS/PIANO 1").arg(defaultType);
 }
 
 QString synthType(const QString &id) {
     const QString up = id.trimmed().toUpper();
-    if (up.startsWith("ZYN")) {
-        return "ZYN";
+    if (up.startsWith("YOSHIMI")) {
+        return "YOSHIMI";
     }
-    return "ZYN";
+    if (up.startsWith("ZYN")) {
+        return "YOSHIMI";
+    }
+    return "YOSHIMI";
 }
 
 QString synthPreset(const QString &id) {
@@ -96,7 +101,9 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
 
     for (const PresetRow &row : m_presetRows) {
         if (!row.header && row.rect.contains(pos) && m_pads) {
-            m_pads->setSynth(m_activePad, QString("ZYN:%1").arg(row.presetId));
+            const QString type =
+                PadBank::synthTypes().isEmpty() ? QString("YOSHIMI") : PadBank::synthTypes().first();
+            m_pads->setSynth(m_activePad, QString("%1:%2").arg(type, row.presetId));
             update();
             return;
         }

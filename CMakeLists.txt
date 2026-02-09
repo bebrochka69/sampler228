@@ -14,6 +14,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia Network)
 find_package(PkgConfig)
 if(PKG_CONFIG_FOUND)
     pkg_check_modules(FLUIDSYNTH QUIET fluidsynth)
+    pkg_check_modules(JACK QUIET jack)
 endif()
 
 set(SOURCES
@@ -72,6 +73,11 @@ if(UNIX AND NOT APPLE)
     # Force ALSA usage on Linux; GrooveBox relies on ALSA for realtime audio + MIDI.
     target_link_libraries(GrooveBoxUI PRIVATE asound)
     target_compile_definitions(GrooveBoxUI PRIVATE GROOVEBOX_WITH_ALSA=1)
+    if(JACK_FOUND)
+        target_include_directories(GrooveBoxUI PRIVATE ${JACK_INCLUDE_DIRS})
+        target_link_libraries(GrooveBoxUI PRIVATE ${JACK_LIBRARIES})
+        target_compile_definitions(GrooveBoxUI PRIVATE GROOVEBOX_WITH_JACK=1)
+    endif()
 endif()
 target_include_directories(GrooveBoxUI PRIVATE src)
 
