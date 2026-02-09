@@ -332,6 +332,9 @@ static bool jackConnectYoshimi(bool connectAudio) {
             g_jackMidi.targetPort = QString::fromLocal8Bit(ports[0]);
         }
     }
+    if (!g_jackMidi.connected) {
+        qWarning() << "Yoshimi MIDI port not found";
+    }
     if (ports) {
         jack_free(ports);
     }
@@ -731,6 +734,7 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
 #endif
 
     if (g_zynEngine.isYoshimi) {
+        qWarning() << "JACK MIDI not available for Yoshimi";
         return false;
     }
 #ifdef GROOVEBOX_WITH_JACK
