@@ -633,7 +633,9 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
 
     QStringList args;
     args << "--no-gui";
-    if (!useYoshimi) {
+    if (useYoshimi) {
+        args << "-j";
+    } else {
         args << "-U" << "-I" << "alsa" << "-O" << "alsa";
     }
     if (sampleRate > 0) {
@@ -728,6 +730,9 @@ static bool ensureZynRunning(const QString &presetName, const QString &presetPat
     }
 #endif
 
+    if (g_zynEngine.isYoshimi) {
+        return false;
+    }
 #ifdef GROOVEBOX_WITH_JACK
     if (qEnvironmentVariable("GROOVEBOX_ALLOW_ALSA_SEQ") != "1") {
         return false;
@@ -823,6 +828,10 @@ static void pollZynState() {
     }
 #endif
 
+    if (g_zynEngine.isYoshimi) {
+        g_zynEngine.ready = false;
+        return;
+    }
 #ifdef GROOVEBOX_WITH_JACK
     if (qEnvironmentVariable("GROOVEBOX_ALLOW_ALSA_SEQ") != "1") {
         g_zynEngine.ready = false;
