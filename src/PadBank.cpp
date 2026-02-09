@@ -280,7 +280,7 @@ static bool ensureJackMidiReady() {
     if (g_jackMidi.active && g_jackMidi.client && g_jackMidi.port) {
         return true;
     }
-    jack_status_t status = JackNullOption;
+    jack_status_t status = 0;
     g_jackMidi.client = jack_client_open("GrooveBox", JackNullOption, &status);
     if (!g_jackMidi.client) {
         g_jackMidi.client = jack_client_open("GrooveBoxMidi", JackNullOption, &status);
