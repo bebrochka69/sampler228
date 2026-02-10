@@ -7,13 +7,12 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia Network)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia)
 
 # ALSA handled after target creation.
 
 find_package(PkgConfig)
 if(PKG_CONFIG_FOUND)
-    pkg_check_modules(FLUIDSYNTH QUIET fluidsynth)
     pkg_check_modules(JACK QUIET jack)
 endif()
 
@@ -67,7 +66,7 @@ set(HEADERS
 
 add_executable(GrooveBoxUI ${SOURCES} ${HEADERS})
 
-target_link_libraries(GrooveBoxUI PRIVATE Qt6::Widgets Qt6::Multimedia Qt6::Network)
+target_link_libraries(GrooveBoxUI PRIVATE Qt6::Widgets Qt6::Multimedia)
 
 if(UNIX AND NOT APPLE)
     # Force ALSA usage on Linux; GrooveBox relies on ALSA for realtime audio + MIDI.
@@ -82,9 +81,3 @@ endif()
 target_include_directories(GrooveBoxUI PRIVATE src)
 
 # ALSA handled above for Linux
-
-if(FLUIDSYNTH_FOUND)
-    target_include_directories(GrooveBoxUI PRIVATE ${FLUIDSYNTH_INCLUDE_DIRS})
-    target_link_libraries(GrooveBoxUI PRIVATE ${FLUIDSYNTH_LIBRARIES})
-    target_compile_definitions(GrooveBoxUI PRIVATE GROOVEBOX_WITH_FLUIDSYNTH=1)
-endif()

@@ -20,7 +20,7 @@ public:
             m_items = PadBank::synthTypes();
         }
         if (m_items.isEmpty()) {
-            m_items << "YOSHIMI";
+            m_items << "HEXTER";
         }
     }
 
@@ -72,8 +72,8 @@ protected:
         for (int i = 0; i < m_rows.size(); ++i) {
             if (m_rows[i].contains(pos) && m_pads) {
                 const QStringList presets = PadBank::synthPresets();
-                const QString preset = presets.isEmpty() ? QString("KEYS/PIANO 1") : presets.first();
-                const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("YOSHIMI");
+                const QString preset = presets.isEmpty() ? QString("PROGRAM 01") : presets.first();
+                const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("HEXTER");
                 m_pads->setSynth(m_activePad, QString("%1:%2").arg(type).arg(preset));
                 emit synthAssigned();
                 return;

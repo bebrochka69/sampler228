@@ -19,19 +19,10 @@
 #include <QtGlobal>
 #include <QtMath>
 #include <QDirIterator>
-#include <QHostAddress>
-#include <QUdpSocket>
 #include <cmath>
 #include <cstdint>
 #include <mutex>
 
-#ifdef GROOVEBOX_WITH_FLUIDSYNTH
-#include <fluidsynth.h>
-#endif
-
-#ifdef GROOVEBOX_WITH_ALSA
-#include <alsa/asoundlib.h>
-#endif
 #ifdef GROOVEBOX_WITH_JACK
 #include <jack/jack.h>
 #include <jack/midiport.h>
@@ -59,21 +50,18 @@ constexpr const char *kFxBusLabels[] = {
     "E",
 };
 
-QString defaultZynLikeType();
+QString defaultHexterType();
 
 QString synthTypeFromName(const QString &name) {
     const QString upper = name.trimmed().toUpper();
-    if (upper.startsWith("YOSHIMI")) {
-        return "YOSHIMI";
-    }
-    if (upper.startsWith("ZYN") || upper.startsWith("ZYNADDSUBFX")) {
-        return "ZYN";
+    if (upper.startsWith("HEXTER")) {
+        return "HEXTER";
     }
     if (upper.contains(":")) {
         const int colon = upper.indexOf(':');
         return upper.left(colon).trimmed();
     }
-    return defaultZynLikeType();
+    return defaultHexterType();
 }
 
 QString synthPresetFromName(const QString &name) {
@@ -90,154 +78,74 @@ QString makeSynthName(const QString &type, const QString &preset) {
     return QString("%1:%2").arg(t, preset);
 }
 
-bool isZynLikeType(const QString &type) {
+bool isHexterType(const QString &type) {
     const QString t = type.trimmed().toUpper();
-    return t == "ZYN" || t == "ZYNADDSUBFX" || t == "YOSHIMI";
+    return t == "HEXTER";
 }
 
-QString defaultZynLikeType() {
+QString defaultHexterType() {
 #ifdef Q_OS_LINUX
-    if (!QStandardPaths::findExecutable("yoshimi").isEmpty()) {
-        return QStringLiteral("YOSHIMI");
+    if (!QStandardPaths::findExecutable("hexter").isEmpty()) {
+        return QStringLiteral("HEXTER");
     }
-    if (!QStandardPaths::findExecutable("zynaddsubfx").isEmpty()) {
-        return QStringLiteral("ZYN");
+    if (!QStandardPaths::findExecutable("jack-dssi-host").isEmpty()) {
+        return QStringLiteral("HEXTER");
     }
 #endif
-    return QStringLiteral("ZYN");
+    return QStringLiteral("HEXTER");
 }
 
-struct SynthPresetInfo {
-    const char *name;
-    int bank;
-    int program;
-    int note;
-};
-
-constexpr SynthPresetInfo kSynthPresets[] = {
-    {"KEYS/PIANO 1", 0, 0, 60},
-    {"KEYS/PIANO 2", 0, 1, 60},
-    {"KEYS/E.PIANO", 0, 4, 60},
-    {"ORGANS/DRAWBAR", 0, 16, 60},
-    {"BASS/FINGER", 0, 32, 48},
-    {"LEADS/SAW", 0, 80, 72},
-    {"PADS/WARM", 0, 89, 60},
-    {"STRINGS/ENSEMBLE", 0, 48, 60},
-    {"BRASS/SECTION", 0, 56, 60},
+struct HexterPresetInfo {
+    QString name;
+    int program = 0;
+    int note = 60;
 };
 
 float clamp01(float value) {
     return qBound(0.0f, value, 1.0f);
 }
 
-struct ZynPreset {
+struct HexterPreset {
     QString display;
-    QString category;
-    QString path;
+    int program = 0;
 };
 
-static QVector<ZynPreset> g_zynPresets;
-static bool g_zynScanned = false;
+static QVector<HexterPreset> g_hexterPresets;
+static bool g_hexterScanned = false;
 
-static void scanZynPresets() {
-    if (g_zynScanned) {
+static void scanHexterPresets() {
+    if (g_hexterScanned) {
         return;
     }
-    g_zynScanned = true;
-    QStringList roots;
-#ifdef Q_OS_LINUX
-    roots << "/usr/share/yoshimi/instruments"
-          << "/usr/local/share/yoshimi/instruments"
-          << "/usr/share/yoshimi/banks"
-          << "/usr/local/share/yoshimi/banks"
-          << "/usr/share/zynaddsubfx/instruments"
-          << "/usr/local/share/zynaddsubfx/instruments"
-          << "/usr/share/zynaddsubfx/banks"
-          << "/usr/local/share/zynaddsubfx/banks";
-#endif
-    roots << QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../zynaddsubfx-master/instruments");
-
-    QStringList found;
-    for (const QString &root : roots) {
-        if (!QFileInfo::exists(root)) {
-            continue;
-        }
-        QDirIterator it(root, QStringList() << "*.xiz", QDir::Files, QDirIterator::Subdirectories);
-        while (it.hasNext()) {
-            found << it.next();
-        }
-    }
-
-    for (const QString &path : found) {
-        QString rel = path;
-        for (const QString &root : roots) {
-            if (path.startsWith(root)) {
-                rel = path.mid(root.length());
-                if (rel.startsWith('/') || rel.startsWith('\\')) {
-                    rel.remove(0, 1);
-                }
-                break;
-            }
-        }
-        QStringList parts = rel.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
-        QString category = parts.isEmpty() ? QString("MISC") : parts.first().toUpper();
-        QString name = parts.isEmpty() ? QFileInfo(path).baseName()
-                                       : QFileInfo(parts.last()).completeBaseName();
-        ZynPreset preset;
-        preset.category = category;
-        preset.display = category + "/" + name.toUpper();
-        preset.path = path;
-        g_zynPresets.push_back(preset);
-    }
-
-    if (g_zynPresets.isEmpty()) {
-        // Fallback list if no preset files are found
-        QStringList fallback = {"KEYS/PIANO 1", "KEYS/PIANO 2", "LEADS/SAW",
-                                "BASS/FINGER", "PADS/WARM"};
-        for (const QString &name : fallback) {
-            ZynPreset preset;
-            preset.category = name.split('/').value(0, "MISC").toUpper();
-            preset.display = name.toUpper();
-            preset.path = QString();
-            g_zynPresets.push_back(preset);
-        }
+    g_hexterScanned = true;
+    g_hexterPresets.clear();
+    for (int i = 0; i < 32; ++i) {
+        HexterPreset preset;
+        preset.program = i;
+        preset.display = QString("PROGRAM %1").arg(i + 1, 2, 10, QChar('0'));
+        g_hexterPresets.push_back(preset);
     }
 }
 
-static QString zynPathForPreset(const QString &display) {
-    scanZynPresets();
-    const QString key = display.trimmed().toUpper();
-    for (const auto &preset : g_zynPresets) {
-        if (preset.display.toUpper() == key) {
-            return preset.path;
+static int hexterProgramForPreset(const QString &display) {
+    const QString trimmed = display.trimmed();
+    QRegularExpression re("(\\d+)");
+    const QRegularExpressionMatch m = re.match(trimmed);
+    if (m.hasMatch()) {
+        bool ok = false;
+        int value = m.captured(1).toInt(&ok);
+        if (ok) {
+            return qBound(0, value - 1, 127);
         }
     }
-    return QString();
+    scanHexterPresets();
+    for (const auto &preset : g_hexterPresets) {
+        if (preset.display.compare(trimmed, Qt::CaseInsensitive) == 0) {
+            return preset.program;
+        }
+    }
+    return 0;
 }
-
-#ifdef GROOVEBOX_WITH_ALSA
-struct ZynEngine {
-    QProcess *proc = nullptr;
-    QString presetPath;
-    QString presetName;
-    QString engineLabel;
-    bool isYoshimi = false;
-    int oscPort = 0;
-    QString lastLoadedPath;
-    bool ready = false;
-    QByteArray stdoutBuffer;
-    snd_seq_t *seq = nullptr;
-    int outPort = -1;
-    int destClient = -1;
-    int destPort = -1;
-    int pendingNote = -1;
-    int pendingVelocity = 0;
-    int pendingLengthMs = 0;
-};
-
-static ZynEngine g_zynEngine;
-
-static void tryAconnectZyn();
 
 #ifdef GROOVEBOX_WITH_JACK
 struct JackMidiEvent {
@@ -308,57 +216,6 @@ static bool ensureJackMidiReady() {
     return true;
 }
 
-static bool jackConnectYoshimi(bool connectAudio) {
-    if (!g_jackMidi.client || !g_jackMidi.port) {
-        return false;
-    }
-    if (g_jackMidi.connected) {
-        return true;
-    }
-    const char **ports = jack_get_ports(
-        g_jackMidi.client, "yoshimi.*midi.*in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
-    if (!ports || !ports[0]) {
-        if (ports) {
-            jack_free(ports);
-        }
-        ports = jack_get_ports(
-            g_jackMidi.client, "Yoshimi.*midi.*in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
-    }
-    if (ports && ports[0]) {
-        const char *src = jack_port_name(g_jackMidi.port);
-        if (src) {
-            jack_connect(g_jackMidi.client, src, ports[0]);
-            g_jackMidi.connected = true;
-            g_jackMidi.targetPort = QString::fromLocal8Bit(ports[0]);
-        }
-    }
-    if (!g_jackMidi.connected) {
-        qWarning() << "Yoshimi MIDI port not found";
-    }
-    if (ports) {
-        jack_free(ports);
-    }
-    if (connectAudio && g_jackMidi.client) {
-        const char **yL = jack_get_ports(g_jackMidi.client, "yoshimi.*left", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
-        const char **yR = jack_get_ports(g_jackMidi.client, "yoshimi.*right", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
-        const char **p1 = jack_get_ports(g_jackMidi.client, "system:playback_1", JACK_DEFAULT_AUDIO_TYPE,
-                                         JackPortIsInput);
-        const char **p2 = jack_get_ports(g_jackMidi.client, "system:playback_2", JACK_DEFAULT_AUDIO_TYPE,
-                                         JackPortIsInput);
-        if (yL && yL[0] && p1 && p1[0]) {
-            jack_connect(g_jackMidi.client, yL[0], p1[0]);
-        }
-        if (yR && yR[0] && p2 && p2[0]) {
-            jack_connect(g_jackMidi.client, yR[0], p2[0]);
-        }
-        if (yL) jack_free(yL);
-        if (yR) jack_free(yR);
-        if (p1) jack_free(p1);
-        if (p2) jack_free(p2);
-    }
-    return g_jackMidi.connected;
-}
-
 static bool jackSendMidi(const uint8_t *data, uint32_t size, uint32_t time = 0) {
     if (!ensureJackMidiReady() || !g_jackMidi.ring) {
         return false;
@@ -382,548 +239,174 @@ static void jackSendNote(int note, int vel, bool on) {
                        static_cast<uint8_t>(vel & 0x7F)};
     jackSendMidi(data, 3, 0);
 }
-#endif
 
-static void queueZynNote(int note, int velocity, int lengthMs) {
-    g_zynEngine.pendingNote = note;
-    g_zynEngine.pendingVelocity = velocity;
-    g_zynEngine.pendingLengthMs = lengthMs;
+static void jackSendProgram(int program) {
+    const uint8_t status = 0xC0;
+    uint8_t data[2] = {status, static_cast<uint8_t>(program & 0x7F)};
+    jackSendMidi(data, 2, 0);
 }
 
-static void appendOscString(QByteArray &buf, const QByteArray &value) {
-    buf.append(value);
-    buf.append('\0');
-    while (buf.size() % 4) {
-        buf.append('\0');
-    }
-}
+struct HexterEngine {
+    QProcess *proc = nullptr;
+    QString presetName;
+    int program = 0;
+    bool ready = false;
+    int pendingNote = -1;
+    int pendingVelocity = 0;
+    int pendingLengthMs = 0;
+};
 
-static void appendOscInt(QByteArray &buf, int value) {
-    unsigned char bytes[4];
-    bytes[0] = static_cast<unsigned char>((value >> 24) & 0xFF);
-    bytes[1] = static_cast<unsigned char>((value >> 16) & 0xFF);
-    bytes[2] = static_cast<unsigned char>((value >> 8) & 0xFF);
-    bytes[3] = static_cast<unsigned char>(value & 0xFF);
-    buf.append(reinterpret_cast<const char *>(bytes), 4);
-}
+static HexterEngine g_hexterEngine;
 
-static void sendZynOscLoad(const QString &path) {
-    if (path.isEmpty()) {
-        return;
-    }
-    int envPort = qEnvironmentVariableIntValue("GROOVEBOX_YOSHIMI_OSC_PORT");
-    if (envPort <= 0) {
-        envPort = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_OSC_PORT");
-    }
-    const int port = envPort > 0 ? envPort : (g_zynEngine.oscPort > 0 ? g_zynEngine.oscPort : 12221);
-    const QByteArray addr = "/load_xiz";
-    const QByteArray str = path.toUtf8();
-
-    QByteArray msgSi;
-    appendOscString(msgSi, addr);
-    appendOscString(msgSi, QByteArray(",si"));
-    appendOscString(msgSi, str);
-    appendOscInt(msgSi, 0);
-
-    QByteArray msgIs;
-    appendOscString(msgIs, addr);
-    appendOscString(msgIs, QByteArray(",is"));
-    appendOscInt(msgIs, 0);
-    appendOscString(msgIs, str);
-
-    QUdpSocket sock;
-    sock.writeDatagram(msgSi, QHostAddress::LocalHost, port);
-    sock.writeDatagram(msgIs, QHostAddress::LocalHost, port);
-}
-
-static void sendZynOscEnablePart(int part, int enabled) {
-    int envPort = qEnvironmentVariableIntValue("GROOVEBOX_YOSHIMI_OSC_PORT");
-    if (envPort <= 0) {
-        envPort = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_OSC_PORT");
-    }
-    const int port = envPort > 0 ? envPort : (g_zynEngine.oscPort > 0 ? g_zynEngine.oscPort : 12221);
-    const QByteArray addr = QByteArray("/part") + QByteArray::number(part) + "/Penabled";
-    QByteArray msg;
-    appendOscString(msg, addr);
-    appendOscString(msg, QByteArray(",i"));
-    appendOscInt(msg, enabled ? 1 : 0);
-    QUdpSocket sock;
-    sock.writeDatagram(msg, QHostAddress::LocalHost, port);
-}
-
-static void sendZynOscPartVolume(int part, int volume) {
-    int envPort = qEnvironmentVariableIntValue("GROOVEBOX_YOSHIMI_OSC_PORT");
-    if (envPort <= 0) {
-        envPort = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_OSC_PORT");
-    }
-    const int port = envPort > 0 ? envPort : (g_zynEngine.oscPort > 0 ? g_zynEngine.oscPort : 12221);
-    const QByteArray addr = QByteArray("/part") + QByteArray::number(part) + "/Pvolume";
-    QByteArray msg;
-    appendOscString(msg, addr);
-    appendOscString(msg, QByteArray(",i"));
-    appendOscInt(msg, qBound(0, volume, 127));
-    QUdpSocket sock;
-    sock.writeDatagram(msg, QHostAddress::LocalHost, port);
-}
-
-static void parseZynOutput(const QByteArray &chunk) {
-    if (chunk.isEmpty()) {
-        return;
-    }
-    g_zynEngine.stdoutBuffer.append(chunk);
-    int idx = 0;
-    while ((idx = g_zynEngine.stdoutBuffer.indexOf('\n')) >= 0) {
-        const QByteArray lineBytes = g_zynEngine.stdoutBuffer.left(idx);
-        g_zynEngine.stdoutBuffer.remove(0, idx + 1);
-        const QString line = QString::fromUtf8(lineBytes).trimmed();
-        if (line.contains("lo server running on", Qt::CaseInsensitive)) {
-            const QRegularExpression re("lo server running on\\s+(\\d+)");
-            const QRegularExpressionMatch m = re.match(line);
-            if (m.hasMatch()) {
-                bool ok = false;
-                const int port = m.captured(1).toInt(&ok);
-                if (ok) {
-                    g_zynEngine.oscPort = port;
-                }
-            }
-        }
-    }
-}
-
-static bool findZynPort(snd_seq_t *seq, int &clientOut, int &portOut) {
-    snd_seq_client_info_t *cinfo;
-    snd_seq_port_info_t *pinfo;
-    snd_seq_client_info_alloca(&cinfo);
-    snd_seq_port_info_alloca(&pinfo);
-
-    snd_seq_client_info_set_client(cinfo, -1);
-    while (snd_seq_query_next_client(seq, cinfo) >= 0) {
-        const int client = snd_seq_client_info_get_client(cinfo);
-        const char *name = snd_seq_client_info_get_name(cinfo);
-        if (!name) {
-            continue;
-        }
-        QString qname = QString::fromLocal8Bit(name).toUpper();
-        if (!qname.contains("ZYN") && !qname.contains("YOSHIMI")) {
-            continue;
-        }
-        snd_seq_port_info_set_client(pinfo, client);
-        snd_seq_port_info_set_port(pinfo, -1);
-        while (snd_seq_query_next_port(seq, pinfo) >= 0) {
-            const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
-            if (!(caps & SND_SEQ_PORT_CAP_WRITE) || !(caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
-                continue;
-            }
-            clientOut = client;
-            portOut = snd_seq_port_info_get_port(pinfo);
-            return true;
-        }
-    }
-    return false;
-}
-
-static void ensureAlsaSequencerLoaded() {
+static QString findHexterCommand(QStringList &args) {
 #ifdef Q_OS_LINUX
-    QProcess proc;
-    proc.start("modprobe", QStringList() << "snd_seq");
-    proc.waitForFinished(2000);
-    proc.start("modprobe", QStringList() << "snd_seq_midi");
-    proc.waitForFinished(2000);
-#endif
-}
-
-static bool ensureZynMidiReady() {
-    if (g_zynEngine.seq) {
-        return true;
+    const QString custom = qEnvironmentVariable("GROOVEBOX_HEXTER_CMD");
+    if (!custom.isEmpty()) {
+        return custom;
     }
-    if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
-        ensureAlsaSequencerLoaded();
-        if (snd_seq_open(&g_zynEngine.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
-            return false;
-        }
-    }
-    snd_seq_set_client_name(g_zynEngine.seq, "GrooveBox");
-    g_zynEngine.outPort = snd_seq_create_simple_port(
-        g_zynEngine.seq, "GrooveBox MIDI",
-        SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
-        SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
-    return g_zynEngine.outPort >= 0;
-}
-
-static QString detectPreferredCard() {
-#ifdef Q_OS_LINUX
-    QFile file("/proc/asound/cards");
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return QString();
-    }
-    QString usbCard;
-    QString phonesCard;
-    while (!file.atEnd()) {
-        const QString line = QString::fromUtf8(file.readLine()).trimmed();
-        if (line.isEmpty()) {
-            continue;
-        }
-        if (line.contains("USB Audio", Qt::CaseInsensitive) ||
-            line.contains("CODEC", Qt::CaseInsensitive) ||
-            line.contains("UMC", Qt::CaseInsensitive) ||
-            line.contains("BEHRINGER", Qt::CaseInsensitive)) {
-            const QString index = line.section(' ', 0, 0).trimmed();
-            if (!index.isEmpty() && index[0].isDigit()) {
-                usbCard = index;
-            }
-        }
-        if (line.contains("Headphones", Qt::CaseInsensitive)) {
-            const QString index = line.section(' ', 0, 0).trimmed();
-            if (!index.isEmpty() && index[0].isDigit()) {
-                phonesCard = index;
+    const QString host = QStandardPaths::findExecutable("jack-dssi-host");
+    QString plugin = qEnvironmentVariable("GROOVEBOX_HEXTER_PLUGIN");
+    if (plugin.isEmpty()) {
+        const QStringList candidates = {
+            "/usr/lib/dssi/hexter.so",
+            "/usr/local/lib/dssi/hexter.so",
+            "/usr/lib64/dssi/hexter.so"
+        };
+        for (const QString &cand : candidates) {
+            if (QFileInfo::exists(cand)) {
+                plugin = cand;
+                break;
             }
         }
     }
-    if (!usbCard.isEmpty()) {
-        return usbCard;
+    if (!host.isEmpty() && !plugin.isEmpty()) {
+        args << plugin;
+        return host;
     }
-    if (!phonesCard.isEmpty()) {
-        return phonesCard;
+    const QString standalone = QStandardPaths::findExecutable("hexter");
+    if (!standalone.isEmpty()) {
+        return standalone;
     }
 #endif
     return QString();
 }
 
-static bool ensureZynRunning(const QString &presetName, const QString &presetPath, int sampleRate) {
-    if (!g_zynEngine.proc) {
-        g_zynEngine.proc = new QProcess();
+static bool jackConnectHexter(bool connectAudio) {
+    if (!g_jackMidi.client || !g_jackMidi.port) {
+        return false;
     }
-    if (g_zynEngine.proc->state() == QProcess::Running) {
-        g_zynEngine.presetPath = presetPath;
-        g_zynEngine.presetName = presetName;
-        const bool allowOsc =
-            !g_zynEngine.isYoshimi && qEnvironmentVariable("GROOVEBOX_ZYN_DISABLE_OSC") != "1";
-        if (g_zynEngine.ready && !presetPath.isEmpty() &&
-            g_zynEngine.lastLoadedPath != presetPath && allowOsc) {
-            sendZynOscLoad(presetPath);
-            g_zynEngine.lastLoadedPath = presetPath;
+    if (g_jackMidi.connected && !g_jackMidi.targetPort.isEmpty()) {
+        return true;
+    }
+    const QString envTarget = qEnvironmentVariable("GROOVEBOX_HEXTER_MIDI_PORT");
+    const char *src = jack_port_name(g_jackMidi.port);
+    if (!src) {
+        return false;
+    }
+    const char **ports = nullptr;
+    if (!envTarget.isEmpty()) {
+        const QByteArray pattern = envTarget.toLocal8Bit();
+        ports = jack_get_ports(g_jackMidi.client, pattern.constData(),
+                               JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
+    }
+    if (!ports || !ports[0]) {
+        if (ports) {
+            jack_free(ports);
         }
-        return g_zynEngine.ready;
+        ports = jack_get_ports(g_jackMidi.client, "hexter.*midi.*in",
+                               JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
     }
-
-    if (g_zynEngine.proc->state() != QProcess::NotRunning) {
-        g_zynEngine.proc->kill();
-        g_zynEngine.proc->waitForFinished(2000);
-    }
-
-    const QString killOthers = qEnvironmentVariable("GROOVEBOX_ZYN_KILL_OTHERS");
-    if (killOthers.isEmpty() || killOthers != "0") {
-        QProcess::execute("killall", QStringList() << "-q" << "yoshimi");
-        QProcess::execute("killall", QStringList() << "-q" << "zynaddsubfx");
-    }
-
-    QString exe = qEnvironmentVariable("GROOVEBOX_YOSHIMI_EXE");
-    if (exe.isEmpty()) {
-        exe = QStandardPaths::findExecutable("yoshimi");
-    }
-    bool useYoshimi = !exe.isEmpty();
-    if (!useYoshimi) {
-        exe = qEnvironmentVariable("GROOVEBOX_ZYN_EXE");
-        if (exe.isEmpty()) {
-            exe = QStandardPaths::findExecutable("zynaddsubfx");
+    if (!ports || !ports[0]) {
+        if (ports) {
+            jack_free(ports);
         }
-        if (exe.isEmpty()) {
-            exe = "/usr/bin/zynaddsubfx";
-        }
+        ports = jack_get_ports(g_jackMidi.client, "Hexter.*midi.*in",
+                               JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
     }
-    g_zynEngine.isYoshimi = useYoshimi;
-    g_zynEngine.engineLabel = useYoshimi ? QString("YOSHIMI") : QString("ZYN");
+    if (!ports || !ports[0]) {
+        if (ports) {
+            jack_free(ports);
+        }
+        ports = jack_get_ports(g_jackMidi.client, "jack-dssi-host.*midi.*in",
+                               JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
+    }
+    if (ports && ports[0]) {
+        jack_connect(g_jackMidi.client, src, ports[0]);
+        g_jackMidi.connected = true;
+        g_jackMidi.targetPort = QString::fromLocal8Bit(ports[0]);
+    }
+    if (ports) {
+        jack_free(ports);
+    }
+    if (!g_jackMidi.connected) {
+        qWarning() << "Hexter MIDI port not found";
+    }
+    if (connectAudio && g_jackMidi.client) {
+        const char **hL = jack_get_ports(g_jackMidi.client, "hexter.*left",
+                                         JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
+        const char **hR = jack_get_ports(g_jackMidi.client, "hexter.*right",
+                                         JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
+        const char **p1 = jack_get_ports(g_jackMidi.client, "system:playback_1",
+                                         JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput);
+        const char **p2 = jack_get_ports(g_jackMidi.client, "system:playback_2",
+                                         JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput);
+        if (hL && hL[0] && p1 && p1[0]) {
+            jack_connect(g_jackMidi.client, hL[0], p1[0]);
+        }
+        if (hR && hR[0] && p2 && p2[0]) {
+            jack_connect(g_jackMidi.client, hR[0], p2[0]);
+        }
+        if (hL) jack_free(hL);
+        if (hR) jack_free(hR);
+        if (p1) jack_free(p1);
+        if (p2) jack_free(p2);
+    }
+    return g_jackMidi.connected;
+}
+
+static bool ensureHexterRunning(const QString &presetName, int program, int sampleRate) {
+    Q_UNUSED(sampleRate);
+    if (!g_hexterEngine.proc) {
+        g_hexterEngine.proc = new QProcess();
+    }
+    if (g_hexterEngine.proc->state() == QProcess::Running) {
+        g_hexterEngine.presetName = presetName;
+        g_hexterEngine.program = program;
+        if (g_hexterEngine.ready) {
+            jackSendProgram(program);
+        }
+        return g_hexterEngine.ready;
+    }
 
     QStringList args;
-    args << "--no-gui";
-    if (useYoshimi) {
-        args << "-j";
-    } else {
-        args << "-U" << "-I" << "alsa" << "-O" << "alsa";
+    const QString cmd = findHexterCommand(args);
+    if (cmd.isEmpty()) {
+        qWarning() << "Hexter command not found";
+        return false;
     }
-    if (sampleRate > 0) {
-        args << "-r" << QString::number(sampleRate);
-    }
-    int buffer = qEnvironmentVariableIntValue("GROOVEBOX_YOSHIMI_BUFFER");
-    if (buffer <= 0) {
-        buffer = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_BUFFER");
-    }
-    if (buffer <= 0) {
-        buffer = 4096;
-    }
-    args << "-b" << QString::number(buffer);
-    int preferredPort = qEnvironmentVariableIntValue("GROOVEBOX_YOSHIMI_OSC_PORT");
-    if (preferredPort <= 0) {
-        preferredPort = qEnvironmentVariableIntValue("GROOVEBOX_ZYN_OSC_PORT");
-    }
-    if (preferredPort <= 0) {
-        preferredPort = 12221;
-    }
-    args << "-P" << QString::number(preferredPort);
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    if (!useYoshimi) {
-        QString device = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
-        if (device.isEmpty()) {
-            const QString card = detectPreferredCard();
-            if (!card.isEmpty()) {
-                device = QString("hw:%1,0").arg(card);
-            }
-        }
-        if (!device.isEmpty()) {
-            QString dev = device.trimmed();
-            const int colon = dev.indexOf(':');
-            if (colon >= 0) {
-                dev = dev.mid(colon + 1);
-            }
-            QRegularExpression re("(\\d+)(?:,(\\d+))?");
-            const QRegularExpressionMatch m = re.match(dev);
-            if (m.hasMatch()) {
-                const QString card = m.captured(1);
-                const QString sub = m.captured(2).isEmpty() ? QString("0") : m.captured(2);
-                env.insert("ALSA_CARD", card);
-                env.insert("ALSA_CTL_CARD", card);
-                env.insert("ALSA_PCM_CARD", card);
-                const QString pcmDevice = qEnvironmentVariable("GROOVEBOX_ZYN_PCM_DEVICE");
-                env.insert("ALSA_PCM_DEVICE", pcmDevice.isEmpty() ? sub : pcmDevice);
-                if (!sub.isEmpty()) {
-                    env.insert("ALSA_PCM_SUBDEVICE", sub);
-                }
-            }
-        }
-    }
-    g_zynEngine.proc->setProcessEnvironment(env);
-    g_zynEngine.oscPort = preferredPort;
-    g_zynEngine.stdoutBuffer.clear();
-    g_zynEngine.ready = false;
-    g_zynEngine.lastLoadedPath.clear();
-    QObject::disconnect(g_zynEngine.proc, nullptr, nullptr, nullptr);
-    g_zynEngine.proc->setProcessChannelMode(QProcess::SeparateChannels);
-    QObject::connect(g_zynEngine.proc, &QProcess::readyReadStandardOutput, []() {
-        parseZynOutput(g_zynEngine.proc->readAllStandardOutput());
-    });
-    QObject::connect(g_zynEngine.proc, &QProcess::readyReadStandardError, []() {
-        parseZynOutput(g_zynEngine.proc->readAllStandardError());
-    });
-    if (!exe.isEmpty()) {
-        g_zynEngine.proc->start(exe, args);
-        if (!g_zynEngine.proc->waitForStarted(3000)) {
-            g_zynEngine.proc->kill();
-            g_zynEngine.proc->waitForFinished(1000);
-            QProcess::startDetached(exe, args);
-        }
-    }
-
-    g_zynEngine.presetPath = presetPath;
-    g_zynEngine.presetName = presetName;
-    g_zynEngine.destClient = -1;
-    g_zynEngine.destPort = -1;
-
-#ifdef GROOVEBOX_WITH_JACK
-    if (ensureJackMidiReady()) {
-        const bool connectAudio =
-            qEnvironmentVariable("GROOVEBOX_JACK_CONNECT_AUDIO") != "0";
-        g_zynEngine.ready = jackConnectYoshimi(connectAudio);
-        const bool allowOsc =
-            !g_zynEngine.isYoshimi && qEnvironmentVariable("GROOVEBOX_ZYN_DISABLE_OSC") != "1";
-        if (g_zynEngine.ready && !presetPath.isEmpty() && allowOsc) {
-            sendZynOscLoad(presetPath);
-            g_zynEngine.lastLoadedPath = presetPath;
-        }
-        return g_zynEngine.ready;
-    }
-#endif
-
-    if (g_zynEngine.isYoshimi) {
-        qWarning() << "JACK MIDI not available for Yoshimi";
+    g_hexterEngine.proc->setProcessEnvironment(env);
+    g_hexterEngine.proc->setProgram(cmd);
+    g_hexterEngine.proc->setArguments(args);
+    g_hexterEngine.proc->setProcessChannelMode(QProcess::MergedChannels);
+    g_hexterEngine.ready = false;
+    g_hexterEngine.presetName = presetName;
+    g_hexterEngine.program = program;
+    g_hexterEngine.proc->start();
+    if (!ensureJackMidiReady()) {
         return false;
     }
-#ifdef GROOVEBOX_WITH_JACK
-    if (qEnvironmentVariable("GROOVEBOX_ALLOW_ALSA_SEQ") != "1") {
-        return false;
+    g_hexterEngine.ready = jackConnectHexter(false);
+    if (g_hexterEngine.ready) {
+        jackSendProgram(program);
     }
-#endif
-
-    if (!ensureZynMidiReady()) {
-        return false;
-    }
-
-    for (int i = 0; i < 35; ++i) {
-        if (findZynPort(g_zynEngine.seq, g_zynEngine.destClient, g_zynEngine.destPort)) {
-            break;
-        }
-        QThread::msleep(80);
-    }
-    if (g_zynEngine.destClient >= 0 && g_zynEngine.outPort >= 0) {
-        snd_seq_connect_to(g_zynEngine.seq, g_zynEngine.outPort,
-                           g_zynEngine.destClient, g_zynEngine.destPort);
-    }
-    if (g_zynEngine.destClient < 0) {
-        tryAconnectZyn();
-    }
-    g_zynEngine.ready = (g_zynEngine.destClient >= 0 && g_zynEngine.destPort >= 0);
-    const bool allowOsc =
-        !g_zynEngine.isYoshimi && qEnvironmentVariable("GROOVEBOX_ZYN_DISABLE_OSC") != "1";
-    if (g_zynEngine.ready && !presetPath.isEmpty() && allowOsc) {
-        sendZynOscLoad(presetPath);
-        sendZynOscEnablePart(0, 1);
-        sendZynOscPartVolume(0, 127);
-        g_zynEngine.lastLoadedPath = presetPath;
-    }
-    return g_zynEngine.ready;
+    return g_hexterEngine.ready;
 }
 
-static void sendZynNote(int note, int vel, bool on) {
-#ifdef GROOVEBOX_WITH_JACK
-    if (g_jackMidi.active) {
-        jackSendNote(note, vel, on);
-        return;
-    }
-#endif
-    if (!g_zynEngine.seq || g_zynEngine.outPort < 0 ||
-        g_zynEngine.destClient < 0 || g_zynEngine.destPort < 0) {
-        return;
-    }
-    snd_seq_event_t ev;
-    snd_seq_ev_clear(&ev);
-    snd_seq_ev_set_source(&ev, g_zynEngine.outPort);
-    snd_seq_ev_set_dest(&ev, g_zynEngine.destClient, g_zynEngine.destPort);
-    snd_seq_ev_set_direct(&ev);
-    if (on) {
-        snd_seq_ev_set_noteon(&ev, 0, note, vel);
-    } else {
-        snd_seq_ev_set_noteoff(&ev, 0, note, vel);
-    }
-    snd_seq_event_output_direct(g_zynEngine.seq, &ev);
-}
-
-static void pollZynState() {
-    if (!g_zynEngine.proc || g_zynEngine.proc->state() != QProcess::Running) {
-        g_zynEngine.ready = false;
-        return;
-    }
-#ifdef GROOVEBOX_WITH_JACK
-    if (g_jackMidi.active || ensureJackMidiReady()) {
-        const bool connectAudio =
-            qEnvironmentVariable("GROOVEBOX_JACK_CONNECT_AUDIO") != "0";
-        if (!g_jackMidi.connected) {
-            jackConnectYoshimi(connectAudio);
-        }
-        g_zynEngine.ready = g_jackMidi.connected;
-        const bool allowOsc =
-            !g_zynEngine.isYoshimi && qEnvironmentVariable("GROOVEBOX_ZYN_DISABLE_OSC") != "1";
-        if (g_zynEngine.ready && !g_zynEngine.presetPath.isEmpty() &&
-            g_zynEngine.lastLoadedPath != g_zynEngine.presetPath && allowOsc) {
-            sendZynOscLoad(g_zynEngine.presetPath);
-            g_zynEngine.lastLoadedPath = g_zynEngine.presetPath;
-        }
-        if (g_zynEngine.ready && g_zynEngine.pendingNote >= 0) {
-            const int note = g_zynEngine.pendingNote;
-            const int vel = g_zynEngine.pendingVelocity;
-            const int lengthMs = g_zynEngine.pendingLengthMs;
-            g_zynEngine.pendingNote = -1;
-            g_zynEngine.pendingVelocity = 0;
-            g_zynEngine.pendingLengthMs = 0;
-            sendZynNote(note, vel, true);
-            if (lengthMs > 0) {
-                QTimer::singleShot(lengthMs, [note]() { sendZynNote(note, 0, false); });
-            }
-        }
-        return;
-    }
-#endif
-
-    if (g_zynEngine.isYoshimi) {
-        g_zynEngine.ready = false;
-        return;
-    }
-#ifdef GROOVEBOX_WITH_JACK
-    if (qEnvironmentVariable("GROOVEBOX_ALLOW_ALSA_SEQ") != "1") {
-        g_zynEngine.ready = false;
-        return;
-    }
-#endif
-    if (!ensureZynMidiReady()) {
-        return;
-    }
-    if (g_zynEngine.destClient < 0 || g_zynEngine.destPort < 0) {
-        if (findZynPort(g_zynEngine.seq, g_zynEngine.destClient, g_zynEngine.destPort)) {
-            if (g_zynEngine.outPort >= 0) {
-                snd_seq_connect_to(g_zynEngine.seq, g_zynEngine.outPort,
-                                   g_zynEngine.destClient, g_zynEngine.destPort);
-            }
-        }
-    }
-    g_zynEngine.ready = (g_zynEngine.destClient >= 0 && g_zynEngine.destPort >= 0);
-    const bool allowOsc =
-        !g_zynEngine.isYoshimi && qEnvironmentVariable("GROOVEBOX_ZYN_DISABLE_OSC") != "1";
-    if (g_zynEngine.ready && !g_zynEngine.presetPath.isEmpty() &&
-        g_zynEngine.lastLoadedPath != g_zynEngine.presetPath && allowOsc) {
-        sendZynOscLoad(g_zynEngine.presetPath);
-        sendZynOscEnablePart(0, 1);
-        sendZynOscPartVolume(0, 127);
-        g_zynEngine.lastLoadedPath = g_zynEngine.presetPath;
-    }
-    if (g_zynEngine.ready && g_zynEngine.pendingNote >= 0) {
-        const int note = g_zynEngine.pendingNote;
-        const int vel = g_zynEngine.pendingVelocity;
-        const int lengthMs = g_zynEngine.pendingLengthMs;
-        g_zynEngine.pendingNote = -1;
-        g_zynEngine.pendingVelocity = 0;
-        g_zynEngine.pendingLengthMs = 0;
-        sendZynNote(note, vel, true);
-        if (lengthMs > 0) {
-            QTimer::singleShot(lengthMs, [note]() { sendZynNote(note, 0, false); });
-        }
-    }
-}
-#endif
-
-#ifdef GROOVEBOX_WITH_ALSA
-static int parseAlsaClientId(const QString &text, const QString &token) {
-    const QStringList lines = text.split('\n');
-    for (const QString &line : lines) {
-        if (!line.contains(token, Qt::CaseInsensitive)) {
-            continue;
-        }
-        // line format: "client 129: 'ZynAddSubFX' [type=user,pid=...]"
-        const int idx = line.indexOf("client");
-        if (idx < 0) {
-            continue;
-        }
-        const int colon = line.indexOf(':', idx);
-        if (colon < 0) {
-            continue;
-        }
-        const QString num = line.mid(idx + 6, colon - (idx + 6)).trimmed();
-        bool ok = false;
-        const int id = num.toInt(&ok);
-        if (ok) {
-            return id;
-        }
-    }
-    return -1;
-}
-
-static void tryAconnectZyn() {
-#ifdef Q_OS_LINUX
-    QProcess list;
-    list.start("aconnect", QStringList() << "-l");
-    if (!list.waitForFinished(1500)) {
-        return;
-    }
-    const QString out = QString::fromUtf8(list.readAllStandardOutput());
-    int zynClient = parseAlsaClientId(out, "Yoshimi");
-    if (zynClient < 0) {
-        zynClient = parseAlsaClientId(out, "ZynAddSubFX");
-    }
-    const int gbClient = parseAlsaClientId(out, "GrooveBox");
-    if (zynClient < 0 || gbClient < 0) {
-        return;
-    }
-    QProcess::startDetached("aconnect",
-                            QStringList() << QString("%1:0").arg(gbClient)
-                                          << QString("%1:0").arg(zynClient));
-#endif
+static void queueHexterNote(int note, int velocity, int lengthMs) {
+    g_hexterEngine.pendingNote = note;
+    g_hexterEngine.pendingVelocity = velocity;
+    g_hexterEngine.pendingLengthMs = lengthMs;
 }
 #endif
 
@@ -1006,130 +489,6 @@ QString buildRenderFilter(double tempoFactor, double pitchRate) {
     return filters.join(',');
 }
 
-const SynthPresetInfo *findSynthPreset(const QString &name) {
-    const QString key = synthPresetFromName(name).trimmed().toUpper();
-    for (const auto &preset : kSynthPresets) {
-        if (key == QString::fromLatin1(preset.name)) {
-            return &preset;
-        }
-    }
-    return &kSynthPresets[0];
-}
-
-#ifdef GROOVEBOX_WITH_FLUIDSYNTH
-struct FluidContext {
-    fluid_settings_t *settings = nullptr;
-    fluid_synth_t *synth = nullptr;
-    int sfid = -1;
-    int sampleRate = 0;
-};
-
-FluidContext *getFluidContext(int sampleRate) {
-    static std::mutex mutex;
-    static std::unique_ptr<FluidContext> context;
-    std::lock_guard<std::mutex> lock(mutex);
-
-    if (context && context->synth && context->sfid >= 0 &&
-        context->sampleRate == sampleRate) {
-        return context.get();
-    }
-
-    if (context && context->synth) {
-        delete_fluid_synth(context->synth);
-    }
-    if (context && context->settings) {
-        delete_fluid_settings(context->settings);
-    }
-    context = std::make_unique<FluidContext>();
-    context->sampleRate = sampleRate;
-    context->settings = new_fluid_settings();
-    fluid_settings_setnum(context->settings, "synth.sample-rate",
-                          static_cast<double>(sampleRate));
-    fluid_settings_setint(context->settings, "synth.threadsafe-api", 0);
-    fluid_settings_setint(context->settings, "synth.chorus.active", 0);
-    fluid_settings_setint(context->settings, "synth.reverb.active", 0);
-
-    context->synth = new_fluid_synth(context->settings);
-    if (!context->synth) {
-        return nullptr;
-    }
-
-    QString sf2 = qEnvironmentVariable("GROOVEBOX_SF2");
-    QStringList candidates;
-    if (!sf2.isEmpty()) {
-        candidates << sf2;
-    }
-    candidates << "/usr/share/sounds/sf2/FluidR3_GM.sf2"
-               << "/usr/share/sounds/sf2/TimGM6mb.sf2"
-               << "/usr/share/sounds/sf2/FluidR3_GS.sf2";
-
-    QString chosen;
-    for (const QString &path : candidates) {
-        if (QFileInfo::exists(path)) {
-            chosen = path;
-            break;
-        }
-    }
-
-    if (chosen.isEmpty()) {
-        delete_fluid_synth(context->synth);
-        delete_fluid_settings(context->settings);
-        context.reset();
-        return nullptr;
-    }
-
-    context->sfid = fluid_synth_sfload(context->synth, chosen.toLocal8Bit().constData(), 1);
-    if (context->sfid < 0) {
-        delete_fluid_synth(context->synth);
-        delete_fluid_settings(context->settings);
-        context.reset();
-        return nullptr;
-    }
-    return context.get();
-}
-
-std::shared_ptr<AudioEngine::Buffer> renderFluidSynth(const SynthPresetInfo &preset,
-                                                      int sampleRate, int midiNote) {
-    FluidContext *ctx = getFluidContext(sampleRate);
-    if (!ctx || !ctx->synth || ctx->sfid < 0) {
-        return nullptr;
-    }
-
-    const int totalFrames = sampleRate * 2;
-    const int noteFrames = static_cast<int>(sampleRate * 0.85f);
-    std::vector<float> left(totalFrames, 0.0f);
-    std::vector<float> right(totalFrames, 0.0f);
-
-    fluid_synth_all_notes_off(ctx->synth, 0);
-    fluid_synth_program_select(ctx->synth, 0, ctx->sfid, preset.bank, preset.program);
-    fluid_synth_noteon(ctx->synth, 0, midiNote, 96);
-
-    fluid_synth_write_float(ctx->synth, noteFrames,
-                            left.data(), 0, 1, right.data(), 0, 1);
-    fluid_synth_noteoff(ctx->synth, 0, midiNote);
-    fluid_synth_write_float(ctx->synth, totalFrames - noteFrames,
-                            left.data() + noteFrames, 0, 1,
-                            right.data() + noteFrames, 0, 1);
-
-    auto buffer = std::make_shared<AudioEngine::Buffer>();
-    buffer->channels = 2;
-    buffer->sampleRate = sampleRate;
-    buffer->samples.resize(totalFrames * 2);
-
-    const int fadeFrames = std::min(sampleRate / 200, totalFrames / 2);
-    for (int i = 0; i < totalFrames; ++i) {
-        float gain = 1.0f;
-        if (i < fadeFrames) {
-            gain = static_cast<float>(i) / static_cast<float>(fadeFrames);
-        } else if (i > totalFrames - fadeFrames) {
-            gain = static_cast<float>(totalFrames - i) / static_cast<float>(fadeFrames);
-        }
-        buffer->samples[i * 2] = left[i] * gain;
-        buffer->samples[i * 2 + 1] = right[i] * gain;
-    }
-    return buffer;
-}
-#endif // GROOVEBOX_WITH_FLUIDSYNTH
 }  // namespace
 
 struct RenderSignature {
@@ -1274,39 +633,25 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
         }
     }
 
-#ifdef GROOVEBOX_WITH_ALSA
-  #ifdef GROOVEBOX_WITH_JACK
+#ifdef GROOVEBOX_WITH_JACK
     ensureJackMidiReady();
-  #else
-    ensureZynMidiReady();
-  #endif
-    scanZynPresets();
-    if (hasZyn()) {
-        QString preset;
-        QString presetPath;
-        if (!g_zynPresets.isEmpty()) {
-            preset = g_zynPresets.first().display;
-            presetPath = g_zynPresets.first().path;
-        } else {
-            preset = defaultZynLikeType();
-        }
-        ensureZynRunning(preset, presetPath, m_engineRate);
+    scanHexterPresets();
+    if (hasHexter()) {
+        const QString preset = g_hexterPresets.isEmpty() ? QString("PROGRAM 01")
+                                                         : g_hexterPresets.first().display;
+        const int program = hexterProgramForPreset(preset);
+        ensureHexterRunning(preset, program, m_engineRate);
     }
-    m_zynConnectTimer = new QTimer(this);
-    m_zynConnectTimer->setInterval(300);
-    connect(m_zynConnectTimer, &QTimer::timeout, this, [this]() {
-    #ifdef GROOVEBOX_WITH_JACK
+    m_synthConnectTimer = new QTimer(this);
+    m_synthConnectTimer->setInterval(300);
+    connect(m_synthConnectTimer, &QTimer::timeout, this, [this]() {
         if (!g_jackMidi.active) {
             ensureJackMidiReady();
         }
-    #else
-        ensureZynMidiReady();
-    #endif
-        pollZynState();
         int padIndex = -1;
         for (int i = 0; i < kPadCount; ++i) {
             if (m_isSynth[static_cast<size_t>(i)] &&
-                isZynLikeType(synthTypeFromName(m_synthNames[static_cast<size_t>(i)]))) {
+                isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(i)]))) {
                 padIndex = i;
                 break;
             }
@@ -1315,11 +660,18 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
             return;
         }
         const QString preset = synthPresetFromName(m_synthNames[static_cast<size_t>(padIndex)]);
-        const QString presetPath = zynPathForPreset(preset);
-        ensureZynRunning(preset, presetPath, m_engineRate);
-        pollZynState();
+        const int program = hexterProgramForPreset(preset);
+        ensureHexterRunning(preset, program, m_engineRate);
+        if (g_hexterEngine.pendingNote >= 0) {
+            const int note = g_hexterEngine.pendingNote;
+            const int vel = g_hexterEngine.pendingVelocity;
+            const int lengthMs = g_hexterEngine.pendingLengthMs;
+            g_hexterEngine.pendingNote = -1;
+            jackSendNote(note, vel, true);
+            QTimer::singleShot(lengthMs, [note]() { jackSendNote(note, 0, false); });
+        }
     });
-    m_zynConnectTimer->start();
+    m_synthConnectTimer->start();
 #endif
 }
 
@@ -1340,6 +692,13 @@ PadBank::~PadBank() {
         delete rt;
         m_runtime[i] = nullptr;
     }
+#ifdef GROOVEBOX_WITH_JACK
+    if (g_hexterEngine.proc) {
+        g_hexterEngine.proc->kill();
+        g_hexterEngine.proc->deleteLater();
+        g_hexterEngine.proc = nullptr;
+    }
+#endif
 }
 
 void PadBank::setActivePad(int index) {
@@ -1416,11 +775,6 @@ void PadBank::copyPad(int from, int to) {
         m_synthParams[static_cast<size_t>(to)] = m_synthParams[static_cast<size_t>(from)];
         m_synthBaseMidi[static_cast<size_t>(to)] = m_synthBaseMidi[static_cast<size_t>(from)];
         m_params[static_cast<size_t>(to)] = srcParams;
-        if (PadRuntime *rt = m_runtime[static_cast<size_t>(to)]) {
-            rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(to)], m_engineRate,
-                                m_synthBaseMidi[static_cast<size_t>(to)],
-                                m_synthParams[static_cast<size_t>(to)]);
-        }
     } else {
         const QString path = m_paths[static_cast<size_t>(from)];
         setPadPath(to, path);
@@ -1472,7 +826,7 @@ QString PadBank::synthName(int index) const {
     }
     const QString raw = m_synthNames[static_cast<size_t>(index)];
     const QString preset = synthPresetFromName(raw);
-    return preset.isEmpty() ? defaultZynLikeType() : preset;
+    return preset.isEmpty() ? defaultHexterType() : preset;
 }
 
 QString PadBank::synthId(int index) const {
@@ -1576,24 +930,18 @@ void PadBank::setSynth(int index, const QString &name) {
     }
     QString synthName = name;
     const QString type = synthTypeFromName(name);
-    if (!name.contains(":")) {
-        synthName = makeSynthName(defaultZynLikeType(),
-                                  QString::fromLatin1(kSynthPresets[0].name));
+    if (!name.contains(":") || !isHexterType(type)) {
+        synthName = makeSynthName(defaultHexterType(), QString("PROGRAM 01"));
     }
 
     m_isSynth[static_cast<size_t>(index)] = true;
     m_synthNames[static_cast<size_t>(index)] = synthName;
     m_paths[static_cast<size_t>(index)].clear();
-    const SynthPresetInfo *preset = findSynthPreset(synthName);
-    if (preset) {
-        m_synthBaseMidi[static_cast<size_t>(index)] = preset->note;
-    } else {
-        m_synthBaseMidi[static_cast<size_t>(index)] = 60;
-    }
+    m_synthBaseMidi[static_cast<size_t>(index)] = 60;
 
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (rt) {
-        if (isZynLikeType(type)) {
+        if (isHexterType(type)) {
             rt->rawBuffer.reset();
             rt->processedBuffer.reset();
             rt->processedReady = false;
@@ -1602,16 +950,11 @@ void PadBank::setSynth(int index, const QString &name) {
             rt->rawDurationMs = 0;
             rt->durationMs = 0;
             rt->normalizeGain = 1.0f;
-#ifdef GROOVEBOX_WITH_ALSA
+#ifdef GROOVEBOX_WITH_JACK
             const QString preset = synthPresetFromName(synthName);
-            const QString presetPath = zynPathForPreset(preset);
-            ensureZynRunning(preset, presetPath, m_engineRate);
+            const int program = hexterProgramForPreset(preset);
+            ensureHexterRunning(preset, program, m_engineRate);
 #endif
-        } else {
-            rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
-                                m_synthBaseMidi[static_cast<size_t>(index)],
-                                m_synthParams[static_cast<size_t>(index)]);
-            rt->normalizeGain = 1.0f;
         }
     }
     if (m_engineAvailable && m_engine) {
@@ -1785,6 +1128,9 @@ void PadBank::setSynthWave(int index, int wave) {
     if (index < 0 || index >= padCount()) {
         return;
     }
+    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        return;
+    }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.wave = qBound(0, wave, 4);
     if (isSynth(index)) {
@@ -1797,6 +1143,9 @@ void PadBank::setSynthWave(int index, int wave) {
 
 void PadBank::setSynthVoices(int index, int voices) {
     if (index < 0 || index >= padCount()) {
+        return;
+    }
+    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         return;
     }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
@@ -1813,6 +1162,9 @@ void PadBank::setSynthDetune(int index, float detune) {
     if (index < 0 || index >= padCount()) {
         return;
     }
+    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        return;
+    }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.detune = qBound(0.0f, detune, 1.0f);
     if (isSynth(index)) {
@@ -1825,6 +1177,9 @@ void PadBank::setSynthDetune(int index, float detune) {
 
 void PadBank::setSynthOctave(int index, int octave) {
     if (index < 0 || index >= padCount()) {
+        return;
+    }
+    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         return;
     }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
@@ -1863,7 +1218,7 @@ bool PadBank::isPadReady(int index) const {
         return true;
     }
     if (isSynth(index)) {
-        if (isZynLikeType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
             return true;
         }
         return rt->rawBuffer && rt->rawBuffer->isValid();
@@ -2338,25 +1693,26 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
-    if (synthPad && isZynLikeType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
-#ifdef GROOVEBOX_WITH_ALSA
+    if (synthPad && isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+#ifdef GROOVEBOX_WITH_JACK
         const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
         const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
-        const QString presetPath = zynPathForPreset(presetName);
-        if (ensureZynRunning(presetName, presetPath, m_engineRate)) {
+        const int program = hexterProgramForPreset(presetName);
+        if (ensureHexterRunning(presetName, program, m_engineRate)) {
             const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
             const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-            sendZynNote(baseMidi, velocity, true);
+            jackSendProgram(program);
+            jackSendNote(baseMidi, velocity, true);
             const int lengthMs =
                 qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
-            QTimer::singleShot(lengthMs, this, [baseMidi]() { sendZynNote(baseMidi, 0, false); });
+            QTimer::singleShot(lengthMs, this, [baseMidi]() { jackSendNote(baseMidi, 0, false); });
             return;
         }
         const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
         const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
         const int lengthMs =
             qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
-        queueZynNote(baseMidi, velocity, lengthMs);
+        queueHexterNote(baseMidi, velocity, lengthMs);
         return;
 #endif
     }
@@ -2579,19 +1935,20 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
     if (!rt) {
         return;
     }
-    if (isZynLikeType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
-#ifdef GROOVEBOX_WITH_ALSA
+    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+#ifdef GROOVEBOX_WITH_JACK
         const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
-        const QString presetPath = zynPathForPreset(presetName);
-        if (ensureZynRunning(presetName, presetPath, m_engineRate)) {
+        const int program = hexterProgramForPreset(presetName);
+        if (ensureHexterRunning(presetName, program, m_engineRate)) {
             PadParams &params = m_params[static_cast<size_t>(index)];
             const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-            sendZynNote(midiNote, velocity, true);
             const int bpm = m_bpm;
             const int stepMs = 60000 / qMax(1, bpm) / 4;
             const int steps = qMax(1, lengthSteps);
             const int lengthMs = qBound(60, steps * stepMs, 4000);
-            QTimer::singleShot(lengthMs, this, [midiNote]() { sendZynNote(midiNote, 0, false); });
+            jackSendProgram(program);
+            jackSendNote(midiNote, velocity, true);
+            QTimer::singleShot(lengthMs, this, [midiNote]() { jackSendNote(midiNote, 0, false); });
             return;
         }
         PadParams &params = m_params[static_cast<size_t>(index)];
@@ -2600,7 +1957,7 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
         const int stepMs = 60000 / qMax(1, bpm) / 4;
         const int steps = qMax(1, lengthSteps);
         const int lengthMs = qBound(60, steps * stepMs, 4000);
-        queueZynNote(midiNote, velocity, lengthMs);
+        queueHexterNote(midiNote, velocity, lengthMs);
         return;
 #endif
     }
@@ -2777,17 +2134,15 @@ QString PadBank::stretchLabel(int index) {
 }
 
 QStringList PadBank::synthPresets() {
-    scanZynPresets();
+    scanHexterPresets();
     QStringList list;
-    for (const auto &preset : g_zynPresets) {
+    for (const auto &preset : g_hexterPresets) {
         list << preset.display;
     }
     if (!list.isEmpty()) {
         return list;
     }
-    for (const auto &preset : kSynthPresets) {
-        list << QString::fromLatin1(preset.name);
-    }
+    list << "PROGRAM 01";
     return list;
 }
 
@@ -2796,23 +2151,17 @@ QStringList PadBank::serumWaves() {
 }
 
 QStringList PadBank::synthTypes() {
-    return {defaultZynLikeType()};
+    return {defaultHexterType()};
 }
 
-bool PadBank::hasFluidSynth() {
-#ifdef GROOVEBOX_WITH_FLUIDSYNTH
-    return true;
-#else
-    return false;
-#endif
-}
-
-bool PadBank::hasZyn() {
+bool PadBank::hasHexter() {
 #ifdef Q_OS_LINUX
-    if (!QStandardPaths::findExecutable("yoshimi").isEmpty()) {
+    if (!QStandardPaths::findExecutable("hexter").isEmpty()) {
         return true;
     }
-    return !QStandardPaths::findExecutable("zynaddsubfx").isEmpty();
+    if (!QStandardPaths::findExecutable("jack-dssi-host").isEmpty()) {
+        return true;
+    }
 #else
     return false;
 #endif

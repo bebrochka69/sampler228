@@ -11,26 +11,20 @@
 namespace {
 QString synthIdOrDefault(PadBank *pads, int pad) {
     const QString defaultType =
-        PadBank::synthTypes().isEmpty() ? QString("YOSHIMI") : PadBank::synthTypes().first();
+        PadBank::synthTypes().isEmpty() ? QString("HEXTER") : PadBank::synthTypes().first();
     if (!pads) {
-        return QString("%1:KEYS/PIANO 1").arg(defaultType);
+        return QString("%1:PROGRAM 01").arg(defaultType);
     }
     const QString id = pads->synthId(pad);
     if (!id.isEmpty()) {
         return id;
     }
-    return QString("%1:KEYS/PIANO 1").arg(defaultType);
+    return QString("%1:PROGRAM 01").arg(defaultType);
 }
 
 QString synthType(const QString &id) {
-    const QString up = id.trimmed().toUpper();
-    if (up.startsWith("YOSHIMI")) {
-        return "YOSHIMI";
-    }
-    if (up.startsWith("ZYN")) {
-        return "YOSHIMI";
-    }
-    return "YOSHIMI";
+    Q_UNUSED(id);
+    return "HEXTER";
 }
 
 QString synthPreset(const QString &id) {
@@ -51,17 +45,11 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
         m_fluidPresets = PadBank::synthPresets();
     }
     if (m_fluidPresets.isEmpty()) {
-        m_fluidPresets << "KEYS/PIANO 1" << "KEYS/PIANO 2" << "LEADS/SAW" << "BASS/FINGER"
-                       << "PADS/WARM";
+        m_fluidPresets << "PROGRAM 01" << "PROGRAM 02" << "PROGRAM 03" << "PROGRAM 04"
+                       << "PROGRAM 05";
     }
     m_categories.clear();
-    for (const QString &item : m_fluidPresets) {
-        const QStringList parts = item.split('/');
-        const QString group = parts.value(0, "MISC").toUpper();
-        if (!m_categories.contains(group)) {
-            m_categories << group;
-        }
-    }
+    m_categories << "PROGRAMS";
 
     if (m_pads) {
         m_activePad = m_pads->activePad();
@@ -102,7 +90,7 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     for (const PresetRow &row : m_presetRows) {
         if (!row.header && row.rect.contains(pos) && m_pads) {
             const QString type =
-                PadBank::synthTypes().isEmpty() ? QString("YOSHIMI") : PadBank::synthTypes().first();
+                PadBank::synthTypes().isEmpty() ? QString("HEXTER") : PadBank::synthTypes().first();
             m_pads->setSynth(m_activePad, QString("%1:%2").arg(type, row.presetId));
             update();
             return;
@@ -176,14 +164,14 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     p.drawRoundedRect(right, Theme::px(10), Theme::px(10));
 
     const QString activeCat =
-        m_categories.isEmpty() ? QString("MISC")
+        m_categories.isEmpty() ? QString("PROGRAMS")
                                : m_categories[qBound(0, m_selectedCategory, m_categories.size() - 1)];
     const float rowH = Theme::pxF(30.0f);
     float y = right.top() + Theme::px(8);
     m_presetRows.clear();
     for (const QString &item : m_fluidPresets) {
         const QStringList parts = item.split('/');
-        const QString group = parts.value(0, "MISC").toUpper();
+        const QString group = "PROGRAMS";
         if (group != activeCat) {
             continue;
         }

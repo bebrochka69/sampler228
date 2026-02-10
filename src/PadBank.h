@@ -100,8 +100,7 @@ public:
     static QStringList synthPresets();
     static QStringList serumWaves();
     static QStringList synthTypes();
-    static bool hasFluidSynth();
-    static bool hasZyn();
+    static bool hasHexter();
     void setBusEffects(int bus, const QVector<BusEffect> &effects);
     float busMeter(int bus) const;
     float busGain(int bus) const;
@@ -137,5 +136,5 @@ private:
     QString m_ffmpegPath;
     std::unique_ptr<class AudioEngine> m_engine;
     std::array<float, 6> m_busGain{};
-    QTimer *m_zynConnectTimer = nullptr;
+    QTimer *m_synthConnectTimer = nullptr;
 };
