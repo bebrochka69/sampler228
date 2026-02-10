@@ -11,7 +11,7 @@
 namespace {
 QString synthIdOrDefault(PadBank *pads, int pad) {
     const QString defaultType =
-        PadBank::synthTypes().isEmpty() ? QString("HEXTER") : PadBank::synthTypes().first();
+        PadBank::synthTypes().isEmpty() ? QString("MINIDEXED") : PadBank::synthTypes().first();
     if (!pads) {
         return QString("%1:PROGRAM 01").arg(defaultType);
     }
@@ -23,8 +23,14 @@ QString synthIdOrDefault(PadBank *pads, int pad) {
 }
 
 QString synthType(const QString &id) {
-    Q_UNUSED(id);
-    return "HEXTER";
+    if (id.isEmpty()) {
+        return QString("MINIDEXED");
+    }
+    const int colon = id.indexOf(':');
+    if (colon >= 0) {
+        return id.left(colon).trimmed().toUpper();
+    }
+    return QString("MINIDEXED");
 }
 
 QString synthPreset(const QString &id) {
@@ -90,7 +96,7 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     for (const PresetRow &row : m_presetRows) {
         if (!row.header && row.rect.contains(pos) && m_pads) {
             const QString type =
-                PadBank::synthTypes().isEmpty() ? QString("HEXTER") : PadBank::synthTypes().first();
+                PadBank::synthTypes().isEmpty() ? QString("MINIDEXED") : PadBank::synthTypes().first();
             m_pads->setSynth(m_activePad, QString("%1:%2").arg(type, row.presetId));
             update();
             return;

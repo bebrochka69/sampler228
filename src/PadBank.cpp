@@ -23,10 +23,8 @@
 #include <cstdint>
 #include <mutex>
 
-#ifdef GROOVEBOX_WITH_JACK
-#include <jack/jack.h>
-#include <jack/midiport.h>
-#include <jack/ringbuffer.h>
+#ifdef GROOVEBOX_WITH_ALSA
+#include <alsa/asoundlib.h>
 #endif
 
 namespace {
@@ -50,18 +48,18 @@ constexpr const char *kFxBusLabels[] = {
     "E",
 };
 
-QString defaultHexterType();
+QString defaultMiniDexedType();
 
 QString synthTypeFromName(const QString &name) {
     const QString upper = name.trimmed().toUpper();
-    if (upper.startsWith("HEXTER")) {
-        return "HEXTER";
+    if (upper.startsWith("MINIDEXED") || upper.startsWith("MINI DEXED")) {
+        return "MINIDEXED";
     }
     if (upper.contains(":")) {
         const int colon = upper.indexOf(':');
         return upper.left(colon).trimmed();
     }
-    return defaultHexterType();
+    return defaultMiniDexedType();
 }
 
 QString synthPresetFromName(const QString &name) {
@@ -78,56 +76,47 @@ QString makeSynthName(const QString &type, const QString &preset) {
     return QString("%1:%2").arg(t, preset);
 }
 
-bool isHexterType(const QString &type) {
+bool isMiniDexedType(const QString &type) {
     const QString t = type.trimmed().toUpper();
-    return t == "HEXTER";
+    return t == "MINIDEXED";
 }
 
-QString defaultHexterType() {
+QString defaultMiniDexedType() {
 #ifdef Q_OS_LINUX
-    if (!QStandardPaths::findExecutable("hexter").isEmpty()) {
-        return QStringLiteral("HEXTER");
-    }
-    if (!QStandardPaths::findExecutable("jack-dssi-host").isEmpty()) {
-        return QStringLiteral("HEXTER");
+    if (!QStandardPaths::findExecutable("minidexed").isEmpty()) {
+        return QStringLiteral("MINIDEXED");
     }
 #endif
-    return QStringLiteral("HEXTER");
+    return QStringLiteral("MINIDEXED");
 }
-
-struct HexterPresetInfo {
-    QString name;
-    int program = 0;
-    int note = 60;
-};
 
 float clamp01(float value) {
     return qBound(0.0f, value, 1.0f);
 }
 
-struct HexterPreset {
+struct MiniDexedPreset {
     QString display;
     int program = 0;
 };
 
-static QVector<HexterPreset> g_hexterPresets;
-static bool g_hexterScanned = false;
+static QVector<MiniDexedPreset> g_minidexedPresets;
+static bool g_minidexedScanned = false;
 
-static void scanHexterPresets() {
-    if (g_hexterScanned) {
+static void scanMiniDexedPresets() {
+    if (g_minidexedScanned) {
         return;
     }
-    g_hexterScanned = true;
-    g_hexterPresets.clear();
+    g_minidexedScanned = true;
+    g_minidexedPresets.clear();
     for (int i = 0; i < 32; ++i) {
-        HexterPreset preset;
+        MiniDexedPreset preset;
         preset.program = i;
         preset.display = QString("PROGRAM %1").arg(i + 1, 2, 10, QChar('0'));
-        g_hexterPresets.push_back(preset);
+        g_minidexedPresets.push_back(preset);
     }
 }
 
-static int hexterProgramForPreset(const QString &display) {
+static int minidexedProgramForPreset(const QString &display) {
     const QString trimmed = display.trimmed();
     QRegularExpression re("(\\d+)");
     const QRegularExpressionMatch m = re.match(trimmed);
@@ -138,8 +127,8 @@ static int hexterProgramForPreset(const QString &display) {
             return qBound(0, value - 1, 127);
         }
     }
-    scanHexterPresets();
-    for (const auto &preset : g_hexterPresets) {
+    scanMiniDexedPresets();
+    for (const auto &preset : g_minidexedPresets) {
         if (preset.display.compare(trimmed, Qt::CaseInsensitive) == 0) {
             return preset.program;
         }
@@ -147,106 +136,130 @@ static int hexterProgramForPreset(const QString &display) {
     return 0;
 }
 
-#ifdef GROOVEBOX_WITH_JACK
-struct JackMidiEvent {
-    uint32_t size = 0;
-    uint32_t time = 0;
-    uint8_t data[3] = {0, 0, 0};
-};
-
-struct JackMidiEngine {
-    jack_client_t *client = nullptr;
-    jack_port_t *port = nullptr;
-    jack_ringbuffer_t *ring = nullptr;
+#ifdef GROOVEBOX_WITH_ALSA
+struct AlsaMidiEngine {
+    snd_seq_t *seq = nullptr;
+    int outPort = -1;
     bool active = false;
-    bool connected = false;
-    QString targetPort;
+    int connectedClient = -1;
+    int connectedPort = -1;
 };
 
-static JackMidiEngine g_jackMidi;
+static AlsaMidiEngine g_alsaMidi;
 
-static int jackProcessCallback(jack_nframes_t nframes, void *arg) {
-    auto *eng = static_cast<JackMidiEngine *>(arg);
-    if (!eng || !eng->port) {
-        return 0;
-    }
-    void *buf = jack_port_get_buffer(eng->port, nframes);
-    jack_midi_clear_buffer(buf);
-    if (!eng->ring) {
-        return 0;
-    }
-    while (jack_ringbuffer_read_space(eng->ring) >= sizeof(JackMidiEvent)) {
-        JackMidiEvent ev;
-        jack_ringbuffer_read(eng->ring, reinterpret_cast<char *>(&ev), sizeof(JackMidiEvent));
-        const jack_nframes_t offset = ev.time < nframes ? ev.time : 0;
-        jack_midi_event_write(buf, offset, ev.data, ev.size);
-    }
-    return 0;
-}
-
-static bool ensureJackMidiReady() {
-    if (g_jackMidi.active && g_jackMidi.client && g_jackMidi.port) {
+static bool ensureAlsaMidiReady() {
+    if (g_alsaMidi.active && g_alsaMidi.seq && g_alsaMidi.outPort >= 0) {
         return true;
     }
-    jack_status_t status = static_cast<jack_status_t>(0);
-    g_jackMidi.client = jack_client_open("GrooveBox", JackNullOption, &status);
-    if (!g_jackMidi.client) {
-        g_jackMidi.client = jack_client_open("GrooveBoxMidi", JackNullOption, &status);
-    }
-    if (!g_jackMidi.client) {
+    if (snd_seq_open(&g_alsaMidi.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
+        g_alsaMidi.seq = nullptr;
         return false;
     }
-    g_jackMidi.port = jack_port_register(g_jackMidi.client, "midi_out",
-                                         JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
-    if (!g_jackMidi.port) {
-        jack_client_close(g_jackMidi.client);
-        g_jackMidi.client = nullptr;
+    snd_seq_set_client_name(g_alsaMidi.seq, "GrooveBox");
+    g_alsaMidi.outPort = snd_seq_create_simple_port(
+        g_alsaMidi.seq,
+        "midi_out",
+        SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
+        SND_SEQ_PORT_TYPE_APPLICATION);
+    if (g_alsaMidi.outPort < 0) {
+        snd_seq_close(g_alsaMidi.seq);
+        g_alsaMidi.seq = nullptr;
         return false;
     }
-    g_jackMidi.ring = jack_ringbuffer_create(16384);
-    if (!g_jackMidi.ring) {
-        return false;
-    }
-    jack_set_process_callback(g_jackMidi.client, jackProcessCallback, &g_jackMidi);
-    if (jack_activate(g_jackMidi.client) != 0) {
-        return false;
-    }
-    g_jackMidi.active = true;
-    g_jackMidi.connected = false;
+    g_alsaMidi.active = true;
+    g_alsaMidi.connectedClient = -1;
+    g_alsaMidi.connectedPort = -1;
     return true;
 }
 
-static bool jackSendMidi(const uint8_t *data, uint32_t size, uint32_t time = 0) {
-    if (!ensureJackMidiReady() || !g_jackMidi.ring) {
+static bool findMiniDexedPort(int &client, int &port) {
+    if (!g_alsaMidi.seq) {
         return false;
     }
-    if (jack_ringbuffer_write_space(g_jackMidi.ring) < sizeof(JackMidiEvent)) {
+    snd_seq_client_info_t *cinfo = nullptr;
+    snd_seq_port_info_t *pinfo = nullptr;
+    snd_seq_client_info_alloca(&cinfo);
+    snd_seq_port_info_alloca(&pinfo);
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(g_alsaMidi.seq, cinfo) >= 0) {
+        const int c = snd_seq_client_info_get_client(cinfo);
+        const QString cname = QString::fromLocal8Bit(snd_seq_client_info_get_name(cinfo));
+        if (!cname.contains("minidexed", Qt::CaseInsensitive)) {
+            continue;
+        }
+        snd_seq_port_info_set_client(pinfo, c);
+        snd_seq_port_info_set_port(pinfo, -1);
+        while (snd_seq_query_next_port(g_alsaMidi.seq, pinfo) >= 0) {
+            const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if (!(caps & SND_SEQ_PORT_CAP_WRITE) && !(caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
+                continue;
+            }
+            client = c;
+            port = snd_seq_port_info_get_port(pinfo);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool connectMiniDexed() {
+    if (!ensureAlsaMidiReady()) {
         return false;
     }
-    JackMidiEvent ev;
-    ev.size = size;
-    ev.time = time;
-    ev.data[0] = data[0];
-    ev.data[1] = size > 1 ? data[1] : 0;
-    ev.data[2] = size > 2 ? data[2] : 0;
-    jack_ringbuffer_write(g_jackMidi.ring, reinterpret_cast<const char *>(&ev), sizeof(JackMidiEvent));
+    int client = -1;
+    int port = -1;
+    if (!findMiniDexedPort(client, port)) {
+        qWarning() << "MiniDexed MIDI port not found";
+        return false;
+    }
+    if (g_alsaMidi.connectedClient == client && g_alsaMidi.connectedPort == port) {
+        return true;
+    }
+    const int result = snd_seq_connect_to(g_alsaMidi.seq, g_alsaMidi.outPort, client, port);
+    if (result < 0) {
+        qWarning() << "Failed to connect MiniDexed MIDI" << result;
+        return false;
+    }
+    g_alsaMidi.connectedClient = client;
+    g_alsaMidi.connectedPort = port;
     return true;
 }
 
-static void jackSendNote(int note, int vel, bool on) {
+static void alsaSendRaw(const uint8_t *data, int size) {
+    if (!ensureAlsaMidiReady()) {
+        return;
+    }
+    snd_seq_event_t ev;
+    snd_seq_ev_clear(&ev);
+    snd_seq_ev_set_source(&ev, g_alsaMidi.outPort);
+    snd_seq_ev_set_subs(&ev);
+    snd_seq_ev_set_direct(&ev);
+    if (size == 2 && (data[0] & 0xF0) == 0xC0) {
+        snd_seq_ev_set_pgmchange(&ev, data[0] & 0x0F, data[1]);
+    } else if (size >= 3 && (data[0] & 0xF0) == 0x90) {
+        snd_seq_ev_set_noteon(&ev, data[0] & 0x0F, data[1], data[2]);
+    } else if (size >= 3 && (data[0] & 0xF0) == 0x80) {
+        snd_seq_ev_set_noteoff(&ev, data[0] & 0x0F, data[1], data[2]);
+    } else {
+        snd_seq_ev_set_variable(&ev, size, const_cast<uint8_t *>(data));
+    }
+    snd_seq_event_output_direct(g_alsaMidi.seq, &ev);
+}
+
+static void alsaSendNote(int note, int vel, bool on) {
     const uint8_t status = static_cast<uint8_t>(on ? 0x90 : 0x80);
     uint8_t data[3] = {status, static_cast<uint8_t>(note & 0x7F),
                        static_cast<uint8_t>(vel & 0x7F)};
-    jackSendMidi(data, 3, 0);
+    alsaSendRaw(data, 3);
 }
 
-static void jackSendProgram(int program) {
+static void alsaSendProgram(int program) {
     const uint8_t status = 0xC0;
     uint8_t data[2] = {status, static_cast<uint8_t>(program & 0x7F)};
-    jackSendMidi(data, 2, 0);
+    alsaSendRaw(data, 2);
 }
 
-struct HexterEngine {
+struct MiniDexedEngine {
     QProcess *proc = nullptr;
     QString presetName;
     int program = 0;
@@ -256,157 +269,88 @@ struct HexterEngine {
     int pendingLengthMs = 0;
 };
 
-static HexterEngine g_hexterEngine;
+static MiniDexedEngine g_minidexedEngine;
 
-static QString findHexterCommand(QStringList &args) {
+static QString findMiniDexedCommand() {
 #ifdef Q_OS_LINUX
-    const QString custom = qEnvironmentVariable("GROOVEBOX_HEXTER_CMD");
+    const QString custom = qEnvironmentVariable("GROOVEBOX_MINIDEXED_CMD");
     if (!custom.isEmpty()) {
         return custom;
     }
-    const QString host = QStandardPaths::findExecutable("jack-dssi-host");
-    QString plugin = qEnvironmentVariable("GROOVEBOX_HEXTER_PLUGIN");
-    if (plugin.isEmpty()) {
-        const QStringList candidates = {
-            "/usr/lib/dssi/hexter.so",
-            "/usr/local/lib/dssi/hexter.so",
-            "/usr/lib64/dssi/hexter.so"
-        };
-        for (const QString &cand : candidates) {
-            if (QFileInfo::exists(cand)) {
-                plugin = cand;
-                break;
-            }
-        }
-    }
-    if (!host.isEmpty() && !plugin.isEmpty()) {
-        args << plugin;
-        return host;
-    }
-    const QString standalone = QStandardPaths::findExecutable("hexter");
-    if (!standalone.isEmpty()) {
-        return standalone;
+    const QString cmd = QStandardPaths::findExecutable("minidexed");
+    if (!cmd.isEmpty()) {
+        return cmd;
     }
 #endif
     return QString();
 }
 
-static bool jackConnectHexter(bool connectAudio) {
-    if (!g_jackMidi.client || !g_jackMidi.port) {
-        return false;
+static void applyAlsaEnv(QProcessEnvironment &env) {
+    const QString card = qEnvironmentVariable("GROOVEBOX_ALSA_CARD");
+    const QString pcm = qEnvironmentVariable("GROOVEBOX_ALSA_PCM_DEVICE");
+    if (!card.isEmpty()) {
+        env.insert("ALSA_CARD", card);
+        env.insert("ALSA_CTL_CARD", card);
     }
-    if (g_jackMidi.connected && !g_jackMidi.targetPort.isEmpty()) {
-        return true;
+    if (!pcm.isEmpty()) {
+        env.insert("ALSA_PCM_DEVICE", pcm);
     }
-    const QString envTarget = qEnvironmentVariable("GROOVEBOX_HEXTER_MIDI_PORT");
-    const char *src = jack_port_name(g_jackMidi.port);
-    if (!src) {
-        return false;
-    }
-    const char **ports = nullptr;
-    if (!envTarget.isEmpty()) {
-        const QByteArray pattern = envTarget.toLocal8Bit();
-        ports = jack_get_ports(g_jackMidi.client, pattern.constData(),
-                               JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
-    }
-    if (!ports || !ports[0]) {
-        if (ports) {
-            jack_free(ports);
+    const QString dev = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
+    if (!dev.isEmpty() && dev.startsWith("hw:")) {
+        const QStringList parts = dev.mid(3).split(',');
+        if (parts.size() >= 1 && !env.contains("ALSA_CARD")) {
+            env.insert("ALSA_CARD", parts[0]);
+            env.insert("ALSA_CTL_CARD", parts[0]);
         }
-        ports = jack_get_ports(g_jackMidi.client, "hexter.*midi.*in",
-                               JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
-    }
-    if (!ports || !ports[0]) {
-        if (ports) {
-            jack_free(ports);
+        if (parts.size() >= 2 && !env.contains("ALSA_PCM_DEVICE")) {
+            env.insert("ALSA_PCM_DEVICE", parts[1]);
         }
-        ports = jack_get_ports(g_jackMidi.client, "Hexter.*midi.*in",
-                               JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
     }
-    if (!ports || !ports[0]) {
-        if (ports) {
-            jack_free(ports);
-        }
-        ports = jack_get_ports(g_jackMidi.client, "jack-dssi-host.*midi.*in",
-                               JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
-    }
-    if (ports && ports[0]) {
-        jack_connect(g_jackMidi.client, src, ports[0]);
-        g_jackMidi.connected = true;
-        g_jackMidi.targetPort = QString::fromLocal8Bit(ports[0]);
-    }
-    if (ports) {
-        jack_free(ports);
-    }
-    if (!g_jackMidi.connected) {
-        qWarning() << "Hexter MIDI port not found";
-    }
-    if (connectAudio && g_jackMidi.client) {
-        const char **hL = jack_get_ports(g_jackMidi.client, "hexter.*left",
-                                         JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
-        const char **hR = jack_get_ports(g_jackMidi.client, "hexter.*right",
-                                         JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
-        const char **p1 = jack_get_ports(g_jackMidi.client, "system:playback_1",
-                                         JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput);
-        const char **p2 = jack_get_ports(g_jackMidi.client, "system:playback_2",
-                                         JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput);
-        if (hL && hL[0] && p1 && p1[0]) {
-            jack_connect(g_jackMidi.client, hL[0], p1[0]);
-        }
-        if (hR && hR[0] && p2 && p2[0]) {
-            jack_connect(g_jackMidi.client, hR[0], p2[0]);
-        }
-        if (hL) jack_free(hL);
-        if (hR) jack_free(hR);
-        if (p1) jack_free(p1);
-        if (p2) jack_free(p2);
-    }
-    return g_jackMidi.connected;
 }
 
-static bool ensureHexterRunning(const QString &presetName, int program, int sampleRate) {
+static bool ensureMiniDexedRunning(const QString &presetName, int program, int sampleRate) {
     Q_UNUSED(sampleRate);
-    if (!g_hexterEngine.proc) {
-        g_hexterEngine.proc = new QProcess();
+    if (!g_minidexedEngine.proc) {
+        g_minidexedEngine.proc = new QProcess();
     }
-    if (g_hexterEngine.proc->state() == QProcess::Running) {
-        g_hexterEngine.presetName = presetName;
-        g_hexterEngine.program = program;
-        if (g_hexterEngine.ready) {
-            jackSendProgram(program);
+    if (g_minidexedEngine.proc->state() == QProcess::Running) {
+        g_minidexedEngine.presetName = presetName;
+        g_minidexedEngine.program = program;
+        if (g_minidexedEngine.ready) {
+            alsaSendProgram(program);
         }
-        return g_hexterEngine.ready;
+        return g_minidexedEngine.ready;
     }
 
-    QStringList args;
-    const QString cmd = findHexterCommand(args);
+    const QString cmd = findMiniDexedCommand();
     if (cmd.isEmpty()) {
-        qWarning() << "Hexter command not found";
+        qWarning() << "MiniDexed command not found";
         return false;
     }
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    g_hexterEngine.proc->setProcessEnvironment(env);
-    g_hexterEngine.proc->setProgram(cmd);
-    g_hexterEngine.proc->setArguments(args);
-    g_hexterEngine.proc->setProcessChannelMode(QProcess::MergedChannels);
-    g_hexterEngine.ready = false;
-    g_hexterEngine.presetName = presetName;
-    g_hexterEngine.program = program;
-    g_hexterEngine.proc->start();
-    if (!ensureJackMidiReady()) {
+    applyAlsaEnv(env);
+    g_minidexedEngine.proc->setProcessEnvironment(env);
+    g_minidexedEngine.proc->setProgram(cmd);
+    g_minidexedEngine.proc->setArguments(QStringList());
+    g_minidexedEngine.proc->setProcessChannelMode(QProcess::MergedChannels);
+    g_minidexedEngine.ready = false;
+    g_minidexedEngine.presetName = presetName;
+    g_minidexedEngine.program = program;
+    g_minidexedEngine.proc->start();
+    if (!ensureAlsaMidiReady()) {
         return false;
     }
-    g_hexterEngine.ready = jackConnectHexter(false);
-    if (g_hexterEngine.ready) {
-        jackSendProgram(program);
+    g_minidexedEngine.ready = connectMiniDexed();
+    if (g_minidexedEngine.ready) {
+        alsaSendProgram(program);
     }
-    return g_hexterEngine.ready;
+    return g_minidexedEngine.ready;
 }
 
-static void queueHexterNote(int note, int velocity, int lengthMs) {
-    g_hexterEngine.pendingNote = note;
-    g_hexterEngine.pendingVelocity = velocity;
-    g_hexterEngine.pendingLengthMs = lengthMs;
+static void queueMiniDexedNote(int note, int velocity, int lengthMs) {
+    g_minidexedEngine.pendingNote = note;
+    g_minidexedEngine.pendingVelocity = velocity;
+    g_minidexedEngine.pendingLengthMs = lengthMs;
 }
 #endif
 
@@ -633,25 +577,21 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
         }
     }
 
-#ifdef GROOVEBOX_WITH_JACK
-    ensureJackMidiReady();
-    scanHexterPresets();
-    if (hasHexter()) {
-        const QString preset = g_hexterPresets.isEmpty() ? QString("PROGRAM 01")
-                                                         : g_hexterPresets.first().display;
-        const int program = hexterProgramForPreset(preset);
-        ensureHexterRunning(preset, program, m_engineRate);
+#ifdef GROOVEBOX_WITH_ALSA
+    scanMiniDexedPresets();
+    if (hasMiniDexed()) {
+        const QString preset = g_minidexedPresets.isEmpty() ? QString("PROGRAM 01")
+                                                            : g_minidexedPresets.first().display;
+        const int program = minidexedProgramForPreset(preset);
+        ensureMiniDexedRunning(preset, program, m_engineRate);
     }
     m_synthConnectTimer = new QTimer(this);
     m_synthConnectTimer->setInterval(300);
     connect(m_synthConnectTimer, &QTimer::timeout, this, [this]() {
-        if (!g_jackMidi.active) {
-            ensureJackMidiReady();
-        }
         int padIndex = -1;
         for (int i = 0; i < kPadCount; ++i) {
             if (m_isSynth[static_cast<size_t>(i)] &&
-                isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(i)]))) {
+                isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(i)]))) {
                 padIndex = i;
                 break;
             }
@@ -660,15 +600,22 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
             return;
         }
         const QString preset = synthPresetFromName(m_synthNames[static_cast<size_t>(padIndex)]);
-        const int program = hexterProgramForPreset(preset);
-        ensureHexterRunning(preset, program, m_engineRate);
-        if (g_hexterEngine.pendingNote >= 0) {
-            const int note = g_hexterEngine.pendingNote;
-            const int vel = g_hexterEngine.pendingVelocity;
-            const int lengthMs = g_hexterEngine.pendingLengthMs;
-            g_hexterEngine.pendingNote = -1;
-            jackSendNote(note, vel, true);
-            QTimer::singleShot(lengthMs, [note]() { jackSendNote(note, 0, false); });
+        const int program = minidexedProgramForPreset(preset);
+        ensureMiniDexedRunning(preset, program, m_engineRate);
+        if (!g_minidexedEngine.ready) {
+            g_minidexedEngine.ready = connectMiniDexed();
+            if (g_minidexedEngine.ready) {
+                alsaSendProgram(g_minidexedEngine.program);
+            }
+        }
+        if (g_minidexedEngine.ready && g_minidexedEngine.pendingNote >= 0) {
+            const int note = g_minidexedEngine.pendingNote;
+            const int vel = g_minidexedEngine.pendingVelocity;
+            const int lengthMs = g_minidexedEngine.pendingLengthMs;
+            g_minidexedEngine.pendingNote = -1;
+            alsaSendProgram(g_minidexedEngine.program);
+            alsaSendNote(note, vel, true);
+            QTimer::singleShot(lengthMs, [note]() { alsaSendNote(note, 0, false); });
         }
     });
     m_synthConnectTimer->start();
@@ -692,11 +639,11 @@ PadBank::~PadBank() {
         delete rt;
         m_runtime[i] = nullptr;
     }
-#ifdef GROOVEBOX_WITH_JACK
-    if (g_hexterEngine.proc) {
-        g_hexterEngine.proc->kill();
-        g_hexterEngine.proc->deleteLater();
-        g_hexterEngine.proc = nullptr;
+#ifdef GROOVEBOX_WITH_ALSA
+    if (g_minidexedEngine.proc) {
+        g_minidexedEngine.proc->kill();
+        g_minidexedEngine.proc->deleteLater();
+        g_minidexedEngine.proc = nullptr;
     }
 #endif
 }
@@ -826,7 +773,7 @@ QString PadBank::synthName(int index) const {
     }
     const QString raw = m_synthNames[static_cast<size_t>(index)];
     const QString preset = synthPresetFromName(raw);
-    return preset.isEmpty() ? defaultHexterType() : preset;
+    return preset.isEmpty() ? defaultMiniDexedType() : preset;
 }
 
 QString PadBank::synthId(int index) const {
@@ -929,9 +876,10 @@ void PadBank::setSynth(int index, const QString &name) {
         return;
     }
     QString synthName = name;
-    const QString type = synthTypeFromName(name);
-    if (!name.contains(":") || !isHexterType(type)) {
-        synthName = makeSynthName(defaultHexterType(), QString("PROGRAM 01"));
+    QString type = synthTypeFromName(name);
+    if (!name.contains(":") || !isMiniDexedType(type)) {
+        synthName = makeSynthName(defaultMiniDexedType(), QString("PROGRAM 01"));
+        type = synthTypeFromName(synthName);
     }
 
     m_isSynth[static_cast<size_t>(index)] = true;
@@ -941,7 +889,7 @@ void PadBank::setSynth(int index, const QString &name) {
 
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (rt) {
-        if (isHexterType(type)) {
+        if (isMiniDexedType(type)) {
             rt->rawBuffer.reset();
             rt->processedBuffer.reset();
             rt->processedReady = false;
@@ -950,10 +898,10 @@ void PadBank::setSynth(int index, const QString &name) {
             rt->rawDurationMs = 0;
             rt->durationMs = 0;
             rt->normalizeGain = 1.0f;
-#ifdef GROOVEBOX_WITH_JACK
+#ifdef GROOVEBOX_WITH_ALSA
             const QString preset = synthPresetFromName(synthName);
-            const int program = hexterProgramForPreset(preset);
-            ensureHexterRunning(preset, program, m_engineRate);
+            const int program = minidexedProgramForPreset(preset);
+            ensureMiniDexedRunning(preset, program, m_engineRate);
 #endif
         }
     }
@@ -1128,7 +1076,7 @@ void PadBank::setSynthWave(int index, int wave) {
     if (index < 0 || index >= padCount()) {
         return;
     }
-    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+    if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         return;
     }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
@@ -1145,7 +1093,7 @@ void PadBank::setSynthVoices(int index, int voices) {
     if (index < 0 || index >= padCount()) {
         return;
     }
-    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+    if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         return;
     }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
@@ -1162,7 +1110,7 @@ void PadBank::setSynthDetune(int index, float detune) {
     if (index < 0 || index >= padCount()) {
         return;
     }
-    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+    if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         return;
     }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
@@ -1179,7 +1127,7 @@ void PadBank::setSynthOctave(int index, int octave) {
     if (index < 0 || index >= padCount()) {
         return;
     }
-    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+    if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         return;
     }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
@@ -1218,7 +1166,7 @@ bool PadBank::isPadReady(int index) const {
         return true;
     }
     if (isSynth(index)) {
-        if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
             return true;
         }
         return rt->rawBuffer && rt->rawBuffer->isValid();
@@ -1693,26 +1641,26 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
-    if (synthPad && isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
-#ifdef GROOVEBOX_WITH_JACK
+    if (synthPad && isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+#ifdef GROOVEBOX_WITH_ALSA
         const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
         const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
-        const int program = hexterProgramForPreset(presetName);
-        if (ensureHexterRunning(presetName, program, m_engineRate)) {
+        const int program = minidexedProgramForPreset(presetName);
+        if (ensureMiniDexedRunning(presetName, program, m_engineRate)) {
             const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
             const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-            jackSendProgram(program);
-            jackSendNote(baseMidi, velocity, true);
+            alsaSendProgram(program);
+            alsaSendNote(baseMidi, velocity, true);
             const int lengthMs =
                 qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
-            QTimer::singleShot(lengthMs, this, [baseMidi]() { jackSendNote(baseMidi, 0, false); });
+            QTimer::singleShot(lengthMs, this, [baseMidi]() { alsaSendNote(baseMidi, 0, false); });
             return;
         }
         const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
         const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
         const int lengthMs =
             qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
-        queueHexterNote(baseMidi, velocity, lengthMs);
+        queueMiniDexedNote(baseMidi, velocity, lengthMs);
         return;
 #endif
     }
@@ -1935,20 +1883,20 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
     if (!rt) {
         return;
     }
-    if (isHexterType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
-#ifdef GROOVEBOX_WITH_JACK
+    if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+#ifdef GROOVEBOX_WITH_ALSA
         const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
-        const int program = hexterProgramForPreset(presetName);
-        if (ensureHexterRunning(presetName, program, m_engineRate)) {
+        const int program = minidexedProgramForPreset(presetName);
+        if (ensureMiniDexedRunning(presetName, program, m_engineRate)) {
             PadParams &params = m_params[static_cast<size_t>(index)];
             const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
             const int bpm = m_bpm;
             const int stepMs = 60000 / qMax(1, bpm) / 4;
             const int steps = qMax(1, lengthSteps);
             const int lengthMs = qBound(60, steps * stepMs, 4000);
-            jackSendProgram(program);
-            jackSendNote(midiNote, velocity, true);
-            QTimer::singleShot(lengthMs, this, [midiNote]() { jackSendNote(midiNote, 0, false); });
+            alsaSendProgram(program);
+            alsaSendNote(midiNote, velocity, true);
+            QTimer::singleShot(lengthMs, this, [midiNote]() { alsaSendNote(midiNote, 0, false); });
             return;
         }
         PadParams &params = m_params[static_cast<size_t>(index)];
@@ -1957,7 +1905,7 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
         const int stepMs = 60000 / qMax(1, bpm) / 4;
         const int steps = qMax(1, lengthSteps);
         const int lengthMs = qBound(60, steps * stepMs, 4000);
-        queueHexterNote(midiNote, velocity, lengthMs);
+        queueMiniDexedNote(midiNote, velocity, lengthMs);
         return;
 #endif
     }
@@ -2134,9 +2082,9 @@ QString PadBank::stretchLabel(int index) {
 }
 
 QStringList PadBank::synthPresets() {
-    scanHexterPresets();
+    scanMiniDexedPresets();
     QStringList list;
-    for (const auto &preset : g_hexterPresets) {
+    for (const auto &preset : g_minidexedPresets) {
         list << preset.display;
     }
     if (!list.isEmpty()) {
@@ -2151,20 +2099,18 @@ QStringList PadBank::serumWaves() {
 }
 
 QStringList PadBank::synthTypes() {
-    return {defaultHexterType()};
+    return {defaultMiniDexedType()};
 }
 
-bool PadBank::hasHexter() {
+bool PadBank::hasMiniDexed() {
 #ifdef Q_OS_LINUX
-    if (!QStandardPaths::findExecutable("hexter").isEmpty()) {
-        return true;
-    }
-    if (!QStandardPaths::findExecutable("jack-dssi-host").isEmpty()) {
+    if (!QStandardPaths::findExecutable("minidexed").isEmpty()) {
         return true;
     }
 #else
     return false;
 #endif
+    return false;
 }
 
 int PadBank::sliceCountForIndex(int index) {

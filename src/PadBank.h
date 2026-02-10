@@ -100,7 +100,7 @@ public:
     static QStringList synthPresets();
     static QStringList serumWaves();
     static QStringList synthTypes();
-    static bool hasHexter();
+    static bool hasMiniDexed();
     void setBusEffects(int bus, const QVector<BusEffect> &effects);
     float busMeter(int bus) const;
     float busGain(int bus) const;
