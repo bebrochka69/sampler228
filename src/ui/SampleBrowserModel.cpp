@@ -49,78 +49,13 @@ void scanProcMounts(QSet<QString> &seenRoots,
     }
 }
 
-void scanAudioRecursive(SampleBrowserModel::Node *node, int depth, int maxDepth) {
-    if (!node || !node->isDir || depth > maxDepth) {
-        return;
+QString canonicalOrClean(const QString &path) {
+    QFileInfo info(path);
+    const QString canonical = info.canonicalFilePath();
+    if (!canonical.isEmpty()) {
+        return canonical;
     }
-    QDir dir(node->path);
-    if (!dir.exists()) {
-        return;
-    }
-    if (depth == 0) {
-        node->children.clear();
-    }
-
-    const QFileInfoList dirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Readable,
-                                                 QDir::Name | QDir::IgnoreCase);
-    for (const QFileInfo &info : dirs) {
-        if (info.fileName().startsWith('.')) {
-            continue;
-        }
-        auto child = std::make_unique<SampleBrowserModel::Node>();
-        child->name = info.fileName();
-        child->path = info.absoluteFilePath();
-        child->isDir = true;
-        child->expanded = false;
-        child->scanned = false;
-        child->parent = node;
-        node->children.push_back(std::move(child));
-        scanAudioRecursive(node->children.back().get(), depth + 1, maxDepth);
-    }
-
-    const QFileInfoList files = dir.entryInfoList(QDir::Files | QDir::Readable,
-                                                  QDir::Name | QDir::IgnoreCase);
-    for (const QFileInfo &info : files) {
-        const QString ext = info.suffix().toLower();
-        if (!(ext == "wav" || ext == "mp3")) {
-            continue;
-        }
-        auto child = std::make_unique<SampleBrowserModel::Node>();
-        child->name = info.fileName();
-        child->path = info.absoluteFilePath();
-        child->isDir = false;
-        child->expanded = false;
-        child->scanned = true;
-        child->parent = node;
-        node->children.push_back(std::move(child));
-    }
-
-    node->scanned = true;
-}
-
-bool hasAudioNodes(const std::vector<std::unique_ptr<SampleBrowserModel::Node>> &roots) {
-    std::function<bool(const SampleBrowserModel::Node *)> walk =
-        [&](const SampleBrowserModel::Node *node) -> bool {
-        if (!node) {
-            return false;
-        }
-        if (!node->isDir) {
-            return true;
-        }
-        for (const auto &child : node->children) {
-            if (walk(child.get())) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    for (const auto &root : roots) {
-        if (walk(root.get())) {
-            return true;
-        }
-    }
-    return false;
+    return QDir::cleanPath(path);
 }
 }  // namespace
 
@@ -136,7 +71,7 @@ void SampleBrowserModel::refresh() {
         if (!dir.exists()) {
             return false;
         }
-        const QString normalized = QDir::cleanPath(path);
+        const QString normalized = canonicalOrClean(path);
         if (seenRoots.contains(normalized)) {
             return false;
         }
@@ -186,7 +121,8 @@ void SampleBrowserModel::refresh() {
         const QFileInfoList entries =
             dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
         for (const QFileInfo &info : entries) {
-            addRootIfExists(info.absoluteFilePath(), info.fileName(), true, true);
+            // Avoid heavy recursive scans during refresh; only list root folders.
+            addRootIfExists(info.absoluteFilePath(), info.fileName(), false, false);
         }
     };
 
@@ -198,47 +134,11 @@ void SampleBrowserModel::refresh() {
     scanMountRoot("/media");
     scanMountRoot("/run/media");
     scanMountRoot("/mnt");
+    // Prefer explicit USB mount points, but keep scans shallow for responsiveness.
     addRootIfExists("/mnt/usb", "USB", true, true);
-    addRootIfExists("/mnt/usb/samples", "USB SAMPLES", true, true);
+    addRootIfExists("/mnt/usb/samples", "USB SAMPLES", false, false);
     addRootIfExists("/media/usb", "USB", true, true);
-    addRootIfExists("/media/usb/samples", "USB SAMPLES", true, true);
-
-    // If no audio files found, do a deeper recursive scan on mounted roots.
-    if (!hasAudioNodes(m_roots)) {
-        for (auto &root : m_roots) {
-            if (!root || !root->isDir) {
-                continue;
-            }
-            root->expanded = true;
-            scanAudioRecursive(root.get(), 0, 12);
-        }
-    }
-
-    // If still nothing, do a deeper recursive scan on common USB roots.
-    if (m_roots.empty() || !hasAudioNodes(m_roots)) {
-        const QStringList deepRoots = {
-            "/mnt/usb",
-            "/media/usb",
-            "/mnt",
-        };
-        for (const QString &root : deepRoots) {
-            QDir dir(root);
-            if (!dir.exists()) {
-                continue;
-            }
-            auto node = std::make_unique<Node>();
-            node->path = QDir::cleanPath(root);
-            node->isDir = true;
-            node->expanded = true;
-            node->scanned = false;
-            node->name = QFileInfo(root).fileName().isEmpty() ? "USB" : QFileInfo(root).fileName();
-            scanAudioRecursive(node.get(), 0, 12);
-            if (!node->children.empty()) {
-                m_roots.push_back(std::move(node));
-                break;
-            }
-        }
-    }
+    addRootIfExists("/media/usb/samples", "USB SAMPLES", false, false);
 
     if (m_roots.empty()) {
         const QString home = QDir::homePath();
