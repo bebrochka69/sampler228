@@ -180,9 +180,7 @@ static void scanDx7Banks() {
         Dx7Bank bank;
         bank.name = "INTERNAL";
         bank.path.clear();
-        for (int i = 0; i < 32; ++i) {
-            bank.programs << makeProgramLabel(i);
-        }
+        bank.programs = internalProgramNames();
         g_dx7Banks.push_back(bank);
     }
 }
@@ -233,6 +231,10 @@ static int programIndexForName(const Dx7Bank &bank, const QString &token) {
         }
     }
     return 0;
+}
+
+static QStringList internalProgramNames() {
+    return {"INIT", "PIANO 1", "E.PIANO"};
 }
 
 double pitchToRate(float semitones) {
@@ -397,6 +399,13 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
         forceExternal = true;
     }
 #endif
+    if (forceExternal && !m_engineAvailable) {
+        const QString ffplay = QStandardPaths::findExecutable("ffplay");
+        const QString aplay = QStandardPaths::findExecutable("aplay");
+        if (ffplay.isEmpty() && aplay.isEmpty()) {
+            forceExternal = false;
+        }
+    }
 
     int defaultVoices = 8;
     {

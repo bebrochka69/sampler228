@@ -163,6 +163,101 @@ bool voiceDiffersFromInit(const uint8_t *voice) {
     return !std::equal(std::begin(kInitVoice), std::end(kInitVoice), voice);
 }
 
+std::array<uint8_t, 156> makeVoiceFromInit() {
+    std::array<uint8_t, 156> voice{};
+    std::copy(std::begin(kInitVoice), std::end(kInitVoice), voice.begin());
+    voice[155] = 0x3f;
+    return voice;
+}
+
+void setVoiceName(std::array<uint8_t, 156> &voice, const char *name) {
+    constexpr int kNameOffset = 145;
+    constexpr int kNameLen = 10;
+    for (int i = 0; i < kNameLen; ++i) {
+        voice[kNameOffset + i] = ' ';
+    }
+    if (!name) {
+        return;
+    }
+    for (int i = 0; i < kNameLen && name[i]; ++i) {
+        voice[kNameOffset + i] = static_cast<uint8_t>(name[i]);
+    }
+}
+
+void setOpEnv(std::array<uint8_t, 156> &voice, int op, int r1, int r2, int r3, int r4,
+              int l1, int l2, int l3, int l4) {
+    const int off = op * 21;
+    voice[off + 0] = static_cast<uint8_t>(r1);
+    voice[off + 1] = static_cast<uint8_t>(r2);
+    voice[off + 2] = static_cast<uint8_t>(r3);
+    voice[off + 3] = static_cast<uint8_t>(r4);
+    voice[off + 4] = static_cast<uint8_t>(l1);
+    voice[off + 5] = static_cast<uint8_t>(l2);
+    voice[off + 6] = static_cast<uint8_t>(l3);
+    voice[off + 7] = static_cast<uint8_t>(l4);
+}
+
+void setOpOutput(std::array<uint8_t, 156> &voice, int op, int level) {
+    const int off = op * 21;
+    voice[off + 16] = static_cast<uint8_t>(level);
+}
+
+void setOpFreq(std::array<uint8_t, 156> &voice, int op, int coarse, int fine, int detune) {
+    const int off = op * 21;
+    voice[off + 17] = 0;  // ratio mode
+    voice[off + 18] = static_cast<uint8_t>(coarse);
+    voice[off + 19] = static_cast<uint8_t>(fine);
+    voice[off + 20] = static_cast<uint8_t>(detune);
+}
+
+std::array<uint8_t, 156> makePianoVoice() {
+    auto voice = makeVoiceFromInit();
+    setVoiceName(voice, "PIANO 1");
+    voice[134] = 31;  // algorithm
+    voice[135] = 0;   // feedback
+    const int outputs[6] = {99, 80, 60, 50, 40, 30};
+    for (int op = 0; op < 6; ++op) {
+        setOpEnv(voice, op, 99, 50, 45, 99, 99, 70, 35, 0);
+        setOpOutput(voice, op, outputs[op]);
+        setOpFreq(voice, op, op + 1, 0, 7);
+    }
+    clampVoice(voice.data(), voice.size());
+    return voice;
+}
+
+std::array<uint8_t, 156> makeEPianoVoice() {
+    auto voice = makeVoiceFromInit();
+    setVoiceName(voice, "E.PIANO");
+    voice[134] = 5;
+    voice[135] = 4;
+    const int outputs[6] = {90, 70, 0, 0, 60, 0};
+    for (int op = 0; op < 6; ++op) {
+        setOpEnv(voice, op, 99, 60, 45, 99, 99, 65, 25, 0);
+        setOpOutput(voice, op, outputs[op]);
+        setOpFreq(voice, op, (op % 2) ? 2 : 1, 0, 7);
+    }
+    clampVoice(voice.data(), voice.size());
+    return voice;
+}
+
+void buildInternalPrograms(std::vector<std::array<uint8_t, 156>> &programs,
+                           std::vector<std::string> &names) {
+    programs.clear();
+    names.clear();
+    auto init = makeVoiceFromInit();
+    setVoiceName(init, "INIT");
+    programs.push_back(init);
+    names.emplace_back("INIT");
+
+    auto piano = makePianoVoice();
+    programs.push_back(piano);
+    names.emplace_back("PIANO 1");
+
+    auto epiano = makeEPianoVoice();
+    programs.push_back(epiano);
+    names.emplace_back("E.PIANO");
+}
+
 bool parseSysexMessage(const uint8_t *msg, size_t len, std::vector<std::array<uint8_t, 156>> &programs,
                        std::vector<std::string> &names) {
     if (len < 7 || msg[0] != 0xF0 || msg[len - 1] != 0xF7) {
@@ -372,9 +467,13 @@ void Dx7Core::init(int sampleRate, int voices) {
 
     impl_->programs.clear();
     impl_->programNames.clear();
+    buildInternalPrograms(impl_->programs, impl_->programNames);
     impl_->lastLoadChanged = false;
 
     resetState();
+    if (!impl_->programs.empty()) {
+        loadVoiceParameters(impl_->programs[0].data(), 155);
+    }
     impl_->initialized = true;
 }
 
