@@ -49,7 +49,7 @@ public:
         float sustain = 0.7f;
         float release = 0.25f;
         int wave = 0;
-        int voices = 1;
+        int voices = 8;
         float detune = 0.12f;
         int octave = 0;
     };
@@ -97,7 +97,9 @@ public:
     static QString stretchLabel(int index);
     static int sliceCountForIndex(int index);
     static QString fxBusLabel(int index);
+    static QStringList synthBanks();
     static QStringList synthPresets();
+    static QStringList synthPresetsForBank(const QString &bank);
     static QStringList serumWaves();
     static QStringList synthTypes();
     static bool hasMiniDexed();
@@ -124,6 +126,8 @@ private:
     std::array<QString, 8> m_paths;
     std::array<bool, 8> m_isSynth{};
     std::array<QString, 8> m_synthNames;
+    std::array<QString, 8> m_synthBanks;
+    std::array<int, 8> m_synthPrograms{};
     std::array<int, 8> m_synthBaseMidi{};
     std::array<SynthParams, 8> m_synthParams;
     std::array<PadParams, 8> m_params;

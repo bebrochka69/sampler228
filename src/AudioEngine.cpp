@@ -42,6 +42,13 @@ void computePanGains(float pan, float volume, float &left, float &right) {
 }  // namespace
 
 AudioEngine::AudioEngine(QObject *parent) : QObject(parent) {
+    {
+        bool ok = false;
+        const int envFrames = qEnvironmentVariableIntValue("GROOVEBOX_PERIOD_FRAMES", &ok);
+        if (ok) {
+            m_periodFrames = qBound(64, envFrames, 2048);
+        }
+    }
 #ifndef GROOVEBOX_WITH_ALSA
     for (auto &gain : m_busGains) {
         gain.store(1.0f);
@@ -310,6 +317,19 @@ void AudioEngine::setBusEffects(int bus, const std::vector<EffectSettings> &effe
         state.p5 = cfg.p5;
         chain.effects.push_back(std::move(state));
     }
+    bool hasSidechain = false;
+    for (const auto &busChain : m_busChains) {
+        for (const auto &fx : busChain.effects) {
+            if (fx.type == 8) {
+                hasSidechain = true;
+                break;
+            }
+        }
+        if (hasSidechain) {
+            break;
+        }
+    }
+    m_hasSidechain.store(hasSidechain);
 }
 
 float AudioEngine::busMeter(int bus) const {
@@ -334,6 +354,213 @@ void AudioEngine::setPadAdsr(int padId, float attack, float decay, float sustain
     m_padDecay[static_cast<size_t>(padId)].store(qBound(0.0f, decay, 1.0f));
     m_padSustain[static_cast<size_t>(padId)].store(qBound(0.0f, sustain, 1.0f));
     m_padRelease[static_cast<size_t>(padId)].store(qBound(0.0f, release, 1.0f));
+}
+
+void AudioEngine::setSynthEnabled(int padId, bool enabled) {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    state.enabled = enabled;
+    if (!enabled) {
+        for (size_t n = 0; n < state.activeNotes.size(); ++n) {
+            if (state.activeNotes[n]) {
+                state.core.noteOff(static_cast<int>(n));
+                state.activeNotes[n] = false;
+            }
+        }
+        state.env = 0.0f;
+        state.envStage = EnvStage::Attack;
+        state.releaseRequested = false;
+    } else {
+        ensureSynthInit(state);
+    }
+}
+
+void AudioEngine::setSynthParams(int padId, float volume, float pan, int bus) {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return;
+    }
+    float gainL = 1.0f;
+    float gainR = 1.0f;
+    computePanGains(pan, volume, gainL, gainR);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    state.gainL = gainL;
+    state.gainR = gainR;
+    state.bus = std::max(0, std::min(static_cast<int>(m_busBuffers.size() - 1), bus));
+}
+
+void AudioEngine::setSynthVoices(int padId, int voices) {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return;
+    }
+    voices = std::max(1, std::min(16, voices));
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    if (state.voices == voices) {
+        return;
+    }
+    state.voices = voices;
+    state.initialized = false;
+    state.bankLoaded = false;
+    if (state.enabled) {
+        ensureSynthInit(state);
+    }
+}
+
+void AudioEngine::synthNoteOn(int padId, int midiNote, int velocity) {
+    if (!m_available) {
+        return;
+    }
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return;
+    }
+    if (midiNote < 0 || midiNote > 127) {
+        return;
+    }
+    velocity = std::max(1, std::min(127, velocity));
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    if (!state.enabled) {
+        return;
+    }
+    const bool hadActive =
+        std::any_of(state.activeNotes.begin(), state.activeNotes.end(), [](bool v) { return v; });
+    ensureSynthInit(state);
+    state.core.noteOn(midiNote, velocity);
+    state.activeNotes[static_cast<size_t>(midiNote)] = true;
+    if (!hadActive || state.envStage == EnvStage::Release) {
+        state.envStage = EnvStage::Attack;
+        state.releaseRequested = false;
+    }
+}
+
+void AudioEngine::synthNoteOff(int padId, int midiNote) {
+    if (!m_available) {
+        return;
+    }
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return;
+    }
+    if (midiNote < 0 || midiNote > 127) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    if (!state.enabled) {
+        return;
+    }
+    ensureSynthInit(state);
+    state.core.noteOff(midiNote);
+    state.activeNotes[static_cast<size_t>(midiNote)] = false;
+    const bool hasActive =
+        std::any_of(state.activeNotes.begin(), state.activeNotes.end(), [](bool v) { return v; });
+    if (!hasActive) {
+        state.releaseRequested = true;
+    }
+}
+
+void AudioEngine::synthAllNotesOff(int padId) {
+    if (!m_available) {
+        return;
+    }
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    if (!state.enabled) {
+        return;
+    }
+    ensureSynthInit(state);
+    for (size_t n = 0; n < state.activeNotes.size(); ++n) {
+        if (state.activeNotes[n]) {
+            state.core.noteOff(static_cast<int>(n));
+            state.activeNotes[n] = false;
+        }
+    }
+    state.releaseRequested = true;
+}
+
+bool AudioEngine::loadSynthSysex(int padId, const QString &path) {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    const QString prevPath = state.bankPath;
+    state.bankPath = path;
+    if (path.isEmpty()) {
+        state.bankLoaded = false;
+        return false;
+    }
+    const bool wasInitialized = state.initialized;
+    ensureSynthInit(state);
+    if (wasInitialized && (prevPath != path || !state.bankLoaded)) {
+        state.bankLoaded = state.core.loadSysexFile(path.toStdString());
+    }
+    if (!state.bankLoaded) {
+        return false;
+    }
+    const int count = state.core.programCount();
+    if (count > 0) {
+        state.programIndex = qBound(0, state.programIndex, count - 1);
+        state.core.selectProgram(state.programIndex);
+    }
+    return true;
+}
+
+bool AudioEngine::setSynthProgram(int padId, int program) {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    state.programIndex = std::max(0, program);
+    ensureSynthInit(state);
+    const int count = state.core.programCount();
+    if (count <= 0) {
+        return false;
+    }
+    state.programIndex = qBound(0, state.programIndex, count - 1);
+    return state.core.selectProgram(state.programIndex);
+}
+
+int AudioEngine::synthProgramCount(int padId) const {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return 0;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    return state.core.programCount();
+}
+
+QString AudioEngine::synthProgramName(int padId, int index) const {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return QString();
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    return QString::fromUtf8(state.core.programName(index));
+}
+
+bool AudioEngine::isSynthActive(int padId) const {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    if (!state.enabled) {
+        return false;
+    }
+    for (bool active : state.activeNotes) {
+        if (active) {
+            return true;
+        }
+    }
+    return state.env > 0.0005f;
 }
 
 void AudioEngine::run() {
@@ -373,6 +600,25 @@ void AudioEngine::run() {
         }
     }
 #endif
+}
+
+void AudioEngine::ensureSynthInit(SynthState &state) {
+    if (state.initialized) {
+        return;
+    }
+    state.core.init(m_sampleRate, state.voices);
+    state.initialized = true;
+    state.bankLoaded = false;
+    if (!state.bankPath.isEmpty()) {
+        state.bankLoaded = state.core.loadSysexFile(state.bankPath.toStdString());
+        if (state.bankLoaded) {
+            const int count = state.core.programCount();
+            if (count > 0) {
+                state.programIndex = qBound(0, state.programIndex, count - 1);
+                state.core.selectProgram(state.programIndex);
+            }
+        }
+    }
 }
 
 void AudioEngine::mix(float *out, int frames) {
@@ -493,6 +739,92 @@ void AudioEngine::mix(float *out, int frames) {
         }
     }
 
+    if (frames > 0 && !m_synthStates.empty()) {
+        if (static_cast<int>(m_synthScratchL.size()) != frames) {
+            m_synthScratchL.assign(frames, 0.0f);
+            m_synthScratchR.assign(frames, 0.0f);
+        }
+        for (size_t pad = 0; pad < m_synthStates.size(); ++pad) {
+            SynthState &synth = m_synthStates[pad];
+            if (!synth.enabled) {
+                continue;
+            }
+            ensureSynthInit(synth);
+            const int busIndex =
+                std::max(0, std::min(static_cast<int>(m_busBuffers.size() - 1), synth.bus));
+            float *busOut = m_busBuffers[static_cast<size_t>(busIndex)].data();
+
+            const int padIndex = qBound(0, static_cast<int>(pad),
+                                        static_cast<int>(m_padAttack.size()) - 1);
+            const float attack = m_padAttack[static_cast<size_t>(padIndex)].load();
+            const float decay = m_padDecay[static_cast<size_t>(padIndex)].load();
+            const float sustain = m_padSustain[static_cast<size_t>(padIndex)].load();
+            const float release = m_padRelease[static_cast<size_t>(padIndex)].load();
+
+            const float attackSec = 0.005f + attack * 1.2f;
+            const float decaySec = 0.01f + decay * 1.2f;
+            const float releaseSec = 0.02f + release * 1.6f;
+            const float attackStep =
+                attackSec > 0.0f ? 1.0f / (attackSec * m_sampleRate) : 1.0f;
+            const float decayStep =
+                decaySec > 0.0f ? (1.0f - sustain) / (decaySec * m_sampleRate) : 1.0f;
+            const float releaseStep =
+                releaseSec > 0.0f ? 1.0f / (releaseSec * m_sampleRate) : 1.0f;
+
+            const bool hasNotes = std::any_of(synth.activeNotes.begin(),
+                                             synth.activeNotes.end(),
+                                             [](bool v) { return v; });
+            if (!hasNotes && !synth.releaseRequested) {
+                synth.env = 0.0f;
+                synth.envStage = EnvStage::Attack;
+                continue;
+            }
+            synth.core.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
+
+            for (int i = 0; i < frames; ++i) {
+                if (synth.releaseRequested && !hasNotes &&
+                    synth.envStage != EnvStage::Release) {
+                    synth.envStage = EnvStage::Release;
+                }
+                float env = synth.env;
+                switch (synth.envStage) {
+                    case EnvStage::Attack:
+                        env += attackStep;
+                        if (env >= 1.0f) {
+                            env = 1.0f;
+                            synth.envStage = EnvStage::Decay;
+                        }
+                        break;
+                    case EnvStage::Decay:
+                        env -= decayStep;
+                        if (env <= sustain || decaySec <= 0.0f) {
+                            env = sustain;
+                            synth.envStage = EnvStage::Sustain;
+                        }
+                        break;
+                    case EnvStage::Sustain:
+                        env = sustain;
+                        break;
+                    case EnvStage::Release:
+                        env -= releaseStep * std::max(0.1f, env);
+                        if (env <= 0.0005f || releaseSec <= 0.0f) {
+                            env = 0.0f;
+                            synth.releaseRequested = false;
+                        }
+                        break;
+                }
+                synth.env = env;
+
+                const int idx = i * m_channels;
+                busOut[idx] += m_synthScratchL[static_cast<size_t>(i)] * synth.gainL * env;
+                if (m_channels > 1) {
+                    busOut[idx + 1] +=
+                        m_synthScratchR[static_cast<size_t>(i)] * synth.gainR * env;
+                }
+            }
+        }
+    }
+
     // Compute sidechain envelope from sum of all buses pre-effects.
     std::vector<float> master(frames * m_channels, 0.0f);
     for (const auto &buf : m_busBuffers) {
@@ -501,7 +833,10 @@ void AudioEngine::mix(float *out, int frames) {
         }
     }
 
-    const float sideEnv = computeEnv(master.data(), frames);
+    float sideEnv = 0.0f;
+    if (m_hasSidechain.load()) {
+        sideEnv = computeEnv(master.data(), frames);
+    }
 
     // Process buses 1..5 into master.
     for (size_t bus = 1; bus < m_busBuffers.size(); ++bus) {

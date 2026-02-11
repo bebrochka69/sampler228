@@ -20,7 +20,7 @@ public:
             m_items = PadBank::synthTypes();
         }
         if (m_items.isEmpty()) {
-            m_items << "MINIDEXED";
+            m_items << "DX7";
         }
     }
 
@@ -73,7 +73,7 @@ protected:
             if (m_rows[i].contains(pos) && m_pads) {
                 const QStringList presets = PadBank::synthPresets();
                 const QString preset = presets.isEmpty() ? QString("PROGRAM 01") : presets.first();
-                const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("MINIDEXED");
+                const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("DX7");
                 m_pads->setSynth(m_activePad, QString("%1:%2").arg(type).arg(preset));
                 emit synthAssigned();
                 return;

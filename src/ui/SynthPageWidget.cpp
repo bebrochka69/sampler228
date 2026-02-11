@@ -9,28 +9,32 @@
 #include "Theme.h"
 
 namespace {
-QString synthIdOrDefault(PadBank *pads, int pad) {
-    const QString defaultType =
-        PadBank::synthTypes().isEmpty() ? QString("MINIDEXED") : PadBank::synthTypes().first();
-    if (!pads) {
-        return QString("%1:PROGRAM 01").arg(defaultType);
-    }
-    const QString id = pads->synthId(pad);
-    if (!id.isEmpty()) {
-        return id;
-    }
-    return QString("%1:PROGRAM 01").arg(defaultType);
+QString defaultSynthType() {
+    return PadBank::synthTypes().isEmpty() ? QString("DX7") : PadBank::synthTypes().first();
 }
 
-QString synthType(const QString &id) {
-    if (id.isEmpty()) {
-        return QString("MINIDEXED");
+QString defaultSynthBank() {
+    const QStringList banks = PadBank::synthBanks();
+    return banks.isEmpty() ? QString("INTERNAL") : banks.first();
+}
+
+QString defaultSynthProgram(const QString &bank) {
+    const QStringList presets = PadBank::synthPresetsForBank(bank);
+    return presets.isEmpty() ? QString("PROGRAM 01") : presets.first();
+}
+
+QString synthIdOrDefault(PadBank *pads, int pad) {
+    const QString defaultType = defaultSynthType();
+    const QString bank = defaultSynthBank();
+    const QString program = defaultSynthProgram(bank);
+    const QString fallback = bank.isEmpty()
+                                 ? QString("%1:%2").arg(defaultType, program)
+                                 : QString("%1:%2/%3").arg(defaultType, bank, program);
+    if (!pads) {
+        return fallback;
     }
-    const int colon = id.indexOf(':');
-    if (colon >= 0) {
-        return id.left(colon).trimmed().toUpper();
-    }
-    return QString("MINIDEXED");
+    const QString id = pads->synthId(pad);
+    return id.isEmpty() ? fallback : id;
 }
 
 QString synthPreset(const QString &id) {
@@ -40,36 +44,87 @@ QString synthPreset(const QString &id) {
     }
     return id.trimmed();
 }
+
+QString synthBank(const QString &id) {
+    const QString preset = synthPreset(id);
+    const int slash = preset.indexOf('/');
+    if (slash >= 0) {
+        return preset.left(slash).trimmed();
+    }
+    const QStringList banks = PadBank::synthBanks();
+    return banks.isEmpty() ? QString() : banks.first();
+}
+
+QString synthProgram(const QString &id) {
+    const QString preset = synthPreset(id);
+    const int slash = preset.indexOf('/');
+    if (slash >= 0) {
+        return preset.mid(slash + 1).trimmed();
+    }
+    return preset.trimmed();
+}
 } // namespace
 
 SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
     : QWidget(parent), m_pads(pads) {
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
-
-    if (m_pads) {
-        m_fluidPresets = PadBank::synthPresets();
-    }
-    if (m_fluidPresets.isEmpty()) {
-        m_fluidPresets << "PROGRAM 01" << "PROGRAM 02" << "PROGRAM 03" << "PROGRAM 04"
-                       << "PROGRAM 05";
-    }
-    m_categories.clear();
-    m_categories << "PROGRAMS";
-
     if (m_pads) {
         m_activePad = m_pads->activePad();
+    }
+    reloadBanks(true);
+
+    if (m_pads) {
         connect(m_pads, &PadBank::activePadChanged, this, [this](int index) {
             m_activePad = index;
+            reloadBanks(true);
             update();
         });
-        connect(m_pads, &PadBank::padChanged, this, [this](int) { update(); });
+        connect(m_pads, &PadBank::padChanged, this, [this](int) {
+            reloadBanks(true);
+            update();
+        });
         connect(m_pads, &PadBank::padParamsChanged, this, [this](int) { update(); });
+    }
+}
+
+void SynthPageWidget::reloadBanks(bool syncSelection) {
+    if (m_pads) {
+        m_categories = PadBank::synthBanks();
+    } else {
+        m_categories.clear();
+    }
+    if (m_categories.isEmpty()) {
+        m_categories << "INTERNAL";
+    }
+    if (syncSelection) {
+        const QString id = synthIdOrDefault(m_pads, m_activePad);
+        const QString bank = synthBank(id);
+        for (int i = 0; i < m_categories.size(); ++i) {
+            if (QString::compare(m_categories[i], bank, Qt::CaseInsensitive) == 0) {
+                m_selectedCategory = i;
+                break;
+            }
+        }
+    }
+    if (m_selectedCategory < 0 || m_selectedCategory >= m_categories.size()) {
+        m_selectedCategory = 0;
+    }
+    const QString bankName =
+        m_categories.value(qBound(0, m_selectedCategory, m_categories.size() - 1));
+    if (m_pads) {
+        m_fluidPresets = PadBank::synthPresetsForBank(bankName);
+    } else {
+        m_fluidPresets.clear();
+    }
+    if (m_fluidPresets.isEmpty()) {
+        m_fluidPresets << "PROGRAM 01";
     }
 }
 
 void SynthPageWidget::setActivePad(int pad) {
     m_activePad = pad;
+    reloadBanks(true);
     update();
 }
 
@@ -88,6 +143,7 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     for (int i = 0; i < m_categoryRects.size(); ++i) {
         if (m_categoryRects[i].contains(pos)) {
             m_selectedCategory = i;
+            reloadBanks(false);
             update();
             return;
         }
@@ -95,9 +151,13 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
 
     for (const PresetRow &row : m_presetRows) {
         if (!row.header && row.rect.contains(pos) && m_pads) {
-            const QString type =
-                PadBank::synthTypes().isEmpty() ? QString("MINIDEXED") : PadBank::synthTypes().first();
-            m_pads->setSynth(m_activePad, QString("%1:%2").arg(type, row.presetId));
+            const QString type = defaultSynthType();
+            const QString bank =
+                m_categories.value(qBound(0, m_selectedCategory, m_categories.size() - 1));
+            const QString presetId = row.presetId;
+            const QString fullPreset =
+                bank.isEmpty() ? presetId : QString("%1/%2").arg(bank, presetId);
+            m_pads->setSynth(m_activePad, QString("%1:%2").arg(type, fullPreset));
             update();
             return;
         }
@@ -116,6 +176,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     QPainter p(this);
     Theme::paintBackground(p, rect());
     Theme::applyRenderHints(p);
+    reloadBanks(false);
 
     const int margin = Theme::px(20);
     const QRectF panel = rect().adjusted(margin, margin, -margin, -margin);
@@ -130,11 +191,14 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     p.drawText(header, Qt::AlignLeft | Qt::AlignVCenter, "SYNTH");
 
     const QString id = synthIdOrDefault(m_pads, m_activePad);
-    const QString preset = synthPreset(id);
+    const QString bankName = synthBank(id);
+    const QString programName = synthProgram(id);
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(10, QFont::DemiBold));
+    const QString displayPreset =
+        bankName.isEmpty() ? programName : QString("%1 / %2").arg(bankName, programName);
     p.drawText(header, Qt::AlignRight | Qt::AlignVCenter,
-               QString("PAD %1  %2").arg(m_activePad + 1).arg(preset));
+               QString("PAD %1  %2").arg(m_activePad + 1).arg(displayPreset));
 
     const float gap = Theme::pxF(14.0f);
     QRectF left(panel.left() + Theme::px(12), header.bottom() + Theme::px(10),
@@ -164,26 +228,21 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         cy += catRowH;
     }
 
-    // Right presets filtered by category
+    // Right presets for the selected bank
     p.setBrush(QColor(24, 24, 30));
     p.setPen(QPen(Theme::stroke(), 1.0));
     p.drawRoundedRect(right, Theme::px(10), Theme::px(10));
 
-    const QString activeCat =
-        m_categories.isEmpty() ? QString("PROGRAMS")
+    const QString activeBank =
+        m_categories.isEmpty() ? QString()
                                : m_categories[qBound(0, m_selectedCategory, m_categories.size() - 1)];
     const float rowH = Theme::pxF(30.0f);
     float y = right.top() + Theme::px(8);
     m_presetRows.clear();
     for (const QString &item : m_fluidPresets) {
-        const QStringList parts = item.split('/');
-        const QString group = "PROGRAMS";
-        if (group != activeCat) {
-            continue;
-        }
         PresetRow row;
         row.header = false;
-        row.label = parts.size() > 1 ? parts[1] : item;
+        row.label = item;
         row.presetId = item;
         row.rect = QRectF(right.left() + Theme::px(12), y,
                           right.width() - Theme::px(20), rowH - Theme::px(4));
@@ -192,7 +251,10 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     }
 
     for (const PresetRow &row : m_presetRows) {
-        const bool active = preset.toUpper() == row.presetId.toUpper();
+        const bool bankMatch =
+            QString::compare(activeBank, bankName, Qt::CaseInsensitive) == 0;
+        const bool active =
+            bankMatch && QString::compare(programName, row.presetId, Qt::CaseInsensitive) == 0;
         p.setBrush(active ? Theme::accentAlt() : Theme::bg2());
         p.setPen(QPen(Theme::stroke(), 1.0));
         p.drawRoundedRect(row.rect, Theme::px(6), Theme::px(6));

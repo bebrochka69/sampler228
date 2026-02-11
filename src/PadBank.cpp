@@ -4,11 +4,12 @@
 
 #include <QAudioOutput>
 #include <QCoreApplication>
+#include <QDir>
+#include <QHash>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QMediaPlayer>
 #include <QProcess>
-#include <QRegularExpression>
 #include <QFile>
 #include <QSoundEffect>
 #include <QStandardPaths>
@@ -16,16 +17,16 @@
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
+#include <QSet>
 #include <QtGlobal>
 #include <QtMath>
 #include <QDirIterator>
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <mutex>
 
-#ifdef GROOVEBOX_WITH_ALSA
-#include <alsa/asoundlib.h>
-#endif
+#include "dx7_core.h"
 
 namespace {
 constexpr int kPadCount = 8;
@@ -52,8 +53,11 @@ QString defaultMiniDexedType();
 
 QString synthTypeFromName(const QString &name) {
     const QString upper = name.trimmed().toUpper();
+    if (upper.startsWith("DX7")) {
+        return "DX7";
+    }
     if (upper.startsWith("MINIDEXED") || upper.startsWith("MINI DEXED")) {
-        return "MINIDEXED";
+        return "DX7";
     }
     if (upper.contains(":")) {
         const int colon = upper.indexOf(':');
@@ -78,281 +82,158 @@ QString makeSynthName(const QString &type, const QString &preset) {
 
 bool isMiniDexedType(const QString &type) {
     const QString t = type.trimmed().toUpper();
-    return t == "MINIDEXED";
+    return t == "DX7";
 }
 
 QString defaultMiniDexedType() {
-#ifdef Q_OS_LINUX
-    if (!QStandardPaths::findExecutable("minidexed").isEmpty()) {
-        return QStringLiteral("MINIDEXED");
-    }
-#endif
-    return QStringLiteral("MINIDEXED");
+    return QStringLiteral("DX7");
 }
 
 float clamp01(float value) {
     return qBound(0.0f, value, 1.0f);
 }
 
-struct MiniDexedPreset {
-    QString display;
-    int program = 0;
+struct Dx7Bank {
+    QString name;
+    QString path;
+    QStringList programs;
 };
 
-static QVector<MiniDexedPreset> g_minidexedPresets;
-static bool g_minidexedScanned = false;
+static QVector<Dx7Bank> g_dx7Banks;
+static bool g_dx7BanksScanned = false;
 
-static void scanMiniDexedPresets() {
-    if (g_minidexedScanned) {
+QString makeProgramLabel(int index) {
+    return QString("PROGRAM %1").arg(index + 1, 2, 10, QChar('0'));
+}
+
+static void scanDx7Banks() {
+    if (g_dx7BanksScanned) {
         return;
     }
-    g_minidexedScanned = true;
-    g_minidexedPresets.clear();
-    for (int i = 0; i < 32; ++i) {
-        MiniDexedPreset preset;
-        preset.program = i;
-        preset.display = QString("PROGRAM %1").arg(i + 1, 2, 10, QChar('0'));
-        g_minidexedPresets.push_back(preset);
+    g_dx7BanksScanned = true;
+    g_dx7Banks.clear();
+
+    QSet<QString> files;
+    QStringList roots;
+    roots << QDir::currentPath();
+    const QString appDir = QCoreApplication::applicationDirPath();
+    if (!roots.contains(appDir)) {
+        roots << appDir;
+    }
+
+    QStringList searchDirs;
+    for (const QString &root : roots) {
+        QDir dir(root);
+        searchDirs << dir.filePath("sysex")
+                   << dir.filePath("assets/sysex")
+                   << dir.filePath("assets/dx7")
+                   << dir.filePath("data/sysex")
+                   << dir.filePath("MiniDexed-main/Synth_Dexed/tools/sysex");
+    }
+
+    for (const QString &dir : searchDirs) {
+        QDirIterator it(dir, {"*.syx", "*.SYX"}, QDir::Files, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            files.insert(QDir::cleanPath(it.next()));
+        }
+    }
+
+    QHash<QString, int> nameCounts;
+    for (const QString &path : files) {
+        Dx7Core core;
+        if (!core.loadSysexFile(path.toStdString())) {
+            continue;
+        }
+        const int count = core.programCount();
+        if (count <= 0) {
+            continue;
+        }
+
+        Dx7Bank bank;
+        const QFileInfo info(path);
+        QString baseName = info.completeBaseName().trimmed();
+        if (baseName.isEmpty()) {
+            baseName = "BANK";
+        }
+        const QString key = baseName.toUpper();
+        const int dup = nameCounts.value(key, 0);
+        nameCounts[key] = dup + 1;
+        bank.name = (dup > 0) ? QString("%1 (%2)").arg(baseName).arg(dup + 1) : baseName;
+        bank.path = path;
+        bank.programs.reserve(count);
+        for (int i = 0; i < count; ++i) {
+            QString program = QString::fromUtf8(core.programName(i)).trimmed();
+            if (program.isEmpty()) {
+                program = makeProgramLabel(i);
+            }
+            bank.programs << program;
+        }
+        g_dx7Banks.push_back(bank);
+    }
+
+    std::sort(g_dx7Banks.begin(), g_dx7Banks.end(),
+              [](const Dx7Bank &a, const Dx7Bank &b) {
+                  return a.name.toLower() < b.name.toLower();
+              });
+
+    if (g_dx7Banks.isEmpty()) {
+        Dx7Bank bank;
+        bank.name = "INTERNAL";
+        bank.path.clear();
+        for (int i = 0; i < 32; ++i) {
+            bank.programs << makeProgramLabel(i);
+        }
+        g_dx7Banks.push_back(bank);
     }
 }
 
-static int minidexedProgramForPreset(const QString &display) {
-    const QString trimmed = display.trimmed();
-    QRegularExpression re("(\\d+)");
-    const QRegularExpressionMatch m = re.match(trimmed);
-    if (m.hasMatch()) {
-        bool ok = false;
-        int value = m.captured(1).toInt(&ok);
-        if (ok) {
-            return qBound(0, value - 1, 127);
-        }
+static const Dx7Bank &defaultDx7Bank() {
+    scanDx7Banks();
+    return g_dx7Banks.front();
+}
+
+static int bankIndexForName(const QString &name) {
+    scanDx7Banks();
+    if (g_dx7Banks.isEmpty()) {
+        return -1;
     }
-    scanMiniDexedPresets();
-    for (const auto &preset : g_minidexedPresets) {
-        if (preset.display.compare(trimmed, Qt::CaseInsensitive) == 0) {
-            return preset.program;
+    if (name.trimmed().isEmpty()) {
+        return 0;
+    }
+    for (int i = 0; i < g_dx7Banks.size(); ++i) {
+        if (QString::compare(g_dx7Banks[i].name, name, Qt::CaseInsensitive) == 0) {
+            return i;
         }
     }
     return 0;
 }
 
-#ifdef GROOVEBOX_WITH_ALSA
-struct AlsaMidiEngine {
-    snd_seq_t *seq = nullptr;
-    int outPort = -1;
-    bool active = false;
-    int connectedClient = -1;
-    int connectedPort = -1;
-};
-
-static AlsaMidiEngine g_alsaMidi;
-
-static bool ensureAlsaMidiReady() {
-    if (g_alsaMidi.active && g_alsaMidi.seq && g_alsaMidi.outPort >= 0) {
-        return true;
+static int programIndexForName(const Dx7Bank &bank, const QString &token) {
+    if (bank.programs.isEmpty()) {
+        return 0;
     }
-    if (snd_seq_open(&g_alsaMidi.seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
-        g_alsaMidi.seq = nullptr;
-        return false;
-    }
-    snd_seq_set_client_name(g_alsaMidi.seq, "GrooveBox");
-    g_alsaMidi.outPort = snd_seq_create_simple_port(
-        g_alsaMidi.seq,
-        "midi_out",
-        SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
-        SND_SEQ_PORT_TYPE_APPLICATION);
-    if (g_alsaMidi.outPort < 0) {
-        snd_seq_close(g_alsaMidi.seq);
-        g_alsaMidi.seq = nullptr;
-        return false;
-    }
-    g_alsaMidi.active = true;
-    g_alsaMidi.connectedClient = -1;
-    g_alsaMidi.connectedPort = -1;
-    return true;
-}
-
-static bool findMiniDexedPort(int &client, int &port) {
-    if (!g_alsaMidi.seq) {
-        return false;
-    }
-    snd_seq_client_info_t *cinfo = nullptr;
-    snd_seq_port_info_t *pinfo = nullptr;
-    snd_seq_client_info_alloca(&cinfo);
-    snd_seq_port_info_alloca(&pinfo);
-    snd_seq_client_info_set_client(cinfo, -1);
-    while (snd_seq_query_next_client(g_alsaMidi.seq, cinfo) >= 0) {
-        const int c = snd_seq_client_info_get_client(cinfo);
-        const QString cname = QString::fromLocal8Bit(snd_seq_client_info_get_name(cinfo));
-        if (!cname.contains("minidexed", Qt::CaseInsensitive)) {
-            continue;
-        }
-        snd_seq_port_info_set_client(pinfo, c);
-        snd_seq_port_info_set_port(pinfo, -1);
-        while (snd_seq_query_next_port(g_alsaMidi.seq, pinfo) >= 0) {
-            const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
-            if (!(caps & SND_SEQ_PORT_CAP_WRITE) && !(caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
-                continue;
+    const QString trimmed = token.trimmed();
+    if (!trimmed.isEmpty()) {
+        for (int i = 0; i < bank.programs.size(); ++i) {
+            if (QString::compare(bank.programs[i], trimmed, Qt::CaseInsensitive) == 0) {
+                return i;
             }
-            client = c;
-            port = snd_seq_port_info_get_port(pinfo);
-            return true;
+        }
+        QString digits;
+        for (QChar ch : trimmed) {
+            if (ch.isDigit()) {
+                digits.append(ch);
+            }
+        }
+        if (!digits.isEmpty()) {
+            const int n = digits.toInt();
+            if (n > 0 && n <= bank.programs.size()) {
+                return n - 1;
+            }
         }
     }
-    return false;
+    return 0;
 }
-
-static bool connectMiniDexed() {
-    if (!ensureAlsaMidiReady()) {
-        return false;
-    }
-    int client = -1;
-    int port = -1;
-    if (!findMiniDexedPort(client, port)) {
-        qWarning() << "MiniDexed MIDI port not found";
-        return false;
-    }
-    if (g_alsaMidi.connectedClient == client && g_alsaMidi.connectedPort == port) {
-        return true;
-    }
-    const int result = snd_seq_connect_to(g_alsaMidi.seq, g_alsaMidi.outPort, client, port);
-    if (result < 0) {
-        qWarning() << "Failed to connect MiniDexed MIDI" << result;
-        return false;
-    }
-    g_alsaMidi.connectedClient = client;
-    g_alsaMidi.connectedPort = port;
-    return true;
-}
-
-static void alsaSendRaw(const uint8_t *data, int size) {
-    if (!ensureAlsaMidiReady()) {
-        return;
-    }
-    snd_seq_event_t ev;
-    snd_seq_ev_clear(&ev);
-    snd_seq_ev_set_source(&ev, g_alsaMidi.outPort);
-    snd_seq_ev_set_subs(&ev);
-    snd_seq_ev_set_direct(&ev);
-    if (size == 2 && (data[0] & 0xF0) == 0xC0) {
-        snd_seq_ev_set_pgmchange(&ev, data[0] & 0x0F, data[1]);
-    } else if (size >= 3 && (data[0] & 0xF0) == 0x90) {
-        snd_seq_ev_set_noteon(&ev, data[0] & 0x0F, data[1], data[2]);
-    } else if (size >= 3 && (data[0] & 0xF0) == 0x80) {
-        snd_seq_ev_set_noteoff(&ev, data[0] & 0x0F, data[1], data[2]);
-    } else {
-        snd_seq_ev_set_variable(&ev, size, const_cast<uint8_t *>(data));
-    }
-    snd_seq_event_output_direct(g_alsaMidi.seq, &ev);
-}
-
-static void alsaSendNote(int note, int vel, bool on) {
-    const uint8_t status = static_cast<uint8_t>(on ? 0x90 : 0x80);
-    uint8_t data[3] = {status, static_cast<uint8_t>(note & 0x7F),
-                       static_cast<uint8_t>(vel & 0x7F)};
-    alsaSendRaw(data, 3);
-}
-
-static void alsaSendProgram(int program) {
-    const uint8_t status = 0xC0;
-    uint8_t data[2] = {status, static_cast<uint8_t>(program & 0x7F)};
-    alsaSendRaw(data, 2);
-}
-
-struct MiniDexedEngine {
-    QProcess *proc = nullptr;
-    QString presetName;
-    int program = 0;
-    bool ready = false;
-    int pendingNote = -1;
-    int pendingVelocity = 0;
-    int pendingLengthMs = 0;
-};
-
-static MiniDexedEngine g_minidexedEngine;
-
-static QString findMiniDexedCommand() {
-#ifdef Q_OS_LINUX
-    const QString custom = qEnvironmentVariable("GROOVEBOX_MINIDEXED_CMD");
-    if (!custom.isEmpty()) {
-        return custom;
-    }
-    const QString cmd = QStandardPaths::findExecutable("minidexed");
-    if (!cmd.isEmpty()) {
-        return cmd;
-    }
-#endif
-    return QString();
-}
-
-static void applyAlsaEnv(QProcessEnvironment &env) {
-    const QString card = qEnvironmentVariable("GROOVEBOX_ALSA_CARD");
-    const QString pcm = qEnvironmentVariable("GROOVEBOX_ALSA_PCM_DEVICE");
-    if (!card.isEmpty()) {
-        env.insert("ALSA_CARD", card);
-        env.insert("ALSA_CTL_CARD", card);
-    }
-    if (!pcm.isEmpty()) {
-        env.insert("ALSA_PCM_DEVICE", pcm);
-    }
-    const QString dev = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
-    if (!dev.isEmpty() && dev.startsWith("hw:")) {
-        const QStringList parts = dev.mid(3).split(',');
-        if (parts.size() >= 1 && !env.contains("ALSA_CARD")) {
-            env.insert("ALSA_CARD", parts[0]);
-            env.insert("ALSA_CTL_CARD", parts[0]);
-        }
-        if (parts.size() >= 2 && !env.contains("ALSA_PCM_DEVICE")) {
-            env.insert("ALSA_PCM_DEVICE", parts[1]);
-        }
-    }
-}
-
-static bool ensureMiniDexedRunning(const QString &presetName, int program, int sampleRate) {
-    Q_UNUSED(sampleRate);
-    if (!g_minidexedEngine.proc) {
-        g_minidexedEngine.proc = new QProcess();
-    }
-    if (g_minidexedEngine.proc->state() == QProcess::Running) {
-        g_minidexedEngine.presetName = presetName;
-        g_minidexedEngine.program = program;
-        if (g_minidexedEngine.ready) {
-            alsaSendProgram(program);
-        }
-        return g_minidexedEngine.ready;
-    }
-
-    const QString cmd = findMiniDexedCommand();
-    if (cmd.isEmpty()) {
-        qWarning() << "MiniDexed command not found";
-        return false;
-    }
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    applyAlsaEnv(env);
-    g_minidexedEngine.proc->setProcessEnvironment(env);
-    g_minidexedEngine.proc->setProgram(cmd);
-    g_minidexedEngine.proc->setArguments(QStringList());
-    g_minidexedEngine.proc->setProcessChannelMode(QProcess::MergedChannels);
-    g_minidexedEngine.ready = false;
-    g_minidexedEngine.presetName = presetName;
-    g_minidexedEngine.program = program;
-    g_minidexedEngine.proc->start();
-    if (!ensureAlsaMidiReady()) {
-        return false;
-    }
-    g_minidexedEngine.ready = connectMiniDexed();
-    if (g_minidexedEngine.ready) {
-        alsaSendProgram(program);
-    }
-    return g_minidexedEngine.ready;
-}
-
-static void queueMiniDexedNote(int note, int velocity, int lengthMs) {
-    g_minidexedEngine.pendingNote = note;
-    g_minidexedEngine.pendingVelocity = velocity;
-    g_minidexedEngine.pendingLengthMs = lengthMs;
-}
-#endif
 
 double pitchToRate(float semitones) {
     return std::pow(2.0, static_cast<double>(semitones) / 12.0);
@@ -517,11 +398,23 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
     }
 #endif
 
+    int defaultVoices = 8;
+    {
+        bool ok = false;
+        const int envVoices = qEnvironmentVariableIntValue("GROOVEBOX_DX7_VOICES", &ok);
+        if (ok) {
+            defaultVoices = qBound(1, envVoices, 8);
+        }
+    }
+
     for (int i = 0; i < kPadCount; ++i) {
         m_runtime[i] = new PadRuntime();
         m_isSynth[static_cast<size_t>(i)] = false;
         m_synthNames[static_cast<size_t>(i)].clear();
+        m_synthBanks[static_cast<size_t>(i)].clear();
+        m_synthPrograms[static_cast<size_t>(i)] = 0;
         m_synthBaseMidi[static_cast<size_t>(i)] = 60;
+        m_synthParams[static_cast<size_t>(i)].voices = defaultVoices;
         m_runtime[i]->useExternal = forceExternal;
         m_runtime[i]->useEngine = m_engineAvailable;
         if (!m_engineAvailable) {
@@ -577,49 +470,6 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
         }
     }
 
-#ifdef GROOVEBOX_WITH_ALSA
-    scanMiniDexedPresets();
-    if (hasMiniDexed()) {
-        const QString preset = g_minidexedPresets.isEmpty() ? QString("PROGRAM 01")
-                                                            : g_minidexedPresets.first().display;
-        const int program = minidexedProgramForPreset(preset);
-        ensureMiniDexedRunning(preset, program, m_engineRate);
-    }
-    m_synthConnectTimer = new QTimer(this);
-    m_synthConnectTimer->setInterval(300);
-    connect(m_synthConnectTimer, &QTimer::timeout, this, [this]() {
-        int padIndex = -1;
-        for (int i = 0; i < kPadCount; ++i) {
-            if (m_isSynth[static_cast<size_t>(i)] &&
-                isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(i)]))) {
-                padIndex = i;
-                break;
-            }
-        }
-        if (padIndex < 0) {
-            return;
-        }
-        const QString preset = synthPresetFromName(m_synthNames[static_cast<size_t>(padIndex)]);
-        const int program = minidexedProgramForPreset(preset);
-        ensureMiniDexedRunning(preset, program, m_engineRate);
-        if (!g_minidexedEngine.ready) {
-            g_minidexedEngine.ready = connectMiniDexed();
-            if (g_minidexedEngine.ready) {
-                alsaSendProgram(g_minidexedEngine.program);
-            }
-        }
-        if (g_minidexedEngine.ready && g_minidexedEngine.pendingNote >= 0) {
-            const int note = g_minidexedEngine.pendingNote;
-            const int vel = g_minidexedEngine.pendingVelocity;
-            const int lengthMs = g_minidexedEngine.pendingLengthMs;
-            g_minidexedEngine.pendingNote = -1;
-            alsaSendProgram(g_minidexedEngine.program);
-            alsaSendNote(note, vel, true);
-            QTimer::singleShot(lengthMs, [note]() { alsaSendNote(note, 0, false); });
-        }
-    });
-    m_synthConnectTimer->start();
-#endif
 }
 
 PadBank::~PadBank() {
@@ -639,13 +489,6 @@ PadBank::~PadBank() {
         delete rt;
         m_runtime[i] = nullptr;
     }
-#ifdef GROOVEBOX_WITH_ALSA
-    if (g_minidexedEngine.proc) {
-        g_minidexedEngine.proc->kill();
-        g_minidexedEngine.proc->deleteLater();
-        g_minidexedEngine.proc = nullptr;
-    }
-#endif
 }
 
 void PadBank::setActivePad(int index) {
@@ -669,6 +512,8 @@ void PadBank::setPadPath(int index, const QString &path) {
     m_paths[static_cast<size_t>(index)] = path;
     m_isSynth[static_cast<size_t>(index)] = false;
     m_synthNames[static_cast<size_t>(index)].clear();
+    m_synthBanks[static_cast<size_t>(index)].clear();
+    m_synthPrograms[static_cast<size_t>(index)] = 0;
     m_params[static_cast<size_t>(index)].start = 0.0f;
     m_params[static_cast<size_t>(index)].end = 1.0f;
     m_params[static_cast<size_t>(index)].sliceIndex = 0;
@@ -706,6 +551,7 @@ void PadBank::setPadPath(int index, const QString &path) {
     scheduleRawRender(index);
     if (m_engineAvailable && m_engine) {
         m_engine->setPadAdsr(index, 0.0f, 0.0f, 1.0f, 0.0f);
+        m_engine->setSynthEnabled(index, false);
     }
     emit padChanged(index);
     emit padParamsChanged(index);
@@ -772,7 +618,11 @@ QString PadBank::synthName(int index) const {
         return QString();
     }
     const QString raw = m_synthNames[static_cast<size_t>(index)];
-    const QString preset = synthPresetFromName(raw);
+    QString preset = synthPresetFromName(raw);
+    const int slash = preset.indexOf('/');
+    if (slash >= 0) {
+        preset = preset.mid(slash + 1).trimmed();
+    }
     return preset.isEmpty() ? defaultMiniDexedType() : preset;
 }
 
@@ -875,15 +725,46 @@ void PadBank::setSynth(int index, const QString &name) {
     if (index < 0 || index >= padCount()) {
         return;
     }
-    QString synthName = name;
-    QString type = synthTypeFromName(name);
-    if (!name.contains(":") || !isMiniDexedType(type)) {
-        synthName = makeSynthName(defaultMiniDexedType(), QString("PROGRAM 01"));
+    const Dx7Bank &defaultBank = defaultDx7Bank();
+    const QString fallbackProgram =
+        defaultBank.programs.isEmpty() ? makeProgramLabel(0) : defaultBank.programs.first();
+    const QString fallbackPreset = QString("%1/%2").arg(defaultBank.name, fallbackProgram);
+
+    QString synthName = name.trimmed();
+    QString type = synthTypeFromName(synthName);
+    if (!synthName.contains(":") || !isMiniDexedType(type)) {
+        synthName = makeSynthName(defaultMiniDexedType(), fallbackPreset);
         type = synthTypeFromName(synthName);
     }
 
+    QString presetToken = synthPresetFromName(synthName);
+    QString bankToken;
+    QString programToken;
+    const int slash = presetToken.indexOf('/');
+    if (slash >= 0) {
+        bankToken = presetToken.left(slash).trimmed();
+        programToken = presetToken.mid(slash + 1).trimmed();
+    } else {
+        programToken = presetToken.trimmed();
+    }
+
+    const int bankIndex = bankIndexForName(bankToken);
+    const Dx7Bank &bank = (bankIndex >= 0 && bankIndex < g_dx7Banks.size())
+                              ? g_dx7Banks[bankIndex]
+                              : defaultBank;
+    const int programIndex = programIndexForName(bank, programToken);
+    QString programName = bank.programs.value(programIndex);
+    if (programName.isEmpty()) {
+        programName = makeProgramLabel(programIndex);
+    }
+
+    const QString resolvedPreset = QString("%1/%2").arg(bank.name, programName);
+    synthName = makeSynthName(defaultMiniDexedType(), resolvedPreset);
+
     m_isSynth[static_cast<size_t>(index)] = true;
     m_synthNames[static_cast<size_t>(index)] = synthName;
+    m_synthBanks[static_cast<size_t>(index)] = bank.name;
+    m_synthPrograms[static_cast<size_t>(index)] = programIndex;
     m_paths[static_cast<size_t>(index)].clear();
     m_synthBaseMidi[static_cast<size_t>(index)] = 60;
 
@@ -898,16 +779,19 @@ void PadBank::setSynth(int index, const QString &name) {
             rt->rawDurationMs = 0;
             rt->durationMs = 0;
             rt->normalizeGain = 1.0f;
-#ifdef GROOVEBOX_WITH_ALSA
-            const QString preset = synthPresetFromName(synthName);
-            const int program = minidexedProgramForPreset(preset);
-            ensureMiniDexedRunning(preset, program, m_engineRate);
-#endif
         }
     }
-    if (m_engineAvailable && m_engine) {
+    if (m_engineAvailable && m_engine && isMiniDexedType(type)) {
         const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
         m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
+        m_engine->setSynthVoices(index, sp.voices);
+        if (!bank.path.isEmpty()) {
+            m_engine->loadSynthSysex(index, bank.path);
+        }
+        m_engine->setSynthProgram(index, programIndex);
+        const PadParams &pp = m_params[static_cast<size_t>(index)];
+        m_engine->setSynthParams(index, pp.volume, pp.pan, pp.fxBus);
+        m_engine->setSynthEnabled(index, true);
     }
     emit padChanged(index);
     emit padParamsChanged(index);
@@ -932,6 +816,10 @@ void PadBank::setVolume(int index, float value) {
         return;
     }
     m_params[static_cast<size_t>(index)].volume = clamp01(value);
+    if (isSynth(index) && m_engineAvailable && m_engine) {
+        const PadParams &pp = m_params[static_cast<size_t>(index)];
+        m_engine->setSynthParams(index, pp.volume, pp.pan, pp.fxBus);
+    }
     emit padParamsChanged(index);
 }
 
@@ -940,6 +828,10 @@ void PadBank::setPan(int index, float value) {
         return;
     }
     m_params[static_cast<size_t>(index)].pan = qBound(-1.0f, value, 1.0f);
+    if (isSynth(index) && m_engineAvailable && m_engine) {
+        const PadParams &pp = m_params[static_cast<size_t>(index)];
+        m_engine->setSynthParams(index, pp.volume, pp.pan, pp.fxBus);
+    }
     emit padParamsChanged(index);
 }
 
@@ -1093,15 +985,10 @@ void PadBank::setSynthVoices(int index, int voices) {
     if (index < 0 || index >= padCount()) {
         return;
     }
-    if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
-        return;
-    }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.voices = qBound(1, voices, 8);
-    if (isSynth(index)) {
-        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
-        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
-                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+    if (isSynth(index) && m_engineAvailable && m_engine) {
+        m_engine->setSynthVoices(index, sp.voices);
     }
     emit padParamsChanged(index);
 }
@@ -1146,6 +1033,9 @@ bool PadBank::isPlaying(int index) const {
     }
     const PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (rt && rt->useEngine && m_engineAvailable && m_engine) {
+        if (isSynth(index)) {
+            return m_engine->isSynthActive(index);
+        }
         return m_engine->isPadActive(index);
     }
     if (rt->external) {
@@ -1166,10 +1056,7 @@ bool PadBank::isPadReady(int index) const {
         return true;
     }
     if (isSynth(index)) {
-        if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
-            return true;
-        }
-        return rt->rawBuffer && rt->rawBuffer->isValid();
+        return true;
     }
     if (padPath(index).isEmpty()) {
         return false;
@@ -1641,28 +1528,23 @@ void PadBank::triggerPad(int index) {
         return;
     }
 
-    if (synthPad && isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
-#ifdef GROOVEBOX_WITH_ALSA
-        const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
-        const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
-        const int program = minidexedProgramForPreset(presetName);
-        if (ensureMiniDexedRunning(presetName, program, m_engineRate)) {
-            const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
-            const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-            alsaSendProgram(program);
-            alsaSendNote(baseMidi, velocity, true);
-            const int lengthMs =
-                qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
-            QTimer::singleShot(lengthMs, this, [baseMidi]() { alsaSendNote(baseMidi, 0, false); });
+    if (synthPad) {
+        if (!m_engineAvailable || !m_engine) {
             return;
         }
+        const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
         const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
         const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-        const int lengthMs =
-            qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
-        queueMiniDexedNote(baseMidi, velocity, lengthMs);
+        m_engine->setSynthEnabled(index, true);
+        m_engine->setSynthParams(index, params.volume, params.pan, params.fxBus);
+        m_engine->synthNoteOn(index, baseMidi, velocity);
+        const int lengthMs = qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
+        QTimer::singleShot(lengthMs, this, [this, index, baseMidi]() {
+            if (m_engine) {
+                m_engine->synthNoteOff(index, baseMidi);
+            }
+        });
         return;
-#endif
     }
 
     const double pitchRate = pitchToRate(params.pitch);
@@ -1684,18 +1566,9 @@ void PadBank::triggerPad(int index) {
             buffer = rt->rawBuffer;
         }
         if (!buffer || !buffer->isValid()) {
-            if (synthPad) {
-                const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
-                buffer = buildSynthBuffer(m_synthNames[static_cast<size_t>(index)], m_engineRate, baseMidi,
-                                          m_synthParams[static_cast<size_t>(index)]);
-                rt->rawBuffer = buffer;
-                rt->processedBuffer = buffer;
-                rt->processedReady = true;
-            } else {
-                rt->pendingTrigger = true;
-                scheduleRawRender(index);
-                return;
-            }
+            rt->pendingTrigger = true;
+            scheduleRawRender(index);
+            return;
         }
         if (buffer && buffer->isValid()) {
             float start = clamp01(params.start);
@@ -1883,82 +1756,24 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
     if (!rt) {
         return;
     }
-    if (isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
-#ifdef GROOVEBOX_WITH_ALSA
-        const QString presetName = synthPresetFromName(m_synthNames[static_cast<size_t>(index)]);
-        const int program = minidexedProgramForPreset(presetName);
-        if (ensureMiniDexedRunning(presetName, program, m_engineRate)) {
-            PadParams &params = m_params[static_cast<size_t>(index)];
-            const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-            const int bpm = m_bpm;
-            const int stepMs = 60000 / qMax(1, bpm) / 4;
-            const int steps = qMax(1, lengthSteps);
-            const int lengthMs = qBound(60, steps * stepMs, 4000);
-            alsaSendProgram(program);
-            alsaSendNote(midiNote, velocity, true);
-            QTimer::singleShot(lengthMs, this, [midiNote]() { alsaSendNote(midiNote, 0, false); });
-            return;
-        }
-        PadParams &params = m_params[static_cast<size_t>(index)];
-        const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
-        const int bpm = m_bpm;
-        const int stepMs = 60000 / qMax(1, bpm) / 4;
-        const int steps = qMax(1, lengthSteps);
-        const int lengthMs = qBound(60, steps * stepMs, 4000);
-        queueMiniDexedNote(midiNote, velocity, lengthMs);
-        return;
-#endif
-    }
-    if (!rt->useEngine || !m_engineAvailable || !m_engine) {
-        return;
-    }
-
-    const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
-    const QString name = m_synthNames[static_cast<size_t>(index)];
-    if (!rt->rawBuffer || !rt->rawBuffer->isValid()) {
-        rt->rawBuffer = buildSynthBuffer(name, m_engineRate, baseMidi,
-                                         m_synthParams[static_cast<size_t>(index)]);
-        rt->processedBuffer = rt->rawBuffer;
-        rt->processedReady = true;
-    }
-    auto buffer = rt->rawBuffer;
-    if (!buffer || !buffer->isValid()) {
+    if (!m_engineAvailable || !m_engine) {
         return;
     }
 
     PadParams &params = m_params[static_cast<size_t>(index)];
-    const float semis = params.pitch + static_cast<float>(midiNote - baseMidi);
-    const float rate = static_cast<float>(pitchToRate(semis));
-
     const int bpm = m_bpm;
     const int stepMs = 60000 / qMax(1, bpm) / 4;
     const int steps = qMax(1, lengthSteps);
-    const qint64 lengthMs = qMax<qint64>(1, static_cast<qint64>(steps) * stepMs);
-    int lengthFrames = static_cast<int>(
-        static_cast<double>(lengthMs) * buffer->sampleRate * rate / 1000.0);
-    lengthFrames = qMax(1, lengthFrames);
-
-    const int totalFrames = buffer->frames();
-    bool loop = false;
-    int endFrame = qMin(totalFrames, lengthFrames);
-    if (lengthFrames > totalFrames) {
-        endFrame = totalFrames;
-        loop = true;
-    }
-
-    m_engine->trigger(index, buffer, 0, endFrame, loop, params.volume,
-                      params.pan, rate, params.fxBus);
-
-    if (loop) {
-        const int token = ++rt->synthStopToken;
-        QTimer::singleShot(static_cast<int>(lengthMs), this, [this, index, token]() {
-            PadRuntime *rtLocal = m_runtime[static_cast<size_t>(index)];
-            if (!rtLocal || rtLocal->synthStopToken != token) {
-                return;
-            }
-            stopPad(index);
-        });
-    }
+    const int lengthMs = qBound(60, steps * stepMs, 4000);
+    const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+    m_engine->setSynthEnabled(index, true);
+    m_engine->setSynthParams(index, params.volume, params.pan, params.fxBus);
+    m_engine->synthNoteOn(index, midiNote, velocity);
+    QTimer::singleShot(lengthMs, this, [this, index, midiNote]() {
+        if (m_engine) {
+            m_engine->synthNoteOff(index, midiNote);
+        }
+    });
 }
 
 void PadBank::stopPad(int index) {
@@ -1972,6 +1787,9 @@ void PadBank::stopPad(int index) {
     rt->pendingTrigger = false;
     if (rt->useEngine && m_engineAvailable && m_engine) {
         m_engine->stopPad(index);
+        if (isSynth(index)) {
+            m_engine->synthAllNotesOff(index);
+        }
     }
     if (rt->effect) {
         rt->effect->stop();
@@ -2082,16 +1900,43 @@ QString PadBank::stretchLabel(int index) {
 }
 
 QStringList PadBank::synthPresets() {
-    scanMiniDexedPresets();
+    scanDx7Banks();
+    if (g_dx7Banks.isEmpty()) {
+        return {"PROGRAM 01"};
+    }
+    const QStringList programs = g_dx7Banks.front().programs;
+    if (!programs.isEmpty()) {
+        return programs;
+    }
+    return {"PROGRAM 01"};
+}
+
+QStringList PadBank::synthBanks() {
+    scanDx7Banks();
     QStringList list;
-    for (const auto &preset : g_minidexedPresets) {
-        list << preset.display;
+    for (const auto &bank : g_dx7Banks) {
+        list << bank.name;
     }
-    if (!list.isEmpty()) {
-        return list;
+    if (list.isEmpty()) {
+        list << "INTERNAL";
     }
-    list << "PROGRAM 01";
     return list;
+}
+
+QStringList PadBank::synthPresetsForBank(const QString &bank) {
+    scanDx7Banks();
+    if (g_dx7Banks.isEmpty()) {
+        return {"PROGRAM 01"};
+    }
+    int index = bankIndexForName(bank);
+    if (index < 0 || index >= g_dx7Banks.size()) {
+        index = 0;
+    }
+    const QStringList programs = g_dx7Banks[index].programs;
+    if (!programs.isEmpty()) {
+        return programs;
+    }
+    return {"PROGRAM 01"};
 }
 
 QStringList PadBank::serumWaves() {
@@ -2103,13 +1948,6 @@ QStringList PadBank::synthTypes() {
 }
 
 bool PadBank::hasMiniDexed() {
-#ifdef Q_OS_LINUX
-    if (!QStandardPaths::findExecutable("minidexed").isEmpty()) {
-        return true;
-    }
-#else
-    return false;
-#endif
     return false;
 }
 
@@ -2132,6 +1970,10 @@ void PadBank::setFxBus(int index, int bus) {
     const int maxIndex = static_cast<int>(sizeof(kFxBusLabels) / sizeof(kFxBusLabels[0])) - 1;
     const int next = qBound(0, bus, maxIndex);
     m_params[static_cast<size_t>(index)].fxBus = next;
+    if (isSynth(index) && m_engineAvailable && m_engine) {
+        const PadParams &pp = m_params[static_cast<size_t>(index)];
+        m_engine->setSynthParams(index, pp.volume, pp.pan, pp.fxBus);
+    }
     emit padParamsChanged(index);
 }
 

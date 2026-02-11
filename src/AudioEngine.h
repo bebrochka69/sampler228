@@ -2,12 +2,15 @@
 
 #include <QObject>
 #include <QVector>
+#include <QString>
 #include <array>
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
+
+#include "dx7_core.h"
 
 class AudioEngine : public QObject {
     Q_OBJECT
@@ -49,6 +52,18 @@ public:
     bool isPadActive(int padId) const;
 
     void setPadAdsr(int padId, float attack, float decay, float sustain, float release);
+
+    void setSynthEnabled(int padId, bool enabled);
+    void setSynthParams(int padId, float volume, float pan, int bus);
+    void setSynthVoices(int padId, int voices);
+    void synthNoteOn(int padId, int midiNote, int velocity);
+    void synthNoteOff(int padId, int midiNote);
+    void synthAllNotesOff(int padId);
+    bool isSynthActive(int padId) const;
+    bool loadSynthSysex(int padId, const QString &path);
+    bool setSynthProgram(int padId, int program);
+    int synthProgramCount(int padId) const;
+    QString synthProgramName(int padId, int index) const;
 
     void setBusEffects(int bus, const std::vector<EffectSettings> &effects);
     float busMeter(int bus) const;
@@ -111,6 +126,23 @@ private:
         std::vector<EffectState> effects;
     };
 
+    struct SynthState {
+        Dx7Core core;
+        bool enabled = false;
+        bool initialized = false;
+        int bus = 0;
+        float gainL = 1.0f;
+        float gainR = 1.0f;
+        int voices = 8;
+        std::array<bool, 128> activeNotes{};
+        QString bankPath;
+        bool bankLoaded = false;
+        int programIndex = 0;
+        float env = 0.0f;
+        EnvStage envStage = EnvStage::Attack;
+        bool releaseRequested = false;
+    };
+
     void start();
     void stop();
     void run();
@@ -118,6 +150,7 @@ private:
     void processBus(int busIndex, float *buffer, int frames, float sidechainEnv);
     float computeEnv(const float *buffer, int frames) const;
     float computePeak(const float *buffer, int frames) const;
+    void ensureSynthInit(SynthState &state);
 
     bool m_available = false;
     int m_sampleRate = 48000;
@@ -132,12 +165,16 @@ private:
     std::array<std::vector<float>, 6> m_busBuffers;
     std::array<std::atomic<float>, 6> m_busMeters{};
     std::array<std::atomic<float>, 6> m_busGains{};
+    std::atomic<bool> m_hasSidechain{false};
     void *m_pcmHandle = nullptr;
 
     std::array<std::atomic<float>, 8> m_padAttack{};
     std::array<std::atomic<float>, 8> m_padDecay{};
     std::array<std::atomic<float>, 8> m_padSustain{};
     std::array<std::atomic<float>, 8> m_padRelease{};
+    std::array<SynthState, 8> m_synthStates{};
+    std::vector<float> m_synthScratchL;
+    std::vector<float> m_synthScratchR;
     std::vector<float> m_lastOut;
     bool m_lastOutValid = false;
 };

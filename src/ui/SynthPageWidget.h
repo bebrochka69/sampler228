@@ -32,6 +32,8 @@ private:
         QRectF rect;
     };
 
+    void reloadBanks(bool syncSelection);
+
     PadBank *m_pads = nullptr;
     int m_activePad = 0;
     QStringList m_fluidPresets;

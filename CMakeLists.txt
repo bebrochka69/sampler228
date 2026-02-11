@@ -64,9 +64,47 @@ set(HEADERS
     src/ui/WaveformRenderer.h
 )
 
+set(DX7_CORE_SOURCES
+    src/dx7_core/dx7_core.cpp
+    src/dx7_core/dx7note.cc
+    src/dx7_core/env.cc
+    src/dx7_core/exp2.cc
+    src/dx7_core/fm_core.cc
+    src/dx7_core/fm_op_kernel.cc
+    src/dx7_core/freqlut.cc
+    src/dx7_core/lfo.cc
+    src/dx7_core/pitchenv.cc
+    src/dx7_core/porta.cpp
+    src/dx7_core/sin.cc
+    src/dx7_core/tuning.cpp
+)
+
+set(DX7_CORE_HEADERS
+    src/dx7_core/aligned_buf.h
+    src/dx7_core/controllers.h
+    src/dx7_core/dx7_core.h
+    src/dx7_core/dx7note.h
+    src/dx7_core/env.h
+    src/dx7_core/exp2.h
+    src/dx7_core/fm_core.h
+    src/dx7_core/fm_op_kernel.h
+    src/dx7_core/freqlut.h
+    src/dx7_core/lfo.h
+    src/dx7_core/libMTSClient.h
+    src/dx7_core/module.h
+    src/dx7_core/pitchenv.h
+    src/dx7_core/porta.h
+    src/dx7_core/sin.h
+    src/dx7_core/synth.h
+    src/dx7_core/tuning.h
+)
+
+add_library(dx7_core STATIC ${DX7_CORE_SOURCES} ${DX7_CORE_HEADERS})
+target_include_directories(dx7_core PUBLIC src/dx7_core)
+
 add_executable(GrooveBoxUI ${SOURCES} ${HEADERS})
 
-target_link_libraries(GrooveBoxUI PRIVATE Qt6::Widgets Qt6::Multimedia)
+target_link_libraries(GrooveBoxUI PRIVATE Qt6::Widgets Qt6::Multimedia dx7_core)
 
 if(UNIX AND NOT APPLE)
     # Force ALSA usage on Linux; GrooveBox relies on ALSA for realtime audio + MIDI.
