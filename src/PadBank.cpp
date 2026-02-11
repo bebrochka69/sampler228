@@ -101,6 +101,7 @@ struct Dx7Bank {
 
 static QVector<Dx7Bank> g_dx7Banks;
 static bool g_dx7BanksScanned = false;
+static QStringList internalProgramNames();
 
 QString makeProgramLabel(int index) {
     return QString("PROGRAM %1").arg(index + 1, 2, 10, QChar('0'));
