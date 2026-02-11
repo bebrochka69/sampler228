@@ -1,0 +1,56 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.O
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Toolchain
+gcc-*
+arm-gnu-*
+
+# Build artifacts
+kernel*
+MiniDexed*
+sdcard
+*.zip
+*.img
+
+# Editor related files
+*.swp
+*.swo
+
+# git submodules
+CMSIS_5
+circle-stdlib
+Synth_Dexed
+
+# Build directories
+minidexed_*
