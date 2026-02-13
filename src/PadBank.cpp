@@ -53,8 +53,11 @@ QString defaultMiniDexedType();
 
 QString synthTypeFromName(const QString &name) {
     const QString upper = name.trimmed().toUpper();
+    if (upper.startsWith("SERUM")) {
+        return "SERUM";
+    }
     if (upper.startsWith("FM")) {
-        return "FM";
+        return "SERUM";
     }
     if (upper.startsWith("DX7")) {
         return "DX7";
@@ -66,7 +69,7 @@ QString synthTypeFromName(const QString &name) {
         const int colon = upper.indexOf(':');
         return upper.left(colon).trimmed();
     }
-    return QStringLiteral("FM");
+    return QStringLiteral("SERUM");
 }
 
 QString synthPresetFromName(const QString &name) {
@@ -90,7 +93,7 @@ bool isMiniDexedType(const QString &type) {
 
 bool isFmType(const QString &type) {
     const QString t = type.trimmed().toUpper();
-    return t == "FM";
+    return t == "FM" || t == "SERUM";
 }
 
 QString defaultMiniDexedType() {
@@ -855,7 +858,7 @@ void PadBank::setSynth(int index, const QString &name) {
 
     if (isFmType(type)) {
         if (!synthName.contains(":")) {
-            synthName = makeSynthName(QStringLiteral("FM"), QStringLiteral("INIT"));
+            synthName = makeSynthName(QStringLiteral("SERUM"), QStringLiteral("INIT"));
         }
         const QString presetToken = synthPresetFromName(synthName);
         QString presetName = presetToken;
@@ -869,8 +872,9 @@ void PadBank::setSynth(int index, const QString &name) {
         }
 
         m_isSynth[static_cast<size_t>(index)] = true;
-        m_synthNames[static_cast<size_t>(index)] = makeSynthName("FM", presetName);
-        m_synthBanks[static_cast<size_t>(index)] = "FM";
+        const QString typeName = type.trimmed().isEmpty() ? QStringLiteral("SERUM") : type;
+        m_synthNames[static_cast<size_t>(index)] = makeSynthName(typeName, presetName);
+        m_synthBanks[static_cast<size_t>(index)] = "SERUM";
         m_synthPrograms[static_cast<size_t>(index)] = 0;
         m_paths[static_cast<size_t>(index)].clear();
         m_synthBaseMidi[static_cast<size_t>(index)] = 60;
@@ -2170,18 +2174,19 @@ QStringList PadBank::synthPresets() {
 QStringList PadBank::synthBanks() {
     scanDx7Banks();
     QStringList list;
-    list << "FM";
     for (const auto &bank : g_dx7Banks) {
         list << bank.name;
     }
     if (list.isEmpty()) {
         list << "INTERNAL";
     }
+    list << "SERUM";
     return list;
 }
 
 QStringList PadBank::synthPresetsForBank(const QString &bank) {
-    if (bank.trimmed().toUpper() == "FM") {
+    const QString upper = bank.trimmed().toUpper();
+    if (upper == "FM" || upper == "SERUM") {
         const QStringList presets = fmPresetNames();
         return presets.isEmpty() ? QStringList{"INIT"} : presets;
     }
@@ -2205,7 +2210,7 @@ QStringList PadBank::serumWaves() {
 }
 
 QStringList PadBank::synthTypes() {
-    return {"FM", defaultMiniDexedType()};
+    return {defaultMiniDexedType(), "SERUM"};
 }
 
 bool PadBank::hasMiniDexed() {

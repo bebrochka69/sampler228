@@ -73,8 +73,9 @@ protected:
             if (m_rows[i].contains(pos) && m_pads) {
                 const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("DX7");
                 QString preset;
-                if (type.trimmed().toUpper() == "FM") {
-                    const QStringList presets = PadBank::synthPresetsForBank("FM");
+                const QString upper = type.trimmed().toUpper();
+                if (upper == "FM" || upper == "SERUM") {
+                    const QStringList presets = PadBank::synthPresetsForBank("SERUM");
                     preset = presets.isEmpty() ? QString("INIT") : presets.first();
                 } else {
                     const QStringList presets = PadBank::synthPresets();
