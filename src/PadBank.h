@@ -103,6 +103,8 @@ public:
     static QStringList serumWaves();
     static QStringList synthTypes();
     static bool hasMiniDexed();
+    int synthVoiceParam(int index, int param) const;
+    void setSynthVoiceParam(int index, int param, int value);
     void setBusEffects(int bus, const QVector<BusEffect> &effects);
     float busMeter(int bus) const;
     float busGain(int bus) const;

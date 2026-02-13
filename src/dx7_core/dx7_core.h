@@ -23,6 +23,8 @@ public:
     int programCount() const;
     const char *programName(int index) const;
     bool lastLoadChanged() const;
+    int voiceParam(int index) const;
+    bool setVoiceParam(int index, int value);
 
 private:
     struct Voice;

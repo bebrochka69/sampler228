@@ -1961,6 +1961,28 @@ bool PadBank::hasMiniDexed() {
     return false;
 }
 
+int PadBank::synthVoiceParam(int index, int param) const {
+    if (index < 0 || index >= padCount()) {
+        return 0;
+    }
+    if (!isSynth(index) || !m_engineAvailable || !m_engine) {
+        return 0;
+    }
+    return m_engine->synthVoiceParam(index, param);
+}
+
+void PadBank::setSynthVoiceParam(int index, int param, int value) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    if (!isSynth(index) || !m_engineAvailable || !m_engine) {
+        return;
+    }
+    if (m_engine->setSynthVoiceParam(index, param, value)) {
+        emit padParamsChanged(index);
+    }
+}
+
 int PadBank::sliceCountForIndex(int index) {
     const int idx = qBound(0, index, 3);
     return kSliceCounts[idx];

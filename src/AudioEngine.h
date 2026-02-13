@@ -64,6 +64,8 @@ public:
     bool setSynthProgram(int padId, int program);
     int synthProgramCount(int padId) const;
     QString synthProgramName(int padId, int index) const;
+    int synthVoiceParam(int padId, int param) const;
+    bool setSynthVoiceParam(int padId, int param, int value);
 
     void setBusEffects(int bus, const std::vector<EffectSettings> &effects);
     float busMeter(int bus) const;

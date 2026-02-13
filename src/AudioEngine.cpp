@@ -546,6 +546,25 @@ QString AudioEngine::synthProgramName(int padId, int index) const {
     return QString::fromUtf8(state.core.programName(index));
 }
 
+int AudioEngine::synthVoiceParam(int padId, int param) const {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return 0;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    return state.core.voiceParam(param);
+}
+
+bool AudioEngine::setSynthVoiceParam(int padId, int param, int value) {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    ensureSynthInit(state);
+    return state.core.setVoiceParam(param, value);
+}
+
 bool AudioEngine::isSynthActive(int padId) const {
     if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
         return false;

@@ -32,12 +32,23 @@ private:
         QRectF rect;
     };
 
+    struct EditParam {
+        QString label;
+        int type = 0;
+        QRectF rect;
+    };
+
     void reloadBanks(bool syncSelection);
+    void adjustEditParam(int delta);
+    int currentEditValue(const EditParam &param) const;
 
     PadBank *m_pads = nullptr;
     int m_activePad = 0;
     QStringList m_fluidPresets;
     QVector<PresetRow> m_presetRows;
+    QVector<EditParam> m_editParams;
+    int m_selectedEditParam = 0;
+    int m_selectedOp = 0;
     QStringList m_categories;
     QVector<QRectF> m_categoryRects;
     int m_selectedCategory = 0;

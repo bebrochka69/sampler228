@@ -555,6 +555,42 @@ bool Dx7Core::lastLoadChanged() const {
     return impl_->lastLoadChanged;
 }
 
+int Dx7Core::voiceParam(int index) const {
+    if (!impl_) {
+        return 0;
+    }
+    if (index < 0 || index >= static_cast<int>(impl_->patch.size())) {
+        return 0;
+    }
+    return static_cast<int>(impl_->patch[static_cast<size_t>(index)]);
+}
+
+bool Dx7Core::setVoiceParam(int index, int value) {
+    if (!impl_) {
+        return false;
+    }
+    if (index < 0 || index >= static_cast<int>(impl_->patch.size())) {
+        return false;
+    }
+    uint8_t v = static_cast<uint8_t>(std::max(0, value));
+    if (index < static_cast<int>(sizeof(kVoiceMaxes))) {
+        v = std::min<uint8_t>(v, kVoiceMaxes[index]);
+    }
+    impl_->patch[static_cast<size_t>(index)] = v;
+
+    if (impl_->initialized) {
+        impl_->lfo.reset(impl_->patch.data() + 137);
+        for (auto &vce : impl_->voices) {
+            if (vce.active && vce.note) {
+                vce.note->update(impl_->patch.data(), vce.midi_note, vce.velocity,
+                                 kDefaultChannel);
+            }
+        }
+    }
+    impl_->lastLoadChanged = voiceDiffersFromInit(impl_->patch.data());
+    return true;
+}
+
 int Dx7Core::findVoiceForNote(int note) const {
     if (!impl_) {
         return -1;
