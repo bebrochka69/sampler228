@@ -52,6 +52,14 @@ public:
         int voices = 8;
         float detune = 0.12f;
         int octave = 0;
+        float fmAmount = 0.4f;
+        float ratio = 1.0f;
+        float feedback = 0.0f;
+        float cutoff = 0.8f;
+        float resonance = 0.1f;
+        float lfoRate = 0.2f;
+        float lfoDepth = 0.0f;
+        std::array<float, 8> macros{{0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f}};
     };
 
     struct BusEffect {
@@ -80,6 +88,10 @@ public:
     void setSynthVoices(int index, int voices);
     void setSynthDetune(int index, float detune);
     void setSynthOctave(int index, int octave);
+    void setSynthFm(int index, float fmAmount, float ratio, float feedback);
+    void setSynthFilter(int index, float cutoff, float resonance);
+    void setSynthLfo(int index, float rate, float depth);
+    void setSynthMacro(int index, int macro, float value);
     int fxBus(int index) const;
     void setFxBus(int index, int bus);
 

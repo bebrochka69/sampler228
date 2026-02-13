@@ -71,9 +71,15 @@ protected:
         const QPointF pos = event->position();
         for (int i = 0; i < m_rows.size(); ++i) {
             if (m_rows[i].contains(pos) && m_pads) {
-                const QStringList presets = PadBank::synthPresets();
-                const QString preset = presets.isEmpty() ? QString("PROGRAM 01") : presets.first();
                 const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("DX7");
+                QString preset;
+                if (type.trimmed().toUpper() == "FM") {
+                    const QStringList presets = PadBank::synthPresetsForBank("FM");
+                    preset = presets.isEmpty() ? QString("INIT") : presets.first();
+                } else {
+                    const QStringList presets = PadBank::synthPresets();
+                    preset = presets.isEmpty() ? QString("PROGRAM 01") : presets.first();
+                }
                 m_pads->setSynth(m_activePad, QString("%1:%2").arg(type).arg(preset));
                 emit synthAssigned();
                 return;

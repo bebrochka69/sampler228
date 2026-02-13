@@ -67,6 +67,9 @@ AudioEngine::AudioEngine(QObject *parent) : QObject(parent) {
         m_padSustain[i].store(1.0f);
         m_padRelease[i].store(0.0f);
     }
+    for (auto &state : m_synthStates) {
+        state.fmParams.macros.fill(0.5f);
+    }
 }
 
 AudioEngine::~AudioEngine() {
@@ -378,6 +381,34 @@ void AudioEngine::setSynthEnabled(int padId, bool enabled) {
     }
 }
 
+void AudioEngine::setSynthKind(int padId, SynthKind kind) {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    if (state.kind == kind) {
+        return;
+    }
+    state.kind = kind;
+    state.initialized = false;
+    state.bankLoaded = false;
+    state.env = 0.0f;
+    state.envStage = EnvStage::Attack;
+    state.releaseRequested = false;
+    state.lfoPhase = 0.0f;
+    state.filterIc1L = 0.0f;
+    state.filterIc2L = 0.0f;
+    state.filterIc1R = 0.0f;
+    state.filterIc2R = 0.0f;
+    for (bool &note : state.activeNotes) {
+        note = false;
+    }
+    if (state.enabled) {
+        ensureSynthInit(state);
+    }
+}
+
 void AudioEngine::setSynthParams(int padId, float volume, float pan, int bus) {
     if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
         return;
@@ -390,6 +421,32 @@ void AudioEngine::setSynthParams(int padId, float volume, float pan, int bus) {
     state.gainL = gainL;
     state.gainR = gainR;
     state.bus = std::max(0, std::min(static_cast<int>(m_busBuffers.size() - 1), bus));
+}
+
+void AudioEngine::setFmParams(int padId, const FmParams &params) {
+    if (padId < 0 || padId >= static_cast<int>(m_synthStates.size())) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    SynthState &state = m_synthStates[static_cast<size_t>(padId)];
+    state.fmParams = params;
+    auto macroShift = [](float base, float macro, float amount) {
+        const float shifted = base + (macro - 0.5f) * amount;
+        return std::max(0.0f, std::min(1.0f, shifted));
+    };
+    const float fm = macroShift(params.fmAmount, params.macros[0], 0.6f);
+    const float ratio = std::max(0.1f, params.ratio + (params.macros[1] - 0.5f) * 4.0f);
+    const float feedback = macroShift(params.feedback, params.macros[2], 0.6f);
+    const float cutoff = macroShift(params.cutoff, params.macros[3], 0.7f);
+    const float resonance = macroShift(params.resonance, params.macros[4], 0.7f);
+    const float lfoDepth = macroShift(params.lfoDepth, params.macros[5], 0.7f);
+    const float lfoRate = std::max(0.01f, params.lfoRate + (params.macros[6] - 0.5f) * 0.6f);
+
+    state.fm.setParams(fm, ratio, feedback);
+    state.filterCutoff = cutoff;
+    state.filterResonance = resonance;
+    state.lfoRate = lfoRate;
+    state.lfoDepth = lfoDepth;
 }
 
 void AudioEngine::setSynthVoices(int padId, int voices) {
@@ -429,7 +486,11 @@ void AudioEngine::synthNoteOn(int padId, int midiNote, int velocity) {
     const bool hadActive =
         std::any_of(state.activeNotes.begin(), state.activeNotes.end(), [](bool v) { return v; });
     ensureSynthInit(state);
-    state.core.noteOn(midiNote, velocity);
+    if (state.kind == SynthKind::SimpleFm) {
+        state.fm.noteOn(midiNote, velocity);
+    } else {
+        state.core.noteOn(midiNote, velocity);
+    }
     state.activeNotes[static_cast<size_t>(midiNote)] = true;
     if (!hadActive || state.envStage == EnvStage::Release) {
         state.envStage = EnvStage::Attack;
@@ -453,7 +514,11 @@ void AudioEngine::synthNoteOff(int padId, int midiNote) {
         return;
     }
     ensureSynthInit(state);
-    state.core.noteOff(midiNote);
+    if (state.kind == SynthKind::SimpleFm) {
+        state.fm.noteOff(midiNote);
+    } else {
+        state.core.noteOff(midiNote);
+    }
     state.activeNotes[static_cast<size_t>(midiNote)] = false;
     const bool hasActive =
         std::any_of(state.activeNotes.begin(), state.activeNotes.end(), [](bool v) { return v; });
@@ -477,7 +542,11 @@ void AudioEngine::synthAllNotesOff(int padId) {
     ensureSynthInit(state);
     for (size_t n = 0; n < state.activeNotes.size(); ++n) {
         if (state.activeNotes[n]) {
-            state.core.noteOff(static_cast<int>(n));
+            if (state.kind == SynthKind::SimpleFm) {
+                state.fm.noteOff(static_cast<int>(n));
+            } else {
+                state.core.noteOff(static_cast<int>(n));
+            }
             state.activeNotes[n] = false;
         }
     }
@@ -625,6 +694,13 @@ void AudioEngine::ensureSynthInit(SynthState &state) {
     if (state.initialized) {
         return;
     }
+    if (state.kind == SynthKind::SimpleFm) {
+        state.fm.init(m_sampleRate, state.voices);
+        state.fm.setParams(state.fmParams.fmAmount, state.fmParams.ratio, state.fmParams.feedback);
+        state.initialized = true;
+        return;
+    }
+
     state.core.init(m_sampleRate, state.voices);
     state.initialized = true;
     state.bankLoaded = false;
@@ -798,7 +874,28 @@ void AudioEngine::mix(float *out, int frames) {
                 synth.envStage = EnvStage::Attack;
                 continue;
             }
-            synth.core.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
+            if (synth.kind == SynthKind::SimpleFm) {
+                synth.fm.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
+            } else {
+                synth.core.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
+            }
+
+            const bool useFilter = (synth.kind == SynthKind::SimpleFm);
+            const float baseCutoff = synth.filterCutoff;
+            const float baseRes = synth.filterResonance;
+            const float lfoDepth = synth.lfoDepth;
+            const float lfoRateHz = 0.1f + synth.lfoRate * 8.0f;
+            const float lfoInc = 2.0f * static_cast<float>(M_PI) * lfoRateHz / m_sampleRate;
+            float staticG = 0.0f;
+            float staticR = 0.0f;
+            if (useFilter && lfoDepth <= 0.0001f) {
+                const float cutoff = std::max(0.02f, std::min(0.98f, baseCutoff));
+                const float hz = 40.0f * std::pow(2.0f, cutoff * 8.0f);
+                const float g = std::tan(static_cast<float>(M_PI) * hz / m_sampleRate);
+                const float q = 0.7f + baseRes * 7.0f;
+                staticG = g;
+                staticR = 1.0f / (2.0f * q);
+            }
 
             for (int i = 0; i < frames; ++i) {
                 if (synth.releaseRequested && !hasNotes &&
@@ -834,11 +931,42 @@ void AudioEngine::mix(float *out, int frames) {
                 }
                 synth.env = env;
 
+                float left = m_synthScratchL[static_cast<size_t>(i)];
+                float right = m_synthScratchR[static_cast<size_t>(i)];
+                if (useFilter) {
+                    float g = staticG;
+                    float R = staticR;
+                    if (lfoDepth > 0.0001f) {
+                        const float lfo = std::sin(synth.lfoPhase);
+                        synth.lfoPhase += lfoInc;
+                        if (synth.lfoPhase > 2.0f * static_cast<float>(M_PI)) {
+                            synth.lfoPhase -= 2.0f * static_cast<float>(M_PI);
+                        }
+                        const float cutoff =
+                            std::max(0.02f, std::min(0.98f, baseCutoff + lfo * lfoDepth * 0.5f));
+                        const float hz = 40.0f * std::pow(2.0f, cutoff * 8.0f);
+                        g = std::tan(static_cast<float>(M_PI) * hz / m_sampleRate);
+                        const float q = 0.7f + baseRes * 7.0f;
+                        R = 1.0f / (2.0f * q);
+                    }
+                    if (g > 0.0f) {
+                        auto svf = [&](float input, float &ic1, float &ic2) {
+                            const float v3 = input - ic2;
+                            const float v1 = (g * v3 + ic1) / (1.0f + g * (g + R));
+                            const float v2 = ic2 + g * v1;
+                            ic1 = 2.0f * v1 - ic1;
+                            ic2 = 2.0f * v2 - ic2;
+                            return v2;
+                        };
+                        left = svf(left, synth.filterIc1L, synth.filterIc2L);
+                        right = svf(right, synth.filterIc1R, synth.filterIc2R);
+                    }
+                }
+
                 const int idx = i * m_channels;
-                busOut[idx] += m_synthScratchL[static_cast<size_t>(i)] * synth.gainL * env;
+                busOut[idx] += left * synth.gainL * env;
                 if (m_channels > 1) {
-                    busOut[idx + 1] +=
-                        m_synthScratchR[static_cast<size_t>(i)] * synth.gainR * env;
+                    busOut[idx + 1] += right * synth.gainR * env;
                 }
             }
         }

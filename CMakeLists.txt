@@ -22,6 +22,7 @@ set(SOURCES
     src/ConsoleModeGuard.cpp
     src/FramebufferCleaner.cpp
     src/AudioEngine.cpp
+    src/simple_fm.cpp
     src/PadBank.cpp
     src/SampleSession.cpp
     src/ui/TopToolbarWidget.cpp
@@ -45,6 +46,7 @@ set(HEADERS
     src/ConsoleModeGuard.h
     src/FramebufferCleaner.h
     src/AudioEngine.h
+    src/simple_fm.h
     src/PadBank.h
     src/SampleSession.h
     src/Theme.h

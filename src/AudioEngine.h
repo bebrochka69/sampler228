@@ -11,10 +11,26 @@
 #include <vector>
 
 #include "dx7_core.h"
+#include "simple_fm.h"
 
 class AudioEngine : public QObject {
     Q_OBJECT
 public:
+    enum class SynthKind {
+        Dx7,
+        SimpleFm
+    };
+
+    struct FmParams {
+        float fmAmount = 0.4f;
+        float ratio = 1.0f;
+        float feedback = 0.0f;
+        float cutoff = 0.8f;
+        float resonance = 0.1f;
+        float lfoRate = 0.2f;
+        float lfoDepth = 0.0f;
+        std::array<float, 8> macros{};
+    };
     struct EffectSettings {
         int type = 0;
         float p1 = 0.5f;
@@ -54,8 +70,10 @@ public:
     void setPadAdsr(int padId, float attack, float decay, float sustain, float release);
 
     void setSynthEnabled(int padId, bool enabled);
+    void setSynthKind(int padId, SynthKind kind);
     void setSynthParams(int padId, float volume, float pan, int bus);
     void setSynthVoices(int padId, int voices);
+    void setFmParams(int padId, const FmParams &params);
     void synthNoteOn(int padId, int midiNote, int velocity);
     void synthNoteOff(int padId, int midiNote);
     void synthAllNotesOff(int padId);
@@ -130,6 +148,8 @@ private:
 
     struct SynthState {
         Dx7Core core;
+        SimpleFmCore fm;
+        SynthKind kind = SynthKind::Dx7;
         bool enabled = false;
         bool initialized = false;
         int bus = 0;
@@ -140,6 +160,16 @@ private:
         QString bankPath;
         bool bankLoaded = false;
         int programIndex = 0;
+        FmParams fmParams;
+        float filterCutoff = 0.8f;
+        float filterResonance = 0.1f;
+        float lfoRate = 0.2f;
+        float lfoDepth = 0.0f;
+        float lfoPhase = 0.0f;
+        float filterIc1L = 0.0f;
+        float filterIc2L = 0.0f;
+        float filterIc1R = 0.0f;
+        float filterIc2R = 0.0f;
         float env = 0.0f;
         EnvStage envStage = EnvStage::Attack;
         bool releaseRequested = false;
