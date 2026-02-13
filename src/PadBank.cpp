@@ -948,12 +948,23 @@ void PadBank::setSynth(int index, const QString &name) {
     const QString resolvedPreset = QString("%1/%2").arg(bank.name, programName);
     synthName = makeSynthName(defaultMiniDexedType(), resolvedPreset);
 
+    const bool wasDx7 =
+        m_isSynth[static_cast<size_t>(index)] &&
+        isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]));
+
     m_isSynth[static_cast<size_t>(index)] = true;
     m_synthNames[static_cast<size_t>(index)] = synthName;
     m_synthBanks[static_cast<size_t>(index)] = bank.name;
     m_synthPrograms[static_cast<size_t>(index)] = programIndex;
     m_paths[static_cast<size_t>(index)].clear();
     m_synthBaseMidi[static_cast<size_t>(index)] = 60;
+    if (!wasDx7) {
+        SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+        sp.attack = 0.0f;
+        sp.decay = 0.0f;
+        sp.sustain = 1.0f;
+        sp.release = 0.0f;
+    }
 
     PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
     if (rt) {
@@ -1794,11 +1805,15 @@ void PadBank::triggerPad(int index) {
         }
         const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
         const int baseMidi = m_synthBaseMidi[static_cast<size_t>(index)];
-        const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+        const int velocity = 127;
+        const bool isDx7 =
+            isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]));
         m_engine->setSynthEnabled(index, true);
         m_engine->setSynthParams(index, params.volume, params.pan, params.fxBus);
         m_engine->synthNoteOn(index, baseMidi, velocity);
-        const int lengthMs = qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
+        const int lengthMs = isDx7
+                                 ? qBound(200, static_cast<int>(1200 + sp.release * 2000.0f), 6000)
+                                 : qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
         QTimer::singleShot(lengthMs, this, [this, index, baseMidi]() {
             if (m_engine) {
                 m_engine->synthNoteOff(index, baseMidi);
@@ -2025,7 +2040,7 @@ void PadBank::triggerPadMidi(int index, int midiNote, int lengthSteps) {
     const int stepMs = 60000 / qMax(1, bpm) / 4;
     const int steps = qMax(1, lengthSteps);
     const int lengthMs = qBound(60, steps * stepMs, 4000);
-    const int velocity = qBound(1, static_cast<int>(params.volume * 127.0f), 127);
+    const int velocity = 127;
     m_engine->setSynthEnabled(index, true);
     m_engine->setSynthParams(index, params.volume, params.pan, params.fxBus);
     m_engine->synthNoteOn(index, midiNote, velocity);

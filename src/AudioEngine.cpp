@@ -866,6 +866,11 @@ void AudioEngine::mix(float *out, int frames) {
             const float releaseStep =
                 releaseSec > 0.0f ? 1.0f / (releaseSec * m_sampleRate) : 1.0f;
 
+            const bool isDx7 = (synth.kind == SynthKind::Dx7);
+            const bool neutralEnv =
+                (attack <= 0.001f && decay <= 0.001f && release <= 0.001f && sustain >= 0.999f);
+            const bool useExternalEnv = !(isDx7 && neutralEnv);
+
             const bool hasNotes = std::any_of(synth.activeNotes.begin(),
                                              synth.activeNotes.end(),
                                              [](bool v) { return v; });
@@ -897,39 +902,46 @@ void AudioEngine::mix(float *out, int frames) {
                 staticR = 1.0f / (2.0f * q);
             }
 
+            float dx7Peak = 0.0f;
             for (int i = 0; i < frames; ++i) {
-                if (synth.releaseRequested && !hasNotes &&
-                    synth.envStage != EnvStage::Release) {
-                    synth.envStage = EnvStage::Release;
-                }
-                float env = synth.env;
-                switch (synth.envStage) {
-                    case EnvStage::Attack:
-                        env += attackStep;
-                        if (env >= 1.0f) {
-                            env = 1.0f;
-                            synth.envStage = EnvStage::Decay;
-                        }
-                        break;
-                    case EnvStage::Decay:
-                        env -= decayStep;
-                        if (env <= sustain || decaySec <= 0.0f) {
+                float env = 1.0f;
+                if (useExternalEnv) {
+                    if (synth.releaseRequested && !hasNotes &&
+                        synth.envStage != EnvStage::Release) {
+                        synth.envStage = EnvStage::Release;
+                    }
+                    env = synth.env;
+                    switch (synth.envStage) {
+                        case EnvStage::Attack:
+                            env += attackStep;
+                            if (env >= 1.0f) {
+                                env = 1.0f;
+                                synth.envStage = EnvStage::Decay;
+                            }
+                            break;
+                        case EnvStage::Decay:
+                            env -= decayStep;
+                            if (env <= sustain || decaySec <= 0.0f) {
+                                env = sustain;
+                                synth.envStage = EnvStage::Sustain;
+                            }
+                            break;
+                        case EnvStage::Sustain:
                             env = sustain;
-                            synth.envStage = EnvStage::Sustain;
-                        }
-                        break;
-                    case EnvStage::Sustain:
-                        env = sustain;
-                        break;
-                    case EnvStage::Release:
-                        env -= releaseStep * std::max(0.1f, env);
-                        if (env <= 0.0005f || releaseSec <= 0.0f) {
-                            env = 0.0f;
-                            synth.releaseRequested = false;
-                        }
-                        break;
+                            break;
+                        case EnvStage::Release:
+                            env -= releaseStep * std::max(0.1f, env);
+                            if (env <= 0.0005f || releaseSec <= 0.0f) {
+                                env = 0.0f;
+                                synth.releaseRequested = false;
+                            }
+                            break;
+                    }
+                    synth.env = env;
+                } else {
+                    synth.envStage = EnvStage::Sustain;
+                    synth.env = 1.0f;
                 }
-                synth.env = env;
 
                 float left = m_synthScratchL[static_cast<size_t>(i)];
                 float right = m_synthScratchR[static_cast<size_t>(i)];
@@ -967,6 +979,17 @@ void AudioEngine::mix(float *out, int frames) {
                 busOut[idx] += left * synth.gainL * env;
                 if (m_channels > 1) {
                     busOut[idx + 1] += right * synth.gainR * env;
+                }
+                if (isDx7 && !useExternalEnv && !hasNotes) {
+                    const float peakL = std::fabs(left * synth.gainL);
+                    const float peakR = std::fabs(right * synth.gainR);
+                    dx7Peak = std::max(dx7Peak, std::max(peakL, peakR));
+                }
+            }
+            if (isDx7 && !useExternalEnv && !hasNotes) {
+                if (dx7Peak < 0.00008f) {
+                    synth.releaseRequested = false;
+                    synth.env = 0.0f;
                 }
             }
         }
