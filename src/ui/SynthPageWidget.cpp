@@ -544,7 +544,8 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     };
 
     const float headerH = Theme::pxF(22.0f);
-    const float availableH = std::max(Theme::pxF(10.0f), controlRect.height() - headerH - Theme::pxF(8.0f));
+    const float availableH =
+        std::max(Theme::pxF(10.0f), static_cast<float>(controlRect.height() - headerH - Theme::pxF(8.0f)));
     const int rows = (kMainParamCount + 1) / 2;
     const float rowH = std::min(Theme::pxF(28.0f), availableH / rows);
     const float colGap = Theme::pxF(10.0f);
@@ -596,7 +597,8 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     const int macroCols = 2;
     const float macroGap = Theme::pxF(8.0f);
     const float macroHeader = Theme::pxF(22.0f);
-    const float macroAvailableH = std::max(Theme::pxF(10.0f), macroRect.height() - macroHeader - Theme::pxF(8.0f));
+    const float macroAvailableH =
+        std::max(Theme::pxF(10.0f), static_cast<float>(macroRect.height() - macroHeader - Theme::pxF(8.0f)));
     const float macroH = (macroAvailableH - macroGap * (macroRows - 1)) / macroRows;
     const float macroW = (macroRect.width() - Theme::pxF(20.0f) - macroGap) / macroCols;
 
