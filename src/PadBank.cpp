@@ -272,6 +272,17 @@ static void ensureFmPresets() {
     init.params.fmAmount = 0.0f;
     init.params.ratio = 1.0f;
     init.params.feedback = 0.0f;
+    init.params.osc1Wave = 0;
+    init.params.osc2Wave = 0;
+    init.params.osc1Voices = 1;
+    init.params.osc2Voices = 1;
+    init.params.osc1Detune = 0.0f;
+    init.params.osc2Detune = 0.0f;
+    init.params.osc1Gain = 0.8f;
+    init.params.osc2Gain = 0.5f;
+    init.params.osc1Pan = -0.1f;
+    init.params.osc2Pan = 0.1f;
+    init.params.filterType = 0;
     init.params.cutoff = 0.9f;
     init.params.resonance = 0.1f;
     init.params.attack = 0.05f;
@@ -286,6 +297,11 @@ static void ensureFmPresets() {
     piano.params.fmAmount = 0.55f;
     piano.params.ratio = 2.0f;
     piano.params.feedback = 0.25f;
+    piano.params.osc1Wave = 0;
+    piano.params.osc2Wave = 0;
+    piano.params.osc1Gain = 0.8f;
+    piano.params.osc2Gain = 0.6f;
+    piano.params.filterType = 0;
     piano.params.cutoff = 0.85f;
     piano.params.resonance = 0.15f;
     piano.params.attack = 0.02f;
@@ -300,6 +316,11 @@ static void ensureFmPresets() {
     bell.params.fmAmount = 0.8f;
     bell.params.ratio = 3.0f;
     bell.params.feedback = 0.4f;
+    bell.params.osc1Wave = 7;
+    bell.params.osc2Wave = 0;
+    bell.params.osc1Gain = 0.75f;
+    bell.params.osc2Gain = 0.6f;
+    bell.params.filterType = 0;
     bell.params.cutoff = 0.95f;
     bell.params.resonance = 0.1f;
     bell.params.attack = 0.01f;
@@ -314,6 +335,11 @@ static void ensureFmPresets() {
     bass.params.fmAmount = 0.35f;
     bass.params.ratio = 1.0f;
     bass.params.feedback = 0.15f;
+    bass.params.osc1Wave = 1;
+    bass.params.osc2Wave = 2;
+    bass.params.osc1Gain = 0.9f;
+    bass.params.osc2Gain = 0.4f;
+    bass.params.filterType = 0;
     bass.params.cutoff = 0.45f;
     bass.params.resonance = 0.25f;
     bass.params.attack = 0.01f;
@@ -328,6 +354,14 @@ static void ensureFmPresets() {
     pad.params.fmAmount = 0.4f;
     pad.params.ratio = 1.5f;
     pad.params.feedback = 0.1f;
+    pad.params.osc1Wave = 6;
+    pad.params.osc2Wave = 0;
+    pad.params.osc1Voices = 2;
+    pad.params.osc2Voices = 1;
+    pad.params.osc1Detune = 0.2f;
+    pad.params.osc1Gain = 0.8f;
+    pad.params.osc2Gain = 0.4f;
+    pad.params.filterType = 0;
     pad.params.cutoff = 0.6f;
     pad.params.resonance = 0.2f;
     pad.params.attack = 0.3f;
@@ -895,16 +929,7 @@ void PadBank::setSynth(int index, const QString &name) {
             m_engine->setSynthKind(index, AudioEngine::SynthKind::SimpleFm);
             m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
             m_engine->setSynthVoices(index, sp.voices);
-            AudioEngine::FmParams fm;
-            fm.fmAmount = sp.fmAmount;
-            fm.ratio = sp.ratio;
-            fm.feedback = sp.feedback;
-            fm.cutoff = sp.cutoff;
-            fm.resonance = sp.resonance;
-            fm.lfoRate = sp.lfoRate;
-            fm.lfoDepth = sp.lfoDepth;
-            fm.macros = sp.macros;
-            m_engine->setFmParams(index, fm);
+            m_engine->setFmParams(index, buildFmParams(sp));
             const PadParams &pp = m_params[static_cast<size_t>(index)];
             m_engine->setSynthParams(index, pp.volume, pp.pan, pp.fxBus);
             m_engine->setSynthEnabled(index, true);
@@ -1230,8 +1255,19 @@ static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     fm.feedback = sp.feedback;
     fm.cutoff = sp.cutoff;
     fm.resonance = sp.resonance;
+    fm.filterType = sp.filterType;
     fm.lfoRate = sp.lfoRate;
     fm.lfoDepth = sp.lfoDepth;
+    fm.osc1Wave = sp.osc1Wave;
+    fm.osc2Wave = sp.osc2Wave;
+    fm.osc1Voices = sp.osc1Voices;
+    fm.osc2Voices = sp.osc2Voices;
+    fm.osc1Detune = sp.osc1Detune;
+    fm.osc2Detune = sp.osc2Detune;
+    fm.osc1Gain = sp.osc1Gain;
+    fm.osc2Gain = sp.osc2Gain;
+    fm.osc1Pan = sp.osc1Pan;
+    fm.osc2Pan = sp.osc2Pan;
     fm.macros = sp.macros;
     return fm;
 }
@@ -1258,6 +1294,52 @@ void PadBank::setSynthFilter(int index, float cutoff, float resonance) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.cutoff = qBound(0.0f, cutoff, 1.0f);
     sp.resonance = qBound(0.0f, resonance, 1.0f);
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthFilterType(int index, int type) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.filterType = qBound(0, type, 9);
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthOsc(int index, int osc, int wave, int voices, float detune, float gain,
+                          float pan) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    const int clampedWave = qBound(0, wave, static_cast<int>(serumWaves().size()) - 1);
+    const int clampedVoices = qBound(1, voices, 8);
+    const float clampedDetune = qBound(0.0f, detune, 1.0f);
+    const float clampedGain = qBound(0.0f, gain, 1.0f);
+    const float clampedPan = qBound(-1.0f, pan, 1.0f);
+
+    if (osc == 0) {
+        sp.osc1Wave = clampedWave;
+        sp.osc1Voices = clampedVoices;
+        sp.osc1Detune = clampedDetune;
+        sp.osc1Gain = clampedGain;
+        sp.osc1Pan = clampedPan;
+    } else {
+        sp.osc2Wave = clampedWave;
+        sp.osc2Voices = clampedVoices;
+        sp.osc2Detune = clampedDetune;
+        sp.osc2Gain = clampedGain;
+        sp.osc2Pan = clampedPan;
+    }
+
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));
@@ -2218,7 +2300,8 @@ QStringList PadBank::synthPresetsForBank(const QString &bank) {
 }
 
 QStringList PadBank::serumWaves() {
-    return {"SINE", "SAW", "SQUARE", "TRI", "NOISE"};
+    return {"SINE", "SAW", "SQUARE", "TRI", "NOISE",
+            "PWM", "SUPERSAW", "BELL", "FORMANT", "METAL"};
 }
 
 QStringList PadBank::synthTypes() {

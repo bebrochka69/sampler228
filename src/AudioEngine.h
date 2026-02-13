@@ -27,8 +27,19 @@ public:
         float feedback = 0.0f;
         float cutoff = 0.8f;
         float resonance = 0.1f;
+        int filterType = 0;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
+        int osc1Wave = 0;
+        int osc2Wave = 1;
+        int osc1Voices = 1;
+        int osc2Voices = 1;
+        float osc1Detune = 0.0f;
+        float osc2Detune = 0.0f;
+        float osc1Gain = 0.8f;
+        float osc2Gain = 0.6f;
+        float osc1Pan = -0.1f;
+        float osc2Pan = 0.1f;
         std::array<float, 8> macros{};
     };
     struct EffectSettings {
@@ -163,6 +174,7 @@ private:
         FmParams fmParams;
         float filterCutoff = 0.8f;
         float filterResonance = 0.1f;
+        int filterType = 0;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
         float lfoPhase = 0.0f;

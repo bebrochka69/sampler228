@@ -57,8 +57,19 @@ public:
         float feedback = 0.0f;
         float cutoff = 0.8f;
         float resonance = 0.1f;
+        int filterType = 0;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
+        int osc1Wave = 0;
+        int osc2Wave = 1;
+        int osc1Voices = 1;
+        int osc2Voices = 1;
+        float osc1Detune = 0.0f;
+        float osc2Detune = 0.0f;
+        float osc1Gain = 0.8f;
+        float osc2Gain = 0.6f;
+        float osc1Pan = -0.1f;
+        float osc2Pan = 0.1f;
         std::array<float, 8> macros{{0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f}};
     };
 
@@ -90,6 +101,9 @@ public:
     void setSynthOctave(int index, int octave);
     void setSynthFm(int index, float fmAmount, float ratio, float feedback);
     void setSynthFilter(int index, float cutoff, float resonance);
+    void setSynthFilterType(int index, int type);
+    void setSynthOsc(int index, int osc, int wave, int voices, float detune, float gain,
+                     float pan);
     void setSynthLfo(int index, float rate, float depth);
     void setSynthMacro(int index, int macro, float value);
     int fxBus(int index) const;

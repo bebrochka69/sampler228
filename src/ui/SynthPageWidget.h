@@ -23,6 +23,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
 private:
     struct PresetRow {
@@ -50,8 +51,9 @@ private:
     int m_selectedEditParam = 0;
     QStringList m_categories;
     QVector<QRectF> m_categoryRects;
-    QVector<QRectF> m_macroRects;
+    QVector<QRectF> m_filterPresetRects;
     int m_selectedCategory = 0;
+    int m_presetScroll = 0;
     bool m_showPresetMenu = false;
     QRectF m_presetButtonRect;
     QRectF m_presetPanelRect;

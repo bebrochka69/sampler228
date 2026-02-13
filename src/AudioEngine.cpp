@@ -442,9 +442,24 @@ void AudioEngine::setFmParams(int padId, const FmParams &params) {
     const float lfoDepth = macroShift(params.lfoDepth, params.macros[5], 0.7f);
     const float lfoRate = std::max(0.01f, params.lfoRate + (params.macros[6] - 0.5f) * 0.6f);
 
-    state.fm.setParams(fm, ratio, feedback);
+    SimpleFmCore::Params fmParams;
+    fmParams.fmAmount = fm;
+    fmParams.ratio = ratio;
+    fmParams.feedback = feedback;
+    fmParams.osc1Wave = params.osc1Wave;
+    fmParams.osc2Wave = params.osc2Wave;
+    fmParams.osc1Voices = params.osc1Voices;
+    fmParams.osc2Voices = params.osc2Voices;
+    fmParams.osc1Detune = params.osc1Detune;
+    fmParams.osc2Detune = params.osc2Detune;
+    fmParams.osc1Gain = params.osc1Gain;
+    fmParams.osc2Gain = params.osc2Gain;
+    fmParams.osc1Pan = params.osc1Pan;
+    fmParams.osc2Pan = params.osc2Pan;
+    state.fm.setParams(fmParams);
     state.filterCutoff = cutoff;
     state.filterResonance = resonance;
+    state.filterType = params.filterType;
     state.lfoRate = lfoRate;
     state.lfoDepth = lfoDepth;
 }
@@ -696,7 +711,21 @@ void AudioEngine::ensureSynthInit(SynthState &state) {
     }
     if (state.kind == SynthKind::SimpleFm) {
         state.fm.init(m_sampleRate, state.voices);
-        state.fm.setParams(state.fmParams.fmAmount, state.fmParams.ratio, state.fmParams.feedback);
+        SimpleFmCore::Params fmParams;
+        fmParams.fmAmount = state.fmParams.fmAmount;
+        fmParams.ratio = state.fmParams.ratio;
+        fmParams.feedback = state.fmParams.feedback;
+        fmParams.osc1Wave = state.fmParams.osc1Wave;
+        fmParams.osc2Wave = state.fmParams.osc2Wave;
+        fmParams.osc1Voices = state.fmParams.osc1Voices;
+        fmParams.osc2Voices = state.fmParams.osc2Voices;
+        fmParams.osc1Detune = state.fmParams.osc1Detune;
+        fmParams.osc2Detune = state.fmParams.osc2Detune;
+        fmParams.osc1Gain = state.fmParams.osc1Gain;
+        fmParams.osc2Gain = state.fmParams.osc2Gain;
+        fmParams.osc1Pan = state.fmParams.osc1Pan;
+        fmParams.osc2Pan = state.fmParams.osc2Pan;
+        state.fm.setParams(fmParams);
         state.initialized = true;
         return;
     }
@@ -962,16 +991,52 @@ void AudioEngine::mix(float *out, int frames) {
                         R = 1.0f / (2.0f * q);
                     }
                     if (g > 0.0f) {
-                        auto svf = [&](float input, float &ic1, float &ic2) {
+                        auto svf = [&](float input, float &ic1, float &ic2, float &low,
+                                       float &band, float &high) {
                             const float v3 = input - ic2;
                             const float v1 = (g * v3 + ic1) / (1.0f + g * (g + R));
                             const float v2 = ic2 + g * v1;
                             ic1 = 2.0f * v1 - ic1;
                             ic2 = 2.0f * v2 - ic2;
-                            return v2;
+                            low = v2;
+                            band = v1;
+                            high = v3 - R * v1 - v2;
                         };
-                        left = svf(left, synth.filterIc1L, synth.filterIc2L);
-                        right = svf(right, synth.filterIc1R, synth.filterIc2R);
+
+                        float lowL = 0.0f, bandL = 0.0f, highL = 0.0f;
+                        float lowR = 0.0f, bandR = 0.0f, highR = 0.0f;
+                        svf(left, synth.filterIc1L, synth.filterIc2L, lowL, bandL, highL);
+                        svf(right, synth.filterIc1R, synth.filterIc2R, lowR, bandR, highR);
+
+                        auto applyFilterMode = [&](float input, float low, float band, float high) {
+                            switch (synth.filterType) {
+                                case 0: // lowpass
+                                    return low;
+                                case 1: // highpass
+                                    return high;
+                                case 2: // bandpass
+                                    return band;
+                                case 3: // notch
+                                    return low + high;
+                                case 4: // peak
+                                    return band;
+                                case 5: // low shelf
+                                    return input + low * 0.6f;
+                                case 6: // high shelf
+                                    return input + high * 0.6f;
+                                case 7: // allpass (approx)
+                                    return input - 2.0f * R * band;
+                                case 8: // bypass
+                                    return input;
+                                case 9: // low+mid
+                                    return low + band;
+                                default:
+                                    return low;
+                            }
+                        };
+
+                        left = applyFilterMode(left, lowL, bandL, highL);
+                        right = applyFilterMode(right, lowR, bandR, highR);
                     }
                 }
 
