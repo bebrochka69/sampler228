@@ -948,17 +948,14 @@ void PadBank::setSynth(int index, const QString &name) {
     const QString resolvedPreset = QString("%1/%2").arg(bank.name, programName);
     synthName = makeSynthName(defaultMiniDexedType(), resolvedPreset);
 
-    const bool wasDx7 =
-        m_isSynth[static_cast<size_t>(index)] &&
-        isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]));
-
     m_isSynth[static_cast<size_t>(index)] = true;
     m_synthNames[static_cast<size_t>(index)] = synthName;
     m_synthBanks[static_cast<size_t>(index)] = bank.name;
     m_synthPrograms[static_cast<size_t>(index)] = programIndex;
     m_paths[static_cast<size_t>(index)].clear();
     m_synthBaseMidi[static_cast<size_t>(index)] = 60;
-    if (!wasDx7) {
+    {
+        // Reset external ADSR so DX7 presets sound authentic by default.
         SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
         sp.attack = 0.0f;
         sp.decay = 0.0f;
@@ -1812,7 +1809,7 @@ void PadBank::triggerPad(int index) {
         m_engine->setSynthParams(index, params.volume, params.pan, params.fxBus);
         m_engine->synthNoteOn(index, baseMidi, velocity);
         const int lengthMs = isDx7
-                                 ? qBound(200, static_cast<int>(1200 + sp.release * 2000.0f), 6000)
+                                 ? qBound(500, static_cast<int>(3000 + sp.release * 3500.0f), 8000)
                                  : qBound(80, static_cast<int>(300 + sp.release * 900.0f), 2000);
         QTimer::singleShot(lengthMs, this, [this, index, baseMidi]() {
             if (m_engine) {
