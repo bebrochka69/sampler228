@@ -111,6 +111,8 @@ QString synthPreset(const QString &id) {
     return id.trimmed();
 }
 
+QString synthTypeFromId(const QString &id);
+
 QString synthBank(const QString &id) {
     const QString type = synthTypeFromId(id).trimmed().toUpper();
     if (type == "SERUM" || type == "FM") {
