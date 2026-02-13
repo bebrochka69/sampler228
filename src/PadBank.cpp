@@ -96,6 +96,8 @@ bool isFmType(const QString &type) {
     return t == "FM" || t == "SERUM";
 }
 
+static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp);
+
 QString defaultMiniDexedType() {
     return QStringLiteral("DX7");
 }
