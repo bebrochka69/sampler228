@@ -163,8 +163,8 @@ void SeqPageWidget::triggerStep(int step) {
     }
     for (int pad = 0; pad < 8; ++pad) {
         if (m_pads->isSynth(pad) && !m_pianoNotes[pad].isEmpty()) {
-            const int baseMidi = 72;
-            const int rows = 48;
+            const int baseMidi = 48;
+            const int rows = 49;
             const auto &notes = m_pianoNotes[pad];
             for (const auto &note : notes) {
                 if (note.start != step) {
@@ -206,7 +206,7 @@ void SeqPageWidget::applyPianoNotes(int pad, const QVector<int> &notesData) {
         PianoNote note;
         note.start = qMax(0, notesData[i]);
         note.length = qMax(1, notesData[i + 1]);
-        note.row = qBound(0, notesData[i + 2], 47);
+        note.row = qBound(0, notesData[i + 2], 48);
         notes.push_back(note);
     }
     update();

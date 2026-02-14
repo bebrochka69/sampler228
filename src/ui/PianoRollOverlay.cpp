@@ -23,6 +23,13 @@ void PianoRollOverlay::showForPad(int pad) {
     if (m_pads) {
         m_pads->setActivePad(m_activePad);
     }
+    m_scrollX = 0.0f;
+    const int c5Row = (m_totalRows - 1) - (72 - m_baseMidi);
+    const float desired = static_cast<float>(c5Row - m_visibleRows / 2);
+    const float maxScrollY =
+        qMax(0.0f, static_cast<float>(m_totalRows - m_visibleRows));
+    m_scrollY = qBound(0.0f, desired, maxScrollY);
+    clampScroll();
     setVisible(true);
     raise();
     emitStepsChanged();

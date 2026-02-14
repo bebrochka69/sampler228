@@ -472,6 +472,17 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
     const float p5 = clamp01(slot.p5);
     const QString fx = slot.effect.toLower();
 
+    struct ParamInfo {
+        QString label;
+        QString value;
+        float norm = 0.0f;
+        int index = 0;
+    };
+
+    auto percent = [](float v) { return QString("%1%").arg(qRound(v * 100.0f)); };
+    auto hzLabel = [](float v) { return QString("%1 Hz").arg(v, 0, 'f', 1); };
+    auto msLabel = [](float v) { return QString("%1 ms").arg(qRound(v * 1000.0f)); };
+
     if (fx.isEmpty()) {
         p.setPen(Theme::textMuted());
         p.setFont(Theme::baseFont(10, QFont::DemiBold));
@@ -1016,6 +1027,125 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.drawLine(QPointF(r.left() + 12, c.y()), QPointF(r.right() - 12, c.y()));
         p.drawLine(QPointF(c.x() - 14, c.y() - 14), QPointF(c.x() + 14, c.y() + 14));
         p.drawLine(QPointF(c.x() - 14, c.y() + 14), QPointF(c.x() + 14, c.y() - 14));
+    }
+
+    if (fx != "comp") {
+        QVector<ParamInfo> params;
+        if (fx == "reverb") {
+            params.push_back({"WET", percent(p1), p1, 0});
+            params.push_back({"FEED", percent(p2), p2, 1});
+        } else if (fx == "dist") {
+            const float drive = 1.0f + p1 * 6.0f;
+            params.push_back({"DRIVE", QString("x%1").arg(drive, 0, 'f', 1), p1, 0});
+            params.push_back({"MIX", percent(p2), p2, 1});
+        } else if (fx == "lofi") {
+            const float bits = 4.0f + p1 * 8.0f;
+            const int hold = 1 + static_cast<int>(p2 * 7.0f);
+            params.push_back({"BITS", QString::number(bits, 'f', 1), p1, 0});
+            params.push_back({"HOLD", QString::number(hold), p2, 1});
+        } else if (fx == "cassette") {
+            params.push_back({"NOISE", percent(p1), p1, 0});
+            params.push_back({"TONE", percent(p2), p2, 1});
+        } else if (fx == "chorus") {
+            const float depth = 0.002f + p1 * 0.008f;
+            const float rate = 0.1f + p2 * 0.8f;
+            params.push_back({"DEPTH", QString::number(depth * 1000.0f, 'f', 1), p1, 0});
+            params.push_back({"RATE", hzLabel(rate), p2, 1});
+            params.push_back({"MIX", percent(p3), p3, 2});
+        } else if (fx == "eq") {
+            const float lowCut = 30.0f * std::pow(2.0f, p1 * 5.5f);
+            const float highCut = 800.0f * std::pow(2.0f, p2 * 4.5f);
+            params.push_back({"LOW CUT", hzLabel(lowCut), p1, 0});
+            params.push_back({"HIGH CUT", hzLabel(highCut), p2, 1});
+        } else if (fx == "sidechan") {
+            params.push_back({"THRESH", percent(p1), p1, 0});
+            params.push_back({"AMOUNT", percent(p2), p2, 1});
+            params.push_back({"RELEASE", percent(p3), p3, 2});
+        } else if (fx == "delay") {
+            const float timeSec = 0.03f + p1 * 0.9f;
+            params.push_back({"TIME", msLabel(timeSec), p1, 0});
+            params.push_back({"FEED", percent(p2), p2, 1});
+            params.push_back({"MIX", percent(p3), p3, 2});
+            params.push_back({"STEREO", (p4 >= 0.5f) ? "ON" : "OFF", p4, 3});
+        } else if (fx == "tremolo") {
+            const bool sync = (p3 >= 0.5f);
+            QString rateLabel;
+            if (sync) {
+                static const QStringList divs = {"1/16", "1/8", "1/4", "1/2", "1/1"};
+                const int idx = qBound(0, static_cast<int>(p2 * 4.99f), 4);
+                rateLabel = divs[idx];
+            } else {
+                const float rate = 0.5f + p2 * 6.0f;
+                rateLabel = hzLabel(rate);
+            }
+            params.push_back({"DEPTH", percent(p1), p1, 0});
+            params.push_back({"RATE", rateLabel, p2, 1});
+            params.push_back({"SYNC", sync ? "ON" : "OFF", p3, 2});
+        } else if (fx == "ringmod") {
+            const float freq = 50.0f * std::pow(2.0f, p1 * 5.0f);
+            params.push_back({"FREQ", hzLabel(freq), p1, 0});
+            params.push_back({"MIX", percent(p2), p2, 1});
+        } else if (fx == "robot") {
+            const float timeSec = 0.002f + p1 * 0.02f;
+            params.push_back({"TIME", msLabel(timeSec), p1, 0});
+            params.push_back({"FEED", percent(p2), p2, 1});
+            params.push_back({"MIX", percent(p3), p3, 2});
+        } else if (fx == "punch") {
+            params.push_back({"AMOUNT", percent(p1), p1, 0});
+            params.push_back({"ATTACK", percent(p2), p2, 1});
+            params.push_back({"RELEASE", percent(p3), p3, 2});
+        } else if (fx == "subharm") {
+            params.push_back({"AMOUNT", percent(p1), p1, 0});
+        } else if (fx == "keyharm") {
+            static const QStringList keys = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+            const int keyIndex = qBound(0, static_cast<int>(p2 * 11.99f), 11);
+            const bool minor = (p3 >= 0.5f);
+            params.push_back({"MIX", percent(p1), p1, 0});
+            params.push_back({"KEY", keys[keyIndex], p2, 1});
+            params.push_back({"MODE", minor ? "MIN" : "MAJ", p3, 2});
+        } else if (fx == "freeze") {
+            const float lenSec = 0.15f + p1 * 0.85f;
+            params.push_back({"LENGTH", msLabel(lenSec), p1, 0});
+            params.push_back({"MIX", percent(p2), p2, 1});
+            params.push_back({"REFRESH", (p3 >= 0.5f) ? "ON" : "OFF", p3, 2});
+        }
+
+        if (!params.isEmpty()) {
+            const float knobRowH = Theme::pxF(70.0f);
+            QRectF knobArea = rect.adjusted(Theme::px(12),
+                                            rect.height() - knobRowH - Theme::px(12),
+                                            -Theme::px(12),
+                                            -Theme::px(12));
+            const int count = params.size();
+            const float cellW = knobArea.width() / count;
+            const float radius = qMin(cellW, knobArea.height()) * 0.28f;
+
+            for (int i = 0; i < count; ++i) {
+                const ParamInfo &pi = params[i];
+                const float cx = knobArea.left() + cellW * (i + 0.5f);
+                const float cy = knobArea.top() + radius + Theme::pxF(8.0f);
+                const QPointF center(cx, cy);
+                const bool selected = (m_selectedParam == pi.index);
+                p.setBrush(selected ? Theme::accentAlt() : QColor(30, 30, 36));
+                p.setPen(QPen(Theme::stroke(), 1.0));
+                p.drawEllipse(center, radius, radius);
+                const float ang = -120.0f + pi.norm * 240.0f;
+                const float rad = ang * static_cast<float>(M_PI) / 180.0f;
+                p.setPen(QPen(selected ? Theme::bg0() : QColor(220, 220, 230), 1.6));
+                p.drawLine(center, QPointF(center.x() + std::cos(rad) * radius * 0.8f,
+                                           center.y() + std::sin(rad) * radius * 0.8f));
+                QRectF labelRect(cx - cellW * 0.5f, knobArea.bottom() - Theme::px(24),
+                                 cellW, Theme::px(12));
+                p.setPen(selected ? Theme::accentAlt() : Theme::textMuted());
+                p.setFont(Theme::baseFont(8, QFont::DemiBold));
+                p.drawText(labelRect, Qt::AlignCenter, pi.label);
+                QRectF valueRect(cx - cellW * 0.5f, labelRect.top() - Theme::px(14),
+                                 cellW, Theme::px(12));
+                p.setPen(Theme::text());
+                p.setFont(Theme::baseFont(8, QFont::DemiBold));
+                p.drawText(valueRect, Qt::AlignCenter, pi.value);
+            }
+        }
     }
 
     p.restore();

@@ -140,6 +140,15 @@ private:
         float env = 0.0f;
         float z1L = 0.0f;
         float z1R = 0.0f;
+        float readPosA = 0.0f;
+        float readPosB = 0.0f;
+        float readPosC = 0.0f;
+        float readPosD = 0.0f;
+        float phaseA = 0.0f;
+        float phaseB = 0.5f;
+        float phaseC = 0.0f;
+        float phaseD = 0.5f;
+        int grainSize = 0;
         float eqLp1L = 0.0f;
         float eqLp1R = 0.0f;
         float eqHp1L = 0.0f;

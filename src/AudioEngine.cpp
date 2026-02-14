@@ -1483,39 +1483,114 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 }
                 break;
             }
-            case 15: {  // key harmonizer
-                const float mix = p1 * 0.4f;
+            case 15: {  // key harmonizer (simple pitch-shifted voices)
+                const float mix = p1 * 0.6f;
                 const int keyIndex = qBound(0, static_cast<int>(p2 * 11.99f), 11);
                 const bool minor = (p3 >= 0.5f);
-                static const int major[3] = {0, 4, 7};
-                static const int minorTriad[3] = {0, 3, 7};
-                const int baseMidi = 60 + keyIndex;
-                const int *intervals = minor ? minorTriad : major;
-                if (fx.bufA.size() < 3) {
-                    fx.bufA.assign(3, 0.0f);
+                const int third = minor ? 3 : 4;
+                const int fifth = 7;
+                int interval1 = keyIndex + third;
+                int interval2 = keyIndex + fifth;
+                if (interval1 >= 12) {
+                    interval1 -= 12;
                 }
+                if (interval2 >= 12) {
+                    interval2 -= 12;
+                }
+                const float ratio1 = std::pow(2.0f, interval1 / 12.0f);
+                const float ratio2 = std::pow(2.0f, interval2 / 12.0f);
+
+                const int grain = 2048;
+                const int bufFrames = grain * 2;
+                const int needed = bufFrames * m_channels;
+                if (fx.bufA.size() != needed) {
+                    fx.bufA.assign(needed, 0.0f);
+                    fx.indexA = 0;
+                    fx.readPosA = 0.0f;
+                    fx.readPosB = 0.0f;
+                    fx.readPosC = 0.0f;
+                    fx.readPosD = 0.0f;
+                    fx.phaseA = 0.0f;
+                    fx.phaseB = 0.5f;
+                    fx.phaseC = 0.0f;
+                    fx.phaseD = 0.5f;
+                    fx.grainSize = grain;
+                }
+
+                auto wrapPos = [&](float &pos) {
+                    while (pos < 0.0f) {
+                        pos += bufFrames;
+                    }
+                    while (pos >= bufFrames) {
+                        pos -= bufFrames;
+                    }
+                };
+                auto readInterp = [&](float pos, int ch) {
+                    const int i0 = static_cast<int>(pos);
+                    const int i1 = (i0 + 1) % bufFrames;
+                    const float frac = pos - i0;
+                    const float s0 = fx.bufA[i0 * m_channels + ch];
+                    const float s1 = fx.bufA[i1 * m_channels + ch];
+                    return s0 + (s1 - s0) * frac;
+                };
+
+                const float phaseInc = 1.0f / static_cast<float>(grain);
+
                 for (int i = 0; i < frames; ++i) {
-                    float env = 0.0f;
+                    const int writePos = fx.indexA;
                     for (int ch = 0; ch < m_channels; ++ch) {
-                        env += std::fabs(buffer[i * m_channels + ch]);
+                        fx.bufA[writePos * m_channels + ch] = buffer[i * m_channels + ch];
                     }
-                    env /= std::max(1, m_channels);
-                    fx.env += (env - fx.env) * 0.05f;
-                    float add = 0.0f;
-                    for (int t = 0; t < 3; ++t) {
-                        const int midi = baseMidi + intervals[t];
-                        const float freq =
-                            440.0f * std::pow(2.0f, (midi - 69.0f) / 12.0f);
-                        fx.bufA[t] += 2.0f * static_cast<float>(M_PI) * freq / m_sampleRate;
-                        if (fx.bufA[t] > 2.0f * static_cast<float>(M_PI)) {
-                            fx.bufA[t] -= 2.0f * static_cast<float>(M_PI);
-                        }
-                        add += std::sin(fx.bufA[t]);
-                    }
-                    add *= (mix * fx.env);
+
+                    const float wA = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * fx.phaseA));
+                    const float wB = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * fx.phaseB));
+                    const float wC = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * fx.phaseC));
+                    const float wD = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * fx.phaseD));
+
                     for (int ch = 0; ch < m_channels; ++ch) {
+                        const float v1 = readInterp(fx.readPosA, ch) * wA +
+                                         readInterp(fx.readPosB, ch) * wB;
+                        const float v2 = readInterp(fx.readPosC, ch) * wC +
+                                         readInterp(fx.readPosD, ch) * wD;
+                        const float add = (v1 + v2) * 0.5f * mix;
                         buffer[i * m_channels + ch] += add;
                     }
+
+                    fx.readPosA += ratio1;
+                    fx.readPosB += ratio1;
+                    fx.readPosC += ratio2;
+                    fx.readPosD += ratio2;
+                    wrapPos(fx.readPosA);
+                    wrapPos(fx.readPosB);
+                    wrapPos(fx.readPosC);
+                    wrapPos(fx.readPosD);
+
+                    fx.phaseA += phaseInc;
+                    fx.phaseB += phaseInc;
+                    fx.phaseC += phaseInc;
+                    fx.phaseD += phaseInc;
+                    if (fx.phaseA >= 1.0f) {
+                        fx.phaseA -= 1.0f;
+                        fx.readPosA = static_cast<float>(writePos - grain);
+                        wrapPos(fx.readPosA);
+                    }
+                    if (fx.phaseB >= 1.0f) {
+                        fx.phaseB -= 1.0f;
+                        fx.readPosB = static_cast<float>(writePos - grain / 2);
+                        wrapPos(fx.readPosB);
+                    }
+                    if (fx.phaseC >= 1.0f) {
+                        fx.phaseC -= 1.0f;
+                        fx.readPosC = static_cast<float>(writePos - grain);
+                        wrapPos(fx.readPosC);
+                    }
+                    if (fx.phaseD >= 1.0f) {
+                        fx.phaseD -= 1.0f;
+                        fx.readPosD = static_cast<float>(writePos - grain / 2);
+                        wrapPos(fx.readPosD);
+                    }
+
+                    fx.indexA = (fx.indexA + 1) % bufFrames;
                 }
                 break;
             }
