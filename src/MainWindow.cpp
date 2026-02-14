@@ -2,6 +2,7 @@
 
 #include <QCloseEvent>
 #include <QKeyEvent>
+#include <QShortcut>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -132,6 +133,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     m_projectMenu = new ProjectMenuOverlay(m_padBank, m_seqPage, m_fxPage, central);
     m_projectMenu->hide();
+
+    auto *menuShortcut = new QShortcut(QKeySequence(Qt::Key_M), this);
+    menuShortcut->setContext(Qt::ApplicationShortcut);
+    connect(menuShortcut, &QShortcut::activated, this, [this]() {
+        if (!m_projectMenu) {
+            return;
+        }
+        if (m_projectMenu->isVisible()) {
+            m_projectMenu->hide();
+        } else {
+            m_projectMenu->showMenu();
+        }
+    });
 
 }
 
