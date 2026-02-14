@@ -1599,13 +1599,13 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 break;
             }
             case 15: {  // key harmonizer (simple pitch-shifted voices)
-                const float mix = p1 * 0.6f;
+                const float mix = 0.2f + p1 * 0.8f;
                 const int keyIndex = qBound(0, static_cast<int>(p2 * 11.99f), 11);
                 const bool minor = (p3 >= 0.5f);
                 const int third = minor ? 3 : 4;
                 const int fifth = 7;
-                int interval1 = keyIndex + third;
-                int interval2 = keyIndex + fifth;
+                int interval1 = third + keyIndex;
+                int interval2 = fifth + keyIndex;
                 if (interval1 >= 12) {
                     interval1 -= 12;
                 }
@@ -1615,11 +1615,10 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 const float ratio1 = std::pow(2.0f, interval1 / 12.0f);
                 const float ratio2 = std::pow(2.0f, interval2 / 12.0f);
 
-                const int grain = 2048;
+                const int grain = 4096;
                 const int bufFrames = grain * 2;
-                const int needed = bufFrames * m_channels;
-                if (fx.bufA.size() != needed) {
-                    fx.bufA.assign(needed, 0.0f);
+                if (fx.bufA.size() != bufFrames) {
+                    fx.bufA.assign(bufFrames, 0.0f);
                     fx.indexA = 0;
                     fx.readPosA = 0.0f;
                     fx.readPosB = 0.0f;
@@ -1630,6 +1629,12 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                     fx.phaseC = 0.0f;
                     fx.phaseD = 0.5f;
                     fx.grainSize = grain;
+                    fx.bufB.assign(grain, 0.0f);
+                    for (int i = 0; i < grain; ++i) {
+                        const float t = static_cast<float>(i) / static_cast<float>(grain - 1);
+                        fx.bufB[static_cast<size_t>(i)] =
+                            0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * t));
+                    }
                 }
 
                 auto wrapPos = [&](float &pos) {
@@ -1644,8 +1649,8 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                     const int i0 = static_cast<int>(pos);
                     const int i1 = (i0 + 1) % bufFrames;
                     const float frac = pos - i0;
-                    const float s0 = fx.bufA[i0 * m_channels + ch];
-                    const float s1 = fx.bufA[i1 * m_channels + ch];
+                    const float s0 = fx.bufA[i0];
+                    const float s1 = fx.bufA[i1];
                     return s0 + (s1 - s0) * frac;
                 };
 
@@ -1653,22 +1658,28 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
 
                 for (int i = 0; i < frames; ++i) {
                     const int writePos = fx.indexA;
-                    for (int ch = 0; ch < m_channels; ++ch) {
-                        fx.bufA[writePos * m_channels + ch] = buffer[i * m_channels + ch];
-                    }
+                    const float inL = buffer[i * m_channels];
+                    const float inR = (m_channels > 1) ? buffer[i * m_channels + 1] : inL;
+                    const float mono = 0.5f * (inL + inR);
+                    fx.bufA[writePos] = mono;
 
-                    const float wA = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * fx.phaseA));
-                    const float wB = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * fx.phaseB));
-                    const float wC = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * fx.phaseC));
-                    const float wD = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * fx.phaseD));
+                    const int wiA = qBound(0, static_cast<int>(fx.phaseA * (grain - 1)), grain - 1);
+                    const int wiB = qBound(0, static_cast<int>(fx.phaseB * (grain - 1)), grain - 1);
+                    const int wiC = qBound(0, static_cast<int>(fx.phaseC * (grain - 1)), grain - 1);
+                    const int wiD = qBound(0, static_cast<int>(fx.phaseD * (grain - 1)), grain - 1);
+                    const float wA = fx.bufB[static_cast<size_t>(wiA)];
+                    const float wB = fx.bufB[static_cast<size_t>(wiB)];
+                    const float wC = fx.bufB[static_cast<size_t>(wiC)];
+                    const float wD = fx.bufB[static_cast<size_t>(wiD)];
 
-                    for (int ch = 0; ch < m_channels; ++ch) {
-                        const float v1 = readInterp(fx.readPosA, ch) * wA +
-                                         readInterp(fx.readPosB, ch) * wB;
-                        const float v2 = readInterp(fx.readPosC, ch) * wC +
-                                         readInterp(fx.readPosD, ch) * wD;
-                        const float add = (v1 + v2) * 0.5f * mix;
-                        buffer[i * m_channels + ch] += add;
+                    const float v1 = readInterp(fx.readPosA, 0) * wA +
+                                     readInterp(fx.readPosB, 0) * wB;
+                    const float v2 = readInterp(fx.readPosC, 0) * wC +
+                                     readInterp(fx.readPosD, 0) * wD;
+                    const float add = (v1 + v2) * 0.5f * mix;
+                    buffer[i * m_channels] += add;
+                    if (m_channels > 1) {
+                        buffer[i * m_channels + 1] += add;
                     }
 
                     fx.readPosA += ratio1;
