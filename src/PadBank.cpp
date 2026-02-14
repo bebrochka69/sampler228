@@ -1613,9 +1613,6 @@ static QStringList buildFfmpegArgsSegment(const QString &path, const QString &fi
 }
 
 bool PadBank::needsProcessing(const PadParams &params) const {
-    if (m_engineAvailable) {
-        return false;
-    }
     return params.stretchIndex > 0;
 }
 
@@ -1952,7 +1949,7 @@ void PadBank::triggerPad(int index) {
                 endFrame = totalFrames;
             }
             float tempoFactor = 1.0f;
-            if (stretchEnabled) {
+            if (!wantsProcessing && stretchEnabled) {
                 const int segmentFrames = qMax(1, endFrame - startFrame);
                 const qint64 segmentMs =
                     static_cast<qint64>(segmentFrames * 1000.0 / qMax(1, buffer->sampleRate));
@@ -1964,7 +1961,7 @@ void PadBank::triggerPad(int index) {
                 tempoFactor = qBound(0.25f, tempoFactor, 4.0f);
             }
 
-            const float rate = static_cast<float>(pitchRate) * tempoFactor;
+            const float rate = wantsProcessing ? 1.0f : static_cast<float>(pitchRate) * tempoFactor;
             const float volume = params.volume * normalizeGain;
             m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, volume,
                               params.pan, rate, params.fxBus);
