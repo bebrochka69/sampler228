@@ -10,6 +10,9 @@ class PadAssignOverlay;
 class PadHoldMenuOverlay;
 class PianoRollOverlay;
 class SynthPageWidget;
+class SeqPageWidget;
+class FxPageWidget;
+class ProjectMenuOverlay;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -18,6 +21,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
 
 private:
     TopToolbarWidget *m_toolbar = nullptr;
@@ -28,4 +32,7 @@ private:
     PadHoldMenuOverlay *m_holdMenu = nullptr;
     PianoRollOverlay *m_pianoRoll = nullptr;
     SynthPageWidget *m_synthPage = nullptr;
+    SeqPageWidget *m_seqPage = nullptr;
+    FxPageWidget *m_fxPage = nullptr;
+    ProjectMenuOverlay *m_projectMenu = nullptr;
 };

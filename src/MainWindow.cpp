@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include <QCloseEvent>
+#include <QKeyEvent>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -10,6 +11,7 @@
 #include "ui/PadAssignOverlay.h"
 #include "ui/PadHoldMenuOverlay.h"
 #include "ui/PianoRollOverlay.h"
+#include "ui/ProjectMenuOverlay.h"
 #include "ui/SeqPageWidget.h"
 #include "ui/SimplePageWidget.h"
 #include "ui/SynthPageWidget.h"
@@ -32,13 +34,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     m_stack = new QStackedWidget(central);
     m_sampleSession = new SampleSession(this);
-    auto *seqPage = new SeqPageWidget(m_padBank, m_stack);
+    m_seqPage = new SeqPageWidget(m_padBank, m_stack);
     auto *editPage = new EditPageWidget(m_sampleSession, m_padBank, m_stack);
-    auto *fxPage = new FxPageWidget(m_padBank, m_stack);
+    m_fxPage = new FxPageWidget(m_padBank, m_stack);
     m_synthPage = new SynthPageWidget(m_padBank, m_stack);
 
-    m_stack->addWidget(seqPage);                      // 0
-    m_stack->addWidget(fxPage);                       // 1
+    m_stack->addWidget(m_seqPage);                      // 0
+    m_stack->addWidget(m_fxPage);                       // 1
     m_stack->addWidget(new SimplePageWidget("ARRANGE", m_stack)); // 2
     m_stack->addWidget(editPage);                     // 3
     m_stack->addWidget(m_synthPage);                  // 4
@@ -76,7 +78,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Hold menu overlay
     m_holdMenu = new PadHoldMenuOverlay(m_padBank, central);
     m_holdMenu->hide();
-    connect(seqPage, &SeqPageWidget::padOpenRequested, this, [this, editPage](int pad) {
+    connect(m_seqPage, &SeqPageWidget::padOpenRequested, this, [this, editPage](int pad) {
         if (m_padBank && m_padBank->isSynth(pad)) {
             m_stack->setCurrentIndex(4);
             if (m_synthPage) {
@@ -86,12 +88,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             m_stack->setCurrentIndex(3);
         }
     });
-    connect(seqPage, &SeqPageWidget::padAssignRequested, this, [this](int pad) {
+    connect(m_seqPage, &SeqPageWidget::padAssignRequested, this, [this](int pad) {
         if (m_assignOverlay) {
             m_assignOverlay->showForPad(pad);
         }
     });
-    connect(seqPage, &SeqPageWidget::padMenuRequested, this, [this](int pad) {
+    connect(m_seqPage, &SeqPageWidget::padMenuRequested, this, [this](int pad) {
         if (m_holdMenu) {
             m_holdMenu->showForPad(pad);
         }
@@ -103,12 +105,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         m_stack->setCurrentIndex(0);
     });
     connect(m_pianoRoll, &PianoRollOverlay::stepsChanged, this,
-            [seqPage](int pad, const QVector<int> &steps) {
-                seqPage->applyPianoSteps(pad, steps);
+            [this](int pad, const QVector<int> &steps) {
+                if (m_seqPage) {
+                    m_seqPage->applyPianoSteps(pad, steps);
+                }
             });
     connect(m_pianoRoll, &PianoRollOverlay::notesChanged, this,
-            [seqPage](int pad, const QVector<int> &notes) {
-                seqPage->applyPianoNotes(pad, notes);
+            [this](int pad, const QVector<int> &notes) {
+                if (m_seqPage) {
+                    m_seqPage->applyPianoNotes(pad, notes);
+                }
             });
     connect(m_holdMenu, &PadHoldMenuOverlay::closed, this, [this]() {
         m_stack->setCurrentIndex(0);
@@ -124,9 +130,27 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         }
     });
 
+    m_projectMenu = new ProjectMenuOverlay(m_padBank, m_seqPage, m_fxPage, central);
+    m_projectMenu->hide();
+
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
     FramebufferCleaner::clearIfNeeded();
     QMainWindow::closeEvent(event);
+}
+
+void MainWindow::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_M) {
+        if (m_projectMenu) {
+            if (m_projectMenu->isVisible()) {
+                m_projectMenu->hide();
+            } else {
+                m_projectMenu->showMenu();
+            }
+            event->accept();
+            return;
+        }
+    }
+    QMainWindow::keyPressEvent(event);
 }

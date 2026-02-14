@@ -2231,6 +2231,52 @@ void PadBank::setBusGain(int bus, float gain) {
     }
 }
 
+bool PadBank::startRecording(const QString &path, int durationMs, int targetRate) {
+    if (!m_engineAvailable || !m_engine) {
+        return false;
+    }
+    if (durationMs <= 0 || path.isEmpty()) {
+        return false;
+    }
+    const int frames = qMax(1, static_cast<int>((durationMs * m_engineRate) / 1000.0));
+    return m_engine->startRecording(path, frames, targetRate);
+}
+
+static std::shared_ptr<AudioEngine::Buffer> makeMetronomeBuffer(int sampleRate, float freq,
+                                                                float lengthSec) {
+    if (sampleRate <= 0) {
+        sampleRate = 48000;
+    }
+    const int frames = qMax(1, static_cast<int>(sampleRate * lengthSec));
+    auto buffer = std::make_shared<AudioEngine::Buffer>();
+    buffer->channels = 2;
+    buffer->sampleRate = sampleRate;
+    buffer->samples.resize(frames * buffer->channels);
+    for (int i = 0; i < frames; ++i) {
+        const float t = static_cast<float>(i) / sampleRate;
+        const float env = std::exp(-t * 12.0f);
+        const float v = std::sin(2.0f * static_cast<float>(M_PI) * freq * t) * env;
+        buffer->samples[i * 2] = v;
+        buffer->samples[i * 2 + 1] = v;
+    }
+    return buffer;
+}
+
+void PadBank::triggerMetronome(bool accent) {
+    if (!m_engineAvailable || !m_engine) {
+        return;
+    }
+    if (!m_metronomeBuffer || !m_metronomeAccent) {
+        m_metronomeBuffer = makeMetronomeBuffer(m_engineRate, 1600.0f, 0.05f);
+        m_metronomeAccent = makeMetronomeBuffer(m_engineRate, 2200.0f, 0.06f);
+    }
+    auto buffer = accent ? m_metronomeAccent : m_metronomeBuffer;
+    if (!buffer || !buffer->isValid()) {
+        return;
+    }
+    m_engine->trigger(-1, buffer, 0, buffer->frames(), false, 0.6f, 0.0f, 1.0f, 0);
+}
+
 float PadBank::normalizeGainForPad(int index) const {
     if (index < 0 || index >= padCount()) {
         return 1.0f;

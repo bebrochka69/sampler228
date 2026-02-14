@@ -57,4 +57,5 @@ private:
     bool m_showPresetMenu = false;
     QRectF m_presetButtonRect;
     QRectF m_presetPanelRect;
+    QRectF m_busRect;
 };

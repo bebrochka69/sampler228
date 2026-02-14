@@ -35,6 +35,7 @@ set(SOURCES
     src/ui/PadAssignOverlay.cpp
     src/ui/PadHoldMenuOverlay.cpp
     src/ui/PianoRollOverlay.cpp
+    src/ui/ProjectMenuOverlay.cpp
     src/ui/SimplePageWidget.cpp
     src/ui/SystemStats.cpp
     src/ui/SampleBrowserModel.cpp
@@ -60,6 +61,7 @@ set(HEADERS
     src/ui/PadAssignOverlay.h
     src/ui/PadHoldMenuOverlay.h
     src/ui/PianoRollOverlay.h
+    src/ui/ProjectMenuOverlay.h
     src/ui/SimplePageWidget.h
     src/ui/SystemStats.h
     src/ui/SampleBrowserModel.h

@@ -46,6 +46,8 @@ class FxPageWidget : public QWidget {
     Q_OBJECT
 public:
     explicit FxPageWidget(PadBank *pads, QWidget *parent = nullptr);
+    QVector<FxTrack> trackData() const;
+    void setTrackData(const QVector<FxTrack> &tracks);
 
 protected:
     void paintEvent(QPaintEvent *event) override;

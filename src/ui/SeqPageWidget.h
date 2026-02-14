@@ -20,6 +20,11 @@ public:
     explicit SeqPageWidget(PadBank *pads, QWidget *parent = nullptr);
     void applyPianoSteps(int pad, const QVector<int> &steps);
     void applyPianoNotes(int pad, const QVector<int> &notesData);
+    QVector<int> pianoSteps(int pad) const;
+    QVector<int> pianoNotesData(int pad) const;
+    void setMetronomeEnabled(bool enabled);
+    bool metronomeEnabled() const { return m_metronomeEnabled; }
+    void renderToFile(const QString &path, int bars, int targetRate);
 
 signals:
     void padOpenRequested(int pad);
@@ -65,6 +70,10 @@ private:
     bool m_scrubActive = false;
     int m_playStep = 0;
     int m_bpm = 120;
+    bool m_metronomeEnabled = false;
+    bool m_rendering = false;
+    int m_renderStepsTotal = 0;
+    int m_renderStepCount = 0;
     PadBank *m_pads = nullptr;
     QPointF m_pressPos;
     int m_pressedPad = -1;

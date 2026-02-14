@@ -25,10 +25,9 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
     const float midY = rect.center().y();
     const float amp = rect.height() * 0.45f;
 
-    QPainterPath area;
-    QPainterPath outline;
-    bool first = true;
-
+    p.save();
+    p.setClipRect(rect);
+    p.setPen(QPen(QColor(25, 220, 255), 1.2));
     for (int x = 0; x < steps; ++x) {
         const int i0 = (x * count) / steps;
         const int i1 = qMin(count - 1, ((x + 1) * count) / steps);
@@ -40,42 +39,10 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
             if (v > maxV) maxV = v;
         }
         const float px = rect.left() + static_cast<float>(x);
-        const float maxAbs = qMax(std::fabs(minV), std::fabs(maxV));
-        const float yMax = midY - maxAbs * amp;
-        if (first) {
-            outline.moveTo(px, yMax);
-            area.moveTo(px, yMax);
-            first = false;
-        } else {
-            outline.lineTo(px, yMax);
-            area.lineTo(px, yMax);
-        }
+        const float yTop = midY - maxV * amp;
+        const float yBot = midY - minV * amp;
+        p.drawLine(QPointF(px, yTop), QPointF(px, yBot));
     }
-
-    for (int x = steps - 1; x >= 0; --x) {
-        const int i0 = (x * count) / steps;
-        const int i1 = qMin(count - 1, ((x + 1) * count) / steps);
-        float minV = 1.0f;
-        float maxV = -1.0f;
-        for (int i = i0; i <= i1; ++i) {
-            const float v = qBound(-1.0f, samples[i] * gain, 1.0f);
-            if (v < minV) minV = v;
-            if (v > maxV) maxV = v;
-        }
-        const float px = rect.left() + static_cast<float>(x);
-        const float maxAbs = qMax(std::fabs(minV), std::fabs(maxV));
-        const float yMin = midY + maxAbs * amp;
-        area.lineTo(px, yMin);
-    }
-    area.closeSubpath();
-
-    p.save();
-    p.setClipRect(rect);
-    p.setPen(QPen(QColor(25, 220, 255), 1.6));
-    p.drawPath(outline);
-    p.setBrush(QColor(25, 220, 255, 80));
-    p.setPen(Qt::NoPen);
-    p.drawPath(area);
     p.setPen(QPen(QColor(180, 200, 220, 120), 1.0));
     p.drawLine(QPointF(rect.left(), midY), QPointF(rect.right(), midY));
     p.restore();

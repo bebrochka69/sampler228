@@ -9,6 +9,7 @@
 #include <QStringList>
 #include <QtGlobal>
 #include <QFile>
+#include <QDataStream>
 
 #ifdef GROOVEBOX_WITH_ALSA
 #include <alsa/asoundlib.h>
@@ -263,6 +264,7 @@ void AudioEngine::trigger(int padId, const std::shared_ptr<Buffer> &buffer, int 
     voice.env = 0.0f;
     voice.envStage = EnvStage::Attack;
     voice.releaseRequested = false;
+    voice.useEnv = (padId >= 0);
     m_voices.push_back(std::move(voice));
 }
 
@@ -352,6 +354,92 @@ void AudioEngine::setBusGain(int bus, float gain) {
 void AudioEngine::setBpm(int bpm) {
     const int next = qBound(30, bpm, 300);
     m_bpm.store(static_cast<float>(next));
+}
+
+static bool writeWavFile(const QString &path, const std::vector<float> &samples,
+                         int srcRate, int targetRate, int channels) {
+    if (samples.empty() || channels <= 0) {
+        return false;
+    }
+    int srcFrames = static_cast<int>(samples.size() / channels);
+    if (srcFrames <= 0) {
+        return false;
+    }
+    if (targetRate <= 0) {
+        targetRate = srcRate;
+    }
+    std::vector<float> resampled;
+    const float rateRatio = static_cast<float>(targetRate) / static_cast<float>(srcRate);
+    int dstFrames = srcFrames;
+    if (targetRate != srcRate) {
+        dstFrames = qMax(1, static_cast<int>(std::floor(srcFrames * rateRatio)));
+        resampled.resize(static_cast<size_t>(dstFrames * channels));
+        for (int i = 0; i < dstFrames; ++i) {
+            const float srcPos = i / rateRatio;
+            const int i0 = qBound(0, static_cast<int>(std::floor(srcPos)), srcFrames - 1);
+            const int i1 = qMin(srcFrames - 1, i0 + 1);
+            const float frac = srcPos - i0;
+            for (int ch = 0; ch < channels; ++ch) {
+                const float s0 = samples[static_cast<size_t>(i0 * channels + ch)];
+                const float s1 = samples[static_cast<size_t>(i1 * channels + ch)];
+                resampled[static_cast<size_t>(i * channels + ch)] = s0 + (s1 - s0) * frac;
+            }
+        }
+    } else {
+        resampled = samples;
+    }
+
+    const int totalFrames = static_cast<int>(resampled.size() / channels);
+    QByteArray pcm;
+    pcm.resize(totalFrames * channels * 2);
+    int16_t *out = reinterpret_cast<int16_t *>(pcm.data());
+    for (int i = 0; i < totalFrames * channels; ++i) {
+        float v = resampled[static_cast<size_t>(i)];
+        v = std::max(-1.0f, std::min(1.0f, v));
+        out[i] = static_cast<int16_t>(v * 32767.0f);
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        return false;
+    }
+    const int byteRate = targetRate * channels * 2;
+    const int blockAlign = channels * 2;
+    const int dataSize = pcm.size();
+    const int riffSize = 36 + dataSize;
+
+    QDataStream ds(&file);
+    ds.setByteOrder(QDataStream::LittleEndian);
+    ds.writeRawData("RIFF", 4);
+    ds << riffSize;
+    ds.writeRawData("WAVE", 4);
+    ds.writeRawData("fmt ", 4);
+    ds << 16;
+    ds << static_cast<quint16>(1);
+    ds << static_cast<quint16>(channels);
+    ds << static_cast<quint32>(targetRate);
+    ds << static_cast<quint32>(byteRate);
+    ds << static_cast<quint16>(blockAlign);
+    ds << static_cast<quint16>(16);
+    ds.writeRawData("data", 4);
+    ds << static_cast<quint32>(dataSize);
+    file.write(pcm);
+    file.close();
+    return true;
+}
+
+bool AudioEngine::startRecording(const QString &path, int totalFrames, int targetSampleRate) {
+    if (totalFrames <= 0 || path.isEmpty()) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(m_recordMutex);
+    m_recordFloat.clear();
+    m_recordFloat.reserve(static_cast<size_t>(totalFrames * m_channels));
+    m_recordFramesLeft = totalFrames;
+    m_recordTargetRate = targetSampleRate;
+    m_recordPath = path;
+    m_recording.store(true);
+    return true;
 }
 
 void AudioEngine::setPadAdsr(int padId, float attack, float decay, float sustain, float release) {
@@ -828,33 +916,37 @@ void AudioEngine::mix(float *out, int frames) {
             float left = leftA + static_cast<float>((leftB - leftA) * frac);
             float right = rightA + static_cast<float>((rightB - rightA) * frac);
             float env = voice.env;
-            switch (voice.envStage) {
-                case EnvStage::Attack:
-                    env += attackStep;
-                    if (env >= 1.0f) {
-                        env = 1.0f;
-                        voice.envStage = EnvStage::Decay;
-                    }
-                    break;
-                case EnvStage::Decay:
-                    env -= decayStep;
-                    if (env <= sustain || decaySec <= 0.0f) {
+            if (voice.useEnv) {
+                switch (voice.envStage) {
+                    case EnvStage::Attack:
+                        env += attackStep;
+                        if (env >= 1.0f) {
+                            env = 1.0f;
+                            voice.envStage = EnvStage::Decay;
+                        }
+                        break;
+                    case EnvStage::Decay:
+                        env -= decayStep;
+                        if (env <= sustain || decaySec <= 0.0f) {
+                            env = sustain;
+                            voice.envStage = EnvStage::Sustain;
+                        }
+                        break;
+                    case EnvStage::Sustain:
                         env = sustain;
-                        voice.envStage = EnvStage::Sustain;
-                    }
-                    break;
-                case EnvStage::Sustain:
-                    env = sustain;
-                    break;
-                case EnvStage::Release:
-                    env -= releaseStep * std::max(0.1f, env);
-                    if (env <= 0.0005f || releaseSec <= 0.0f) {
-                        env = 0.0f;
-                        done = true;
-                    }
-                    break;
+                        break;
+                    case EnvStage::Release:
+                        env -= releaseStep * std::max(0.1f, env);
+                        if (env <= 0.0005f || releaseSec <= 0.0f) {
+                            env = 0.0f;
+                            done = true;
+                        }
+                        break;
+                }
+                voice.env = env;
+            } else {
+                env = 1.0f;
             }
-            voice.env = env;
             busOut[i * m_channels] += left * voice.gainL * env;
             busOut[i * m_channels + 1] += right * voice.gainR * env;
             pos += voice.rate;
@@ -1066,16 +1158,22 @@ void AudioEngine::mix(float *out, int frames) {
     }
 
     // Compute sidechain envelope from sum of all buses pre-effects.
-    std::vector<float> master(frames * m_channels, 0.0f);
+    std::vector<float> drySum(frames * m_channels, 0.0f);
     for (const auto &buf : m_busBuffers) {
         for (int i = 0; i < frames * m_channels; ++i) {
-            master[i] += buf[i];
+            drySum[i] += buf[i];
         }
     }
 
     float sideEnv = 0.0f;
     if (m_hasSidechain.load()) {
-        sideEnv = computeEnv(master.data(), frames);
+        sideEnv = computeEnv(drySum.data(), frames);
+    }
+
+    // Start master with bus 0 only (avoid double-counting).
+    std::vector<float> master(frames * m_channels, 0.0f);
+    if (!m_busBuffers.empty()) {
+        std::copy(m_busBuffers[0].begin(), m_busBuffers[0].end(), master.begin());
     }
 
     // Process buses 1..5 into master.
@@ -1101,6 +1199,23 @@ void AudioEngine::mix(float *out, int frames) {
         master[i] *= masterGain;
     }
     m_busMeters[0].store(computePeak(master.data(), frames));
+
+    // Recording tap (float).
+    if (m_recording.load()) {
+        std::lock_guard<std::mutex> lock(m_recordMutex);
+        if (m_recording.load() && m_recordFramesLeft > 0) {
+            const int framesToWrite = std::min(frames, m_recordFramesLeft);
+            m_recordFloat.insert(m_recordFloat.end(), master.begin(),
+                                 master.begin() + framesToWrite * m_channels);
+            m_recordFramesLeft -= framesToWrite;
+            if (m_recordFramesLeft <= 0) {
+                m_recording.store(false);
+                writeWavFile(m_recordPath, m_recordFloat, m_sampleRate, m_recordTargetRate,
+                             m_channels);
+                m_recordFloat.clear();
+            }
+        }
+    }
 
     std::copy(master.begin(), master.end(), out);
     if (static_cast<int>(m_lastOut.size()) != frames * m_channels) {

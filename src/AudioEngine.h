@@ -100,6 +100,8 @@ public:
     float busMeter(int bus) const;
     void setBusGain(int bus, float gain);
     void setBpm(int bpm);
+    bool startRecording(const QString &path, int totalFrames, int targetSampleRate);
+    bool isRecording() const { return m_recording.load(); }
 
 private:
     enum class EnvStage {
@@ -123,6 +125,7 @@ private:
         float env = 0.0f;
         EnvStage envStage = EnvStage::Attack;
         bool releaseRequested = false;
+        bool useEnv = true;
     };
 
     struct EffectState {
@@ -221,6 +224,13 @@ private:
     std::array<std::atomic<float>, 6> m_busGains{};
     std::atomic<bool> m_hasSidechain{false};
     std::atomic<float> m_bpm{120.0f};
+
+    std::atomic<bool> m_recording{false};
+    int m_recordFramesLeft = 0;
+    int m_recordTargetRate = 0;
+    QString m_recordPath;
+    std::vector<float> m_recordFloat;
+    std::mutex m_recordMutex;
     void *m_pcmHandle = nullptr;
 
     std::array<std::atomic<float>, 8> m_padAttack{};

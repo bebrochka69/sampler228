@@ -55,6 +55,39 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
     m_waveFilled = false;
 }
 
+QVector<FxTrack> FxPageWidget::trackData() const {
+    return m_tracks;
+}
+
+void FxPageWidget::setTrackData(const QVector<FxTrack> &tracks) {
+    m_tracks = tracks;
+    const QStringList defaultNames = {"MASTER", "A", "B", "C", "D", "E"};
+    if (m_tracks.isEmpty()) {
+        for (const QString &name : defaultNames) {
+            m_tracks.push_back({name, QVector<FxInsert>(4)});
+        }
+    }
+    // Normalize track count and slot sizes.
+    while (m_tracks.size() < defaultNames.size()) {
+        m_tracks.push_back({defaultNames[m_tracks.size()], QVector<FxInsert>(4)});
+    }
+    if (m_tracks.size() > defaultNames.size()) {
+        m_tracks.resize(defaultNames.size());
+    }
+    for (int i = 0; i < m_tracks.size(); ++i) {
+        if (m_tracks[i].name.isEmpty()) {
+            m_tracks[i].name = defaultNames.value(i);
+        }
+        if (m_tracks[i].inserts.size() != 4) {
+            m_tracks[i].inserts.resize(4);
+        }
+        syncBusEffects(i);
+    }
+    m_selectedTrack = qBound(0, m_selectedTrack, m_tracks.size() - 1);
+    m_selectedSlot = qBound(0, m_selectedSlot, m_tracks[m_selectedTrack].inserts.size() - 1);
+    update();
+}
+
 void FxPageWidget::assignEffect(int effectIndex) {
     if (effectIndex < 0 || effectIndex >= m_effects.size()) {
         return;

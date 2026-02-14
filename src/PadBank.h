@@ -135,6 +135,9 @@ public:
     float busMeter(int bus) const;
     float busGain(int bus) const;
     void setBusGain(int bus, float gain);
+    int engineSampleRate() const { return m_engineRate; }
+    bool startRecording(const QString &path, int durationMs, int targetRate);
+    void triggerMetronome(bool accent);
     float normalizeGainForPad(int index) const;
 
 signals:
@@ -169,4 +172,6 @@ private:
     std::unique_ptr<class AudioEngine> m_engine;
     std::array<float, 6> m_busGain{};
     QTimer *m_synthConnectTimer = nullptr;
+    std::shared_ptr<AudioEngine::Buffer> m_metronomeBuffer;
+    std::shared_ptr<AudioEngine::Buffer> m_metronomeAccent;
 };

@@ -338,6 +338,13 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
 
+    if (m_busRect.contains(pos) && m_pads) {
+        const int nextBus = (m_pads->fxBus(m_activePad) + 1) % 6;
+        m_pads->setFxBus(m_activePad, nextBus);
+        update();
+        return;
+    }
+
     if (m_presetButtonRect.contains(pos)) {
         m_showPresetMenu = !m_showPresetMenu;
         update();
@@ -458,8 +465,15 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     const QString programName = synthProgram(id);
     const QString synthType = synthTypeFromId(id);
 
+    const float busW = Theme::pxF(90.0f);
+    m_busRect = QRectF(header.right() - busW, header.top() + Theme::pxF(2.0f),
+                       busW, buttonH);
+    QRectF padInfoRect = header;
+    padInfoRect.setRight(m_busRect.left() - Theme::pxF(8.0f));
+
     QRectF presetNameRect = header;
     presetNameRect.setLeft(m_presetButtonRect.right() + Theme::pxF(10.0f));
+    presetNameRect.setRight(padInfoRect.left() - Theme::pxF(8.0f));
     p.setPen(Theme::text());
     p.setFont(Theme::baseFont(12, QFont::DemiBold));
     QString displayPreset = programName;
@@ -471,9 +485,17 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     }
     p.drawText(presetNameRect, Qt::AlignLeft | Qt::AlignVCenter, displayPreset);
 
+    const int bus = m_pads ? m_pads->fxBus(m_activePad) : 0;
+    p.setBrush(Theme::bg2());
+    p.setPen(QPen(Theme::stroke(), 1.0));
+    p.drawRoundedRect(m_busRect, Theme::px(6), Theme::px(6));
+    p.setPen(Theme::accentAlt());
+    p.setFont(Theme::baseFont(9, QFont::DemiBold));
+    p.drawText(m_busRect, Qt::AlignCenter, QString("BUS %1").arg(PadBank::fxBusLabel(bus)));
+
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(9, QFont::DemiBold));
-    p.drawText(header, Qt::AlignRight | Qt::AlignVCenter,
+    p.drawText(padInfoRect, Qt::AlignRight | Qt::AlignVCenter,
                QString("PAD %1  %2").arg(m_activePad + 1).arg(synthType));
 
     const QString synthTypeUpper = synthType.trimmed().toUpper();

@@ -151,6 +151,19 @@ void SeqPageWidget::togglePlayback() {
 void SeqPageWidget::advancePlayhead() {
     m_playStep = (m_playStep + 1) % 64;
     triggerStep(m_playStep);
+    if (m_rendering) {
+        m_renderStepCount++;
+        if (m_renderStepCount >= m_renderStepsTotal) {
+            m_rendering = false;
+            m_playing = false;
+            m_waiting = false;
+            m_playTimer.stop();
+            m_animTimer.stop();
+            if (m_pads) {
+                m_pads->stopAll();
+            }
+        }
+    }
     if (m_playClock.isValid()) {
         m_lastStepMs = m_playClock.elapsed();
     }
@@ -160,6 +173,10 @@ void SeqPageWidget::advancePlayhead() {
 void SeqPageWidget::triggerStep(int step) {
     if (!m_pads) {
         return;
+    }
+    if (m_metronomeEnabled && (step % 4 == 0)) {
+        const bool accent = (step % 16 == 0);
+        m_pads->triggerMetronome(accent);
     }
     for (int pad = 0; pad < 8; ++pad) {
         if (m_pads->isSynth(pad) && !m_pianoNotes[pad].isEmpty()) {
@@ -194,6 +211,60 @@ void SeqPageWidget::applyPianoSteps(int pad, const QVector<int> &steps) {
         }
     }
     update();
+}
+
+QVector<int> SeqPageWidget::pianoSteps(int pad) const {
+    QVector<int> steps;
+    if (pad < 0 || pad >= 8) {
+        return steps;
+    }
+    for (int i = 0; i < 64; ++i) {
+        if (m_steps[pad][i]) {
+            steps.push_back(i);
+        }
+    }
+    return steps;
+}
+
+QVector<int> SeqPageWidget::pianoNotesData(int pad) const {
+    QVector<int> data;
+    if (pad < 0 || pad >= 8) {
+        return data;
+    }
+    const auto &notes = m_pianoNotes[pad];
+    data.reserve(notes.size() * 3);
+    for (const auto &note : notes) {
+        data.push_back(note.start);
+        data.push_back(note.length);
+        data.push_back(note.row);
+    }
+    return data;
+}
+
+void SeqPageWidget::setMetronomeEnabled(bool enabled) {
+    m_metronomeEnabled = enabled;
+}
+
+void SeqPageWidget::renderToFile(const QString &path, int bars, int targetRate) {
+    if (!m_pads || bars <= 0 || path.isEmpty()) {
+        return;
+    }
+    const int steps = bars * 16;
+    const int totalMs = steps * stepIntervalMs();
+    if (!m_pads->startRecording(path, totalMs, targetRate)) {
+        return;
+    }
+    if (m_playing || m_waiting) {
+        m_playing = false;
+        m_waiting = false;
+        m_playTimer.stop();
+        m_animTimer.stop();
+        m_readyTimer.stop();
+    }
+    m_rendering = true;
+    m_renderStepsTotal = steps;
+    m_renderStepCount = 0;
+    startPlayback();
 }
 
 void SeqPageWidget::applyPianoNotes(int pad, const QVector<int> &notesData) {
