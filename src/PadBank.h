@@ -6,7 +6,8 @@
 #include <array>
 #include <memory>
 
-class AudioEngine;
+#include "AudioEngine.h"
+
 class QTimer;
 
 class PadBank : public QObject {
