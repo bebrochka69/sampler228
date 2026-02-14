@@ -611,11 +611,11 @@ void ProjectMenuOverlay::paintEvent(QPaintEvent *event) {
     p.drawText(projectList.adjusted(Theme::px(8), Theme::px(6), -Theme::px(8), -Theme::px(6)),
                Qt::AlignLeft | Qt::AlignTop, "PROJECT FILES");
 
-    const float rowH = Theme::pxF(24.0f);
+    const float projectRowH = Theme::pxF(24.0f);
     float py = projectList.top() + Theme::pxF(24.0f);
     for (int i = 0; i < m_projectNames.size(); ++i) {
         QRectF row(projectList.left() + Theme::px(8), py,
-                   projectList.width() - Theme::px(16), rowH);
+                   projectList.width() - Theme::px(16), projectRowH);
         m_projectRowRects.push_back(row);
         const bool selected = (i == m_selectedProject);
         p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
@@ -625,7 +625,7 @@ void ProjectMenuOverlay::paintEvent(QPaintEvent *event) {
         p.setFont(Theme::baseFont(9, QFont::DemiBold));
         p.drawText(row.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
                    Qt::AlignLeft | Qt::AlignVCenter, m_projectNames[i]);
-        py += rowH + Theme::pxF(6.0f);
+        py += projectRowH + Theme::pxF(6.0f);
         if (py > projectList.bottom() - Theme::pxF(10.0f)) {
             break;
         }
@@ -637,12 +637,12 @@ void ProjectMenuOverlay::paintEvent(QPaintEvent *event) {
     }
 
     const float btnY = m_rightTopRect.bottom() - Theme::pxF(40.0f);
-    const float btnW = (m_rightTopRect.width() - Theme::pxF(36.0f)) / 3.0f;
-    m_newRect = QRectF(m_rightTopRect.left() + Theme::pxF(12.0f), btnY, btnW,
+    const float projectBtnW = (m_rightTopRect.width() - Theme::pxF(36.0f)) / 3.0f;
+    m_newRect = QRectF(m_rightTopRect.left() + Theme::pxF(12.0f), btnY, projectBtnW,
                        Theme::pxF(30.0f));
-    m_saveRect = QRectF(m_newRect.right() + Theme::pxF(6.0f), btnY, btnW,
+    m_saveRect = QRectF(m_newRect.right() + Theme::pxF(6.0f), btnY, projectBtnW,
                         Theme::pxF(30.0f));
-    m_loadRect = QRectF(m_saveRect.right() + Theme::pxF(6.0f), btnY, btnW,
+    m_loadRect = QRectF(m_saveRect.right() + Theme::pxF(6.0f), btnY, projectBtnW,
                         Theme::pxF(30.0f));
 
     auto drawButton = [&](const QRectF &r, const QString &label, const QColor &color) {
