@@ -539,6 +539,7 @@ PadBank::PadBank(QObject *parent) : QObject(parent) {
         for (int i = 0; i < static_cast<int>(m_busGain.size()); ++i) {
             m_engine->setBusGain(i, m_busGain[static_cast<size_t>(i)]);
         }
+        m_engine->setBpm(m_bpm);
     }
     m_ffmpegPath = QStandardPaths::findExecutable("ffmpeg");
 
@@ -2175,6 +2176,9 @@ void PadBank::setBpm(int bpm) {
         return;
     }
     m_bpm = next;
+    if (m_engineAvailable && m_engine) {
+        m_engine->setBpm(m_bpm);
+    }
     for (int i = 0; i < padCount(); ++i) {
         if (m_params[static_cast<size_t>(i)].stretchIndex > 0) {
             scheduleProcessedRender(i);

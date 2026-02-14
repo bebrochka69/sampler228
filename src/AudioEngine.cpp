@@ -349,6 +349,11 @@ void AudioEngine::setBusGain(int bus, float gain) {
     m_busGains[static_cast<size_t>(bus)].store(qBound(0.0f, gain, 1.2f));
 }
 
+void AudioEngine::setBpm(int bpm) {
+    const int next = qBound(30, bpm, 300);
+    m_bpm.store(static_cast<float>(next));
+}
+
 void AudioEngine::setPadAdsr(int padId, float attack, float decay, float sustain, float release) {
     if (padId < 0 || padId >= static_cast<int>(m_padAttack.size())) {
         return;
@@ -1273,27 +1278,21 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 }
                 break;
             }
-            case 7: {  // eq (simple tilt)
-                const float dbLow = (p1 - 0.5f) * 24.0f;
-                const float dbMid1 = (p2 - 0.5f) * 24.0f;
-                const float dbMid2 = (p3 - 0.5f) * 24.0f;
-                const float dbHigh = (p4 - 0.5f) * 24.0f;
-
-                const float gLow = std::pow(10.0f, dbLow / 20.0f);
-                const float gMid1 = std::pow(10.0f, dbMid1 / 20.0f);
-                const float gMid2 = std::pow(10.0f, dbMid2 / 20.0f);
-                const float gHigh = std::pow(10.0f, dbHigh / 20.0f);
+            case 7: {  // eq (low/high cut)
+                float lowCut = 30.0f * std::pow(2.0f, p1 * 5.5f);
+                float highCut = 800.0f * std::pow(2.0f, p2 * 4.5f);
+                lowCut = std::min(lowCut, 4000.0f);
+                highCut = std::min(highCut, static_cast<float>(m_sampleRate * 0.45f));
+                if (highCut < lowCut * 1.5f) {
+                    highCut = lowCut * 1.5f;
+                }
 
                 auto alphaFor = [&](float hz) {
                     const float x = -2.0f * static_cast<float>(M_PI) * hz / m_sampleRate;
                     return std::exp(x);
                 };
-                const float aLow = alphaFor(200.0f);
-                const float aHigh = alphaFor(4000.0f);
-                const float aM1Low = alphaFor(300.0f);
-                const float aM1High = alphaFor(1200.0f);
-                const float aM2Low = alphaFor(1200.0f);
-                const float aM2High = alphaFor(5000.0f);
+                const float aLow = alphaFor(lowCut);
+                const float aHigh = alphaFor(highCut);
 
                 auto onePoleLow = [](float x, float &z, float a) {
                     z = a * z + (1.0f - a) * x;
@@ -1308,31 +1307,13 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                     for (int ch = 0; ch < m_channels; ++ch) {
                         const int idx = i * m_channels + ch;
                         float x = buffer[idx];
-
-                        float low = (ch == 0)
-                                        ? onePoleLow(x, fx.eqLowL, aLow)
-                                        : onePoleLow(x, fx.eqLowR, aLow);
-                        float high = (ch == 0)
-                                         ? onePoleHigh(x, fx.eqHighL, aHigh)
-                                         : onePoleHigh(x, fx.eqHighR, aHigh);
-
-                        float m1lp = (ch == 0)
-                                         ? onePoleLow(x, fx.eqLp1L, aM1High)
-                                         : onePoleLow(x, fx.eqLp1R, aM1High);
-                        float mid1 = (ch == 0)
-                                         ? onePoleHigh(m1lp, fx.eqHp1L, aM1Low)
-                                         : onePoleHigh(m1lp, fx.eqHp1R, aM1Low);
-
-                        float m2lp = (ch == 0)
-                                         ? onePoleLow(x, fx.eqLp2L, aM2High)
-                                         : onePoleLow(x, fx.eqLp2R, aM2High);
-                        float mid2 = (ch == 0)
-                                         ? onePoleHigh(m2lp, fx.eqHp2L, aM2Low)
-                                         : onePoleHigh(m2lp, fx.eqHp2R, aM2Low);
-
-                        const float out = x + (gLow - 1.0f) * low + (gMid1 - 1.0f) * mid1 +
-                                          (gMid2 - 1.0f) * mid2 + (gHigh - 1.0f) * high;
-                        buffer[idx] = out;
+                        float hp = (ch == 0)
+                                       ? onePoleHigh(x, fx.eqLowL, aLow)
+                                       : onePoleHigh(x, fx.eqLowR, aLow);
+                        float lp = (ch == 0)
+                                       ? onePoleLow(hp, fx.eqHighL, aHigh)
+                                       : onePoleLow(hp, fx.eqHighR, aHigh);
+                        buffer[idx] = lp;
                     }
                 }
                 break;
@@ -1347,6 +1328,232 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 }
                 for (int i = 0; i < frames * m_channels; ++i) {
                     buffer[i] *= gain;
+                }
+                break;
+            }
+            case 9: {  // delay
+                const float maxDelay = 0.9f;
+                const float timeSec = 0.03f + p1 * maxDelay;
+                const int delaySamples = std::max(1, static_cast<int>(timeSec * m_sampleRate));
+                const bool stereo = (p4 >= 0.5f);
+                const float feedback = 0.1f + p2 * 0.85f;
+                const float mix = p3;
+                const int needed = delaySamples * m_channels;
+                if (fx.bufA.size() < needed) {
+                    fx.bufA.assign(needed, 0.0f);
+                    fx.indexA = 0;
+                }
+                const int framesDelay = fx.bufA.size() / m_channels;
+                for (int i = 0; i < frames; ++i) {
+                    const int readIndex = (fx.indexA - delaySamples + framesDelay) % framesDelay;
+                    const int writeIndex = fx.indexA;
+                    float inL = buffer[i * m_channels];
+                    float inR = (m_channels > 1) ? buffer[i * m_channels + 1] : inL;
+                    float dl = fx.bufA[readIndex * m_channels];
+                    float dr = (m_channels > 1) ? fx.bufA[readIndex * m_channels + 1] : dl;
+                    float fbL = stereo ? dr : dl;
+                    float fbR = stereo ? dl : dr;
+                    fx.bufA[writeIndex * m_channels] = inL + fbL * feedback;
+                    if (m_channels > 1) {
+                        fx.bufA[writeIndex * m_channels + 1] = inR + fbR * feedback;
+                    }
+                    buffer[i * m_channels] = inL * (1.0f - mix) + dl * mix;
+                    if (m_channels > 1) {
+                        buffer[i * m_channels + 1] = inR * (1.0f - mix) + dr * mix;
+                    }
+                    fx.indexA = (fx.indexA + 1) % framesDelay;
+                }
+                break;
+            }
+            case 10: {  // tremolo
+                const float depth = p1;
+                const bool sync = (p3 >= 0.5f);
+                float rate = 0.5f + p2 * 6.0f;
+                if (sync) {
+                    const float bpm = std::max(30.0f, m_bpm.load());
+                    const float base = bpm / 60.0f;
+                    const int divIndex = qBound(0, static_cast<int>(p2 * 4.99f), 4);
+                    static const float mults[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f};
+                    rate = base * mults[divIndex];
+                }
+                for (int i = 0; i < frames; ++i) {
+                    const float lfo = (std::sin(fx.phase) + 1.0f) * 0.5f;
+                    const float gain = 1.0f - depth * (1.0f - lfo);
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        buffer[i * m_channels + ch] *= gain;
+                    }
+                    fx.phase += 2.0f * static_cast<float>(M_PI) * rate / m_sampleRate;
+                    if (fx.phase > 2.0f * static_cast<float>(M_PI)) {
+                        fx.phase -= 2.0f * static_cast<float>(M_PI);
+                    }
+                }
+                break;
+            }
+            case 11: {  // ring modulation
+                const float freq = 50.0f * std::pow(2.0f, p1 * 5.0f);
+                const float mix = p2;
+                for (int i = 0; i < frames; ++i) {
+                    const float mod = std::sin(fx.phase);
+                    fx.phase += 2.0f * static_cast<float>(M_PI) * freq / m_sampleRate;
+                    if (fx.phase > 2.0f * static_cast<float>(M_PI)) {
+                        fx.phase -= 2.0f * static_cast<float>(M_PI);
+                    }
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        const int idx = i * m_channels + ch;
+                        const float dry = buffer[idx];
+                        const float wet = dry * mod;
+                        buffer[idx] = dry * (1.0f - mix) + wet * mix;
+                    }
+                }
+                break;
+            }
+            case 12: {  // robot (short delay/comb)
+                const float timeSec = 0.002f + p1 * 0.02f;
+                const float feedback = p2 * 0.6f;
+                const float mix = p3;
+                const int delaySamples = std::max(1, static_cast<int>(timeSec * m_sampleRate));
+                const int needed = delaySamples * m_channels;
+                if (fx.bufA.size() < needed) {
+                    fx.bufA.assign(needed, 0.0f);
+                    fx.indexA = 0;
+                }
+                const int framesDelay = fx.bufA.size() / m_channels;
+                for (int i = 0; i < frames; ++i) {
+                    const int readIndex = (fx.indexA - delaySamples + framesDelay) % framesDelay;
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        const int idx = i * m_channels + ch;
+                        const float delayed = fx.bufA[readIndex * m_channels + ch];
+                        const float dry = buffer[idx];
+                        const float wet = dry + delayed * feedback;
+                        fx.bufA[fx.indexA * m_channels + ch] = wet;
+                        buffer[idx] = dry * (1.0f - mix) + wet * mix;
+                    }
+                    fx.indexA = (fx.indexA + 1) % framesDelay;
+                }
+                break;
+            }
+            case 13: {  // punch (transient boost)
+                const float amount = 1.0f + p1 * 2.5f;
+                const float attack = 0.2f + p2 * 0.6f;
+                const float release = 0.02f + p3 * 0.2f;
+                for (int i = 0; i < frames; ++i) {
+                    float env = 0.0f;
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        env += std::fabs(buffer[i * m_channels + ch]);
+                    }
+                    env /= std::max(1, m_channels);
+                    fx.z1L += (env - fx.z1L) * attack;
+                    fx.env += (env - fx.env) * release;
+                    const float transient = std::max(0.0f, fx.z1L - fx.env);
+                    const float gain = 1.0f + transient * amount;
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        buffer[i * m_channels + ch] *= gain;
+                    }
+                }
+                break;
+            }
+            case 14: {  // subharmonic generator
+                const float amount = p1 * 0.7f;
+                auto onePoleLow = [](float x, float &z, float a) {
+                    z = a * z + (1.0f - a) * x;
+                    return z;
+                };
+                const float a = std::exp(-2.0f * static_cast<float>(M_PI) * 180.0f / m_sampleRate);
+                if (fx.env == 0.0f) {
+                    fx.env = 1.0f;
+                }
+                for (int i = 0; i < frames; ++i) {
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        const int idx = i * m_channels + ch;
+                        const float x = buffer[idx];
+                        const float prev = (ch == 0) ? fx.z1L : fx.z1R;
+                        if ((x >= 0.0f && prev < 0.0f) || (x < 0.0f && prev >= 0.0f)) {
+                            fx.env = -fx.env;
+                        }
+                        if (ch == 0) {
+                            fx.z1L = x;
+                        } else {
+                            fx.z1R = x;
+                        }
+                        float sub = fx.env * std::fabs(x);
+                        sub = (ch == 0) ? onePoleLow(sub, fx.eqLowL, a)
+                                        : onePoleLow(sub, fx.eqLowR, a);
+                        buffer[idx] = x + sub * amount;
+                    }
+                }
+                break;
+            }
+            case 15: {  // key harmonizer
+                const float mix = p1 * 0.4f;
+                const int keyIndex = qBound(0, static_cast<int>(p2 * 11.99f), 11);
+                const bool minor = (p3 >= 0.5f);
+                static const int major[3] = {0, 4, 7};
+                static const int minorTriad[3] = {0, 3, 7};
+                const int baseMidi = 60 + keyIndex;
+                const int *intervals = minor ? minorTriad : major;
+                if (fx.bufA.size() < 3) {
+                    fx.bufA.assign(3, 0.0f);
+                }
+                for (int i = 0; i < frames; ++i) {
+                    float env = 0.0f;
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        env += std::fabs(buffer[i * m_channels + ch]);
+                    }
+                    env /= std::max(1, m_channels);
+                    fx.env += (env - fx.env) * 0.05f;
+                    float add = 0.0f;
+                    for (int t = 0; t < 3; ++t) {
+                        const int midi = baseMidi + intervals[t];
+                        const float freq =
+                            440.0f * std::pow(2.0f, (midi - 69.0f) / 12.0f);
+                        fx.bufA[t] += 2.0f * static_cast<float>(M_PI) * freq / m_sampleRate;
+                        if (fx.bufA[t] > 2.0f * static_cast<float>(M_PI)) {
+                            fx.bufA[t] -= 2.0f * static_cast<float>(M_PI);
+                        }
+                        add += std::sin(fx.bufA[t]);
+                    }
+                    add *= (mix * fx.env);
+                    for (int ch = 0; ch < m_channels; ++ch) {
+                        buffer[i * m_channels + ch] += add;
+                    }
+                }
+                break;
+            }
+            case 16: {  // pad freeze
+                const float lenSec = 0.15f + p1 * 0.85f;
+                const float mix = p2;
+                const bool refresh = (p3 >= 0.5f);
+                const int length = std::max(1, static_cast<int>(lenSec * m_sampleRate));
+                const int needed = length * m_channels;
+                if (fx.bufA.size() != needed) {
+                    fx.bufA.assign(needed, 0.0f);
+                    fx.indexA = 0;
+                    fx.indexB = 0;
+                    fx.env = 0.0f;
+                }
+                const int framesLen = fx.bufA.size() / m_channels;
+                for (int i = 0; i < frames; ++i) {
+                    float inL = buffer[i * m_channels];
+                    float inR = (m_channels > 1) ? buffer[i * m_channels + 1] : inL;
+                    if (fx.env < 1.0f || refresh) {
+                        fx.bufA[fx.indexB * m_channels] = inL;
+                        if (m_channels > 1) {
+                            fx.bufA[fx.indexB * m_channels + 1] = inR;
+                        }
+                        fx.indexB = (fx.indexB + 1) % framesLen;
+                        fx.env = std::min(1.0f, fx.env + 1.0f / framesLen);
+                        if (refresh) {
+                            fx.indexA = fx.indexB;
+                        }
+                    }
+                    const float frL = fx.bufA[fx.indexA * m_channels];
+                    const float frR =
+                        (m_channels > 1) ? fx.bufA[fx.indexA * m_channels + 1] : frL;
+                    fx.indexA = (fx.indexA + 1) % framesLen;
+                    buffer[i * m_channels] = inL * (1.0f - mix) + frL * mix;
+                    if (m_channels > 1) {
+                        buffer[i * m_channels + 1] = inR * (1.0f - mix) + frR * mix;
+                    }
                 }
                 break;
             }

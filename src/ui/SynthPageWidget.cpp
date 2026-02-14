@@ -48,7 +48,6 @@ QVector<int> visibleParamIndicesForType(const QString &type) {
     indices << EditOsc2Wave << EditOsc2Voices << EditOsc2Detune << EditOsc2Gain << EditOsc2Pan;
     indices << EditCutoff << EditResonance << EditFilterType;
     indices << EditAttack << EditDecay << EditSustain << EditRelease;
-    indices << EditLfoRate << EditLfoDepth;
     return indices;
 }
 
@@ -518,7 +517,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     const PadBank::SynthParams sp = m_pads ? m_pads->synthParams(m_activePad)
                                            : PadBank::SynthParams();
     const QStringList waves = PadBank::serumWaves();
-    const QStringList filterPresets = {"LOW", "HIGH", "BAND", "LOW+HIGH", "PEAK",
+    const QStringList filterPresets = {"LOW", "HIGH", "BAND", "NOTCH", "PEAK",
                                        "LOW SHELF", "HIGH SHELF", "ALLPASS", "BYPASS", "LOW+MID"};
 
     auto formatValue = [&](int type) {
@@ -772,8 +771,8 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
 
         QRectF adsrRect(modRow.left(), modRow.top(),
                         modRow.width() * 0.55f - gap * 0.5f, modRow.height());
-        QRectF lfoRect(adsrRect.right() + gap, modRow.top(),
-                       modRow.right() - adsrRect.right() - gap, modRow.height());
+        QRectF filterRect(adsrRect.right() + gap, modRow.top(),
+                          modRow.right() - adsrRect.right() - gap, modRow.height());
 
         drawPanel(adsrRect, "ADSR");
         QRectF adsrInner = adsrRect.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
@@ -845,33 +844,10 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                               adsrParams.top() + adsrH + adsrGap, adsrW, adsrH),
                        EditRelease);
 
-        drawPanel(lfoRect, "LFO");
-        QRectF lfoInner = lfoRect.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
-        QRectF lfoWave = lfoInner;
-        lfoWave.setHeight(lfoInner.height() * 0.6f);
-        {
-            const float rate = clamp01(sp.lfoRate);
-            const float depth = clamp01(sp.lfoDepth);
-            const float cycles = 1.0f + rate * 3.0f;
-            drawWave(lfoWave, Theme::accentAlt(), [cycles, depth](float t) {
-                const float phase = kTwoPi * t * cycles;
-                return std::sin(phase) * (0.25f + depth * 0.6f);
-            });
-        }
-
-        QRectF lfoParams = lfoInner;
-        lfoParams.setTop(lfoWave.bottom() + Theme::pxF(6.0f));
-        const float lfoGap = Theme::pxF(6.0f);
-        const float lfoW = (lfoParams.width() - lfoGap) / 2.0f;
-        const float lfoH = lfoParams.height();
-        drawSmallParam(QRectF(lfoParams.left(), lfoParams.top(), lfoW, lfoH), EditLfoRate);
-        drawSmallParam(QRectF(lfoParams.left() + lfoW + lfoGap, lfoParams.top(), lfoW, lfoH),
-                       EditLfoDepth);
-
-        drawPanel(filterRow, "FILTER");
-        QRectF filterInner = filterRow.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
+        drawPanel(filterRect, "FILTER");
+        QRectF filterInner = filterRect.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
         QRectF filterVis = filterInner;
-        filterVis.setHeight(filterInner.height() * 0.4f);
+        filterVis.setHeight(filterInner.height() * 0.55f);
 
         // Simple filter visual.
         {
@@ -909,9 +885,18 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             p.drawPath(curve);
         }
 
-        QRectF presetArea = filterInner;
-        presetArea.setTop(filterVis.bottom() + Theme::pxF(6.0f));
-        presetArea.setHeight(filterInner.height() * 0.4f);
+        QRectF filterParams = filterInner;
+        filterParams.setTop(filterVis.bottom() + Theme::pxF(6.0f));
+        const float filterGap = Theme::pxF(8.0f);
+        const float filterW = (filterParams.width() - filterGap) / 2.0f;
+        drawSmallParam(QRectF(filterParams.left(), filterParams.top(), filterW, filterParams.height()),
+                       EditCutoff);
+        drawSmallParam(QRectF(filterParams.left() + filterW + filterGap, filterParams.top(),
+                              filterW, filterParams.height()),
+                       EditResonance);
+
+        drawPanel(filterRow, "FILTER PRESETS");
+        QRectF presetArea = filterRow.adjusted(Theme::px(8), Theme::px(22), -Theme::px(8), -Theme::px(8));
 
         const int presetCols = 5;
         const int presetRows = 2;
@@ -939,17 +924,6 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 p.drawText(r, Qt::AlignCenter, filterPresets[idx]);
             }
         }
-
-        QRectF filterParams = filterInner;
-        filterParams.setTop(presetArea.bottom() + Theme::pxF(6.0f));
-        filterParams.setHeight(filterInner.bottom() - filterParams.top());
-        const float filterGap = Theme::pxF(8.0f);
-        const float filterW = (filterParams.width() - filterGap) / 2.0f;
-        drawSmallParam(QRectF(filterParams.left(), filterParams.top(), filterW, filterParams.height()),
-                       EditCutoff);
-        drawSmallParam(QRectF(filterParams.left() + filterW + filterGap, filterParams.top(),
-                              filterW, filterParams.height()),
-                       EditResonance);
     }
 
     if (m_showPresetMenu) {

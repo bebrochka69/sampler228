@@ -66,10 +66,12 @@ private:
     std::array<QVector<Note>, 8> m_notes;
 
     float m_zoom = 1.0f;
-    float m_scroll = 0.0f;
-    int m_totalSteps = 128;
-    int m_rows = 24;
-    int m_baseMidi = 60;
+    float m_scrollX = 0.0f;
+    float m_scrollY = 0.0f;
+    int m_totalSteps = 64;
+    int m_totalRows = 48;
+    int m_visibleRows = 24;
+    int m_baseMidi = 72;
     int m_playheadStep = 0;
 
     bool m_deleteMode = false;
@@ -77,6 +79,7 @@ private:
     int m_dragNoteIndex = -1;
     QPointF m_pressPos;
     float m_pressScroll = 0.0f;
+    float m_pressScrollY = 0.0f;
     Note m_pressNote;
 
     QRectF m_closeRect;

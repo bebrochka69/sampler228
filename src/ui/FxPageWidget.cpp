@@ -41,7 +41,10 @@ FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_
         {"E", QVector<FxInsert>(4)},
     };
 
-    m_effects = {"reverb", "comp", "dist", "lofi", "cassette", "chorus", "eq", "sidechan"};
+    m_effects = {"reverb", "comp", "dist", "lofi",
+                 "cassette", "chorus", "eq", "sidechan",
+                 "delay", "tremolo", "ringmod", "robot",
+                 "punch", "subharm", "keyharm", "freeze"};
 
     m_animTimer.setInterval(33);
     m_animTimer.setTimerType(Qt::PreciseTimer);
@@ -69,6 +72,22 @@ void FxPageWidget::assignEffect(int effectIndex) {
     track.inserts[m_selectedSlot].p3 = 0.5f;
     track.inserts[m_selectedSlot].p4 = 0.5f;
     track.inserts[m_selectedSlot].p5 = 0.0f;
+    const QString name = track.inserts[m_selectedSlot].effect.toLower();
+    if (name == "delay") {
+        track.inserts[m_selectedSlot].p3 = 0.35f; // mix
+        track.inserts[m_selectedSlot].p4 = 1.0f;  // stereo
+    } else if (name == "tremolo") {
+        track.inserts[m_selectedSlot].p1 = 0.6f;
+        track.inserts[m_selectedSlot].p3 = 1.0f;  // sync
+    } else if (name == "keyharm") {
+        track.inserts[m_selectedSlot].p1 = 0.35f;
+        track.inserts[m_selectedSlot].p2 = 0.0f;  // C
+        track.inserts[m_selectedSlot].p3 = 0.0f;  // major
+    } else if (name == "freeze") {
+        track.inserts[m_selectedSlot].p1 = 0.45f;
+        track.inserts[m_selectedSlot].p2 = 0.8f;  // wet
+        track.inserts[m_selectedSlot].p3 = 0.0f;  // hold
+    }
     syncBusEffects(m_selectedTrack);
     update();
 }
@@ -117,7 +136,7 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
 
     if (m_showMenu) {
         const int cols = 4;
-        const int rows = 2;
+        const int rows = qMax(1, (m_effects.size() + cols - 1) / cols);
         int row = m_selectedEffect / cols;
         int col = m_selectedEffect % cols;
         if (key == Qt::Key_Left) {
@@ -762,46 +781,47 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.drawPath(wave);
         p.restore();
     } else if (fx == "eq") {
-        // 4-band EQ: low shelf, peak1, peak2, high shelf (flat at center).
+        // Low/High cut preview.
         const QRectF frame = r.adjusted(8, 10, -8, -12);
         p.setPen(QPen(QColor(80, 160, 200, 200), 1.2));
         p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(frame, 8, 8);
 
         p.setPen(QPen(QColor(60, 60, 80, 160), 1.0));
-        for (int i = 1; i < 6; ++i) {
-            const float y = frame.top() + (frame.height() / 6.0f) * i;
+        for (int i = 1; i < 5; ++i) {
+            const float y = frame.top() + (frame.height() / 5.0f) * i;
             p.drawLine(QPointF(frame.left() + 6, y), QPointF(frame.right() - 6, y));
         }
 
-        auto mapY = [&](float v) {
-            const float norm = lerp(0.2f, 0.8f, v);
-            return frame.bottom() - frame.height() * norm;
-        };
-        const QPointF pL(frame.left() + frame.width() * 0.12f, mapY(p1));
-        const QPointF pM1(frame.left() + frame.width() * 0.38f, mapY(p2));
-        const QPointF pM2(frame.left() + frame.width() * 0.62f, mapY(p3));
-        const QPointF pH(frame.left() + frame.width() * 0.88f, mapY(p4));
+        float lowPos = lerp(0.08f, 0.45f, p1);
+        float highPos = lerp(0.55f, 0.92f, p2);
+        if (highPos - lowPos < 0.12f) {
+            highPos = lowPos + 0.12f;
+        }
+        const float xLow = frame.left() + frame.width() * lowPos;
+        const float xHigh = frame.left() + frame.width() * highPos;
 
+        p.setPen(QPen(QColor(200, 220, 240, 220), 1.6));
         QPainterPath curve;
-        curve.moveTo(frame.left(), frame.bottom() - frame.height() * 0.5f);
-        curve.cubicTo(QPointF(frame.left() + frame.width() * 0.2f, pL.y()),
-                      QPointF(frame.left() + frame.width() * 0.3f, pM1.y()), pM1);
-        curve.cubicTo(QPointF(frame.left() + frame.width() * 0.46f, pM1.y()),
-                      QPointF(frame.left() + frame.width() * 0.54f, pM2.y()), pM2);
-        curve.cubicTo(QPointF(frame.left() + frame.width() * 0.7f, pM2.y()),
-                      QPointF(frame.left() + frame.width() * 0.8f, pH.y()), pH);
-        curve.lineTo(frame.right(), frame.bottom() - frame.height() * 0.5f);
-
-        p.setPen(QPen(QColor(190, 210, 220, 220), 1.4));
+        curve.moveTo(frame.left(), frame.bottom());
+        curve.lineTo(xLow, frame.bottom());
+        curve.lineTo(xLow, frame.top());
+        curve.lineTo(xHigh, frame.top());
+        curve.lineTo(xHigh, frame.bottom());
+        curve.lineTo(frame.right(), frame.bottom());
         p.drawPath(curve);
 
-        p.setBrush(QColor(220, 220, 220));
-        p.setPen(Qt::NoPen);
-        p.drawEllipse(pL, 3, 3);
-        p.drawEllipse(pM1, 3, 3);
-        p.drawEllipse(pM2, 3, 3);
-        p.drawEllipse(pH, 3, 3);
+        p.setPen(QPen(QColor(255, 200, 120, 220), 1.4));
+        p.drawLine(QPointF(xLow, frame.top()), QPointF(xLow, frame.bottom()));
+        p.setPen(QPen(QColor(120, 200, 255, 220), 1.4));
+        p.drawLine(QPointF(xHigh, frame.top()), QPointF(xHigh, frame.bottom()));
+
+        p.setPen(QColor(200, 200, 220));
+        p.setFont(Theme::baseFont(8, QFont::DemiBold));
+        p.drawText(QRectF(frame.left() + 6, frame.top() + 6, 60, 14),
+                   Qt::AlignLeft | Qt::AlignVCenter, "LOW CUT");
+        p.drawText(QRectF(frame.right() - 70, frame.top() + 6, 60, 14),
+                   Qt::AlignRight | Qt::AlignVCenter, "HIGH CUT");
     } else if (fx == "cassette") {
         // Cassette shell.
         const QRectF shell = r.adjusted(10, 14, -10, -18);
@@ -904,6 +924,98 @@ void FxPageWidget::drawEffectPreview(QPainter &p, const QRectF &rect, const FxIn
         p.setPen(QPen(QColor(255, 120, 120, 160), 1.2));
         const QRectF pressPlate(r.left() + 18, r.top() + 12, r.width() - 36, 6);
         p.drawRoundedRect(pressPlate, 3, 3);
+    } else if (fx == "delay") {
+        // Echo taps.
+        const int taps = 4;
+        for (int i = 0; i < taps; ++i) {
+            const float f = static_cast<float>(i) / taps;
+            const float alpha = 0.25f + (1.0f - f) * 0.5f * (0.2f + p3);
+            const float dx = w * (0.08f + f * (0.6f + p1 * 0.3f));
+            QRectF echo(r.left() + dx, r.top() + 20 + f * 8, w * 0.22f, h * 0.18f);
+            p.setPen(QPen(QColor(120, 200, 255, static_cast<int>(alpha * 255)), 1.4));
+            p.setBrush(Qt::NoBrush);
+            p.drawRoundedRect(echo, 6, 6);
+        }
+        p.setPen(QColor(200, 200, 220));
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.drawText(r.adjusted(8, 8, -8, -8), Qt::AlignTop | Qt::AlignLeft,
+                   (p4 > 0.5f) ? "STEREO" : "MONO");
+    } else if (fx == "tremolo") {
+        // Amplitude wave.
+        QPainterPath wave;
+        const float cycles = 1.0f + p2 * 3.0f;
+        for (int x = 0; x <= static_cast<int>(w); ++x) {
+            const float tX = static_cast<float>(x) / qMax(1.0f, w);
+            const float amp =
+                (std::sin(tX * 2.0f * static_cast<float>(M_PI) * cycles + t) + 1.0f) * 0.5f;
+            const float yy = r.center().y() - (amp - 0.5f) * h * (0.6f + p1 * 0.3f);
+            if (x == 0) {
+                wave.moveTo(r.left() + x, yy);
+            } else {
+                wave.lineTo(r.left() + x, yy);
+            }
+        }
+        p.setPen(QPen(QColor(140, 220, 160, 220), 1.6));
+        p.drawPath(wave);
+    } else if (fx == "ringmod") {
+        // Ring modulation cross.
+        p.setPen(QPen(QColor(180, 220, 255, 220), 1.4));
+        p.drawEllipse(c, w * 0.18f, w * 0.18f);
+        p.drawLine(QPointF(c.x() - w * 0.2f, c.y()),
+                   QPointF(c.x() + w * 0.2f, c.y()));
+        p.drawLine(QPointF(c.x(), c.y() - w * 0.2f),
+                   QPointF(c.x(), c.y() + w * 0.2f));
+    } else if (fx == "robot") {
+        // Short comb blocks.
+        const int blocks = 6;
+        for (int i = 0; i < blocks; ++i) {
+            const float f = static_cast<float>(i) / blocks;
+            QRectF b(r.left() + f * w * 0.85f, r.center().y() - 12, w * 0.1f, 24);
+            p.setBrush(QColor(160, 200, 240, static_cast<int>((0.3f + 0.5f * p3) * 255)));
+            p.setPen(Qt::NoPen);
+            p.drawRect(b);
+        }
+    } else if (fx == "punch") {
+        // Transient spike.
+        QPainterPath spike;
+        spike.moveTo(r.left() + 10, r.bottom() - 18);
+        spike.lineTo(c.x(), r.top() + 10);
+        spike.lineTo(r.right() - 10, r.bottom() - 18);
+        p.setPen(QPen(QColor(255, 180, 80, 230), 2.0));
+        p.drawPath(spike);
+    } else if (fx == "subharm") {
+        // Low sine wave.
+        const QRectF waveRect = r.adjusted(6, 18, -6, -18);
+        QPainterPath wave;
+        const int steps = 48;
+        for (int i = 0; i <= steps; ++i) {
+            const float tX = static_cast<float>(i) / steps;
+            const float phase = tX * 2.0f * static_cast<float>(M_PI);
+            const float yy = waveRect.center().y() - std::sin(phase * 0.5f) * waveRect.height() * 0.3f;
+            const float xx = waveRect.left() + tX * waveRect.width();
+            if (i == 0) {
+                wave.moveTo(xx, yy);
+            } else {
+                wave.lineTo(xx, yy);
+            }
+        }
+        p.setPen(QPen(QColor(120, 200, 255, 220), 1.6));
+        p.drawPath(wave);
+    } else if (fx == "keyharm") {
+        // Key + mode text.
+        static const QStringList keys = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+        const int keyIndex = qBound(0, static_cast<int>(std::floor(p2 * 11.99f)), 11);
+        const QString mode = (p3 > 0.5f) ? "MINOR" : "MAJOR";
+        p.setPen(QColor(220, 220, 240));
+        p.setFont(Theme::condensedFont(12, QFont::Bold));
+        p.drawText(r, Qt::AlignCenter, QString("%1 %2").arg(keys[keyIndex], mode));
+    } else if (fx == "freeze") {
+        // Freeze icon.
+        p.setPen(QPen(QColor(180, 220, 255, 220), 2.0));
+        p.drawLine(QPointF(c.x(), r.top() + 12), QPointF(c.x(), r.bottom() - 12));
+        p.drawLine(QPointF(r.left() + 12, c.y()), QPointF(r.right() - 12, c.y()));
+        p.drawLine(QPointF(c.x() - 14, c.y() - 14), QPointF(c.x() + 14, c.y() + 14));
+        p.drawLine(QPointF(c.x() - 14, c.y() + 14), QPointF(c.x() + 14, c.y() - 14));
     }
 
     p.restore();
@@ -1150,8 +1262,8 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
                           menuRect.width() - Theme::px(32), Theme::px(24)),
                    Qt::AlignLeft | Qt::AlignVCenter, "PLUGIN MENU");
 
-        const int rows = 2;
         const int cols = 4;
+        const int rows = qMax(1, (m_effects.size() + cols - 1) / cols);
         const float gridGap = Theme::pxF(12.0f);
         const QRectF gridRect(menuRect.left() + Theme::px(16), menuRect.top() + Theme::px(48),
                               menuRect.width() - Theme::px(32), menuRect.height() - Theme::px(64));

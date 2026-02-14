@@ -99,6 +99,7 @@ public:
     void setBusEffects(int bus, const std::vector<EffectSettings> &effects);
     float busMeter(int bus) const;
     void setBusGain(int bus, float gain);
+    void setBpm(int bpm);
 
 private:
     enum class EnvStage {
@@ -210,6 +211,7 @@ private:
     std::array<std::atomic<float>, 6> m_busMeters{};
     std::array<std::atomic<float>, 6> m_busGains{};
     std::atomic<bool> m_hasSidechain{false};
+    std::atomic<float> m_bpm{120.0f};
     void *m_pcmHandle = nullptr;
 
     std::array<std::atomic<float>, 8> m_padAttack{};
