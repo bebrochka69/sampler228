@@ -519,6 +519,7 @@ struct PadBank::PadRuntime {
     QByteArray renderInput;
     bool renderProcessed = false;
     RenderSignature renderSignature;
+    int renderSampleRate = 0;
     RenderSignature processedSignature;
     bool processedReady = false;
     bool pendingProcessed = false;
@@ -1866,6 +1867,7 @@ void PadBank::scheduleProcessedRender(int index) {
         proc->setArguments(
             buildFfmpegArgsSegment(path, filter, m_engineRate, 2, renderStartMs, renderDurationMs));
     }
+    rt->renderSampleRate = renderSampleRate;
     proc->setProcessChannelMode(QProcess::SeparateChannels);
 
     if (useRawInput) {
@@ -1912,7 +1914,7 @@ void PadBank::scheduleProcessedRender(int index) {
                 const QByteArray bytes = rt->renderBytes;
                 rt->renderBytes.clear();
                 rt->renderInput.clear();
-                auto buffer = decodePcm16(bytes, renderSampleRate, 2);
+                auto buffer = decodePcm16(bytes, rt->renderSampleRate, 2);
                 if (buffer && buffer->isValid()) {
                     rt->processedBuffer = buffer;
                     rt->processedSignature = rt->renderSignature;
