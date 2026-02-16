@@ -31,6 +31,7 @@ QJsonObject padParamsToJson(const PadBank::PadParams &p) {
     obj["pan"] = p.pan;
     obj["pitch"] = p.pitch;
     obj["stretch"] = p.stretchIndex;
+    obj["stretchMode"] = p.stretchMode;
     obj["start"] = p.start;
     obj["end"] = p.end;
     obj["sliceCount"] = p.sliceCountIndex;
@@ -47,6 +48,7 @@ PadBank::PadParams padParamsFromJson(const QJsonObject &obj) {
     p.pan = static_cast<float>(obj.value("pan").toDouble(p.pan));
     p.pitch = static_cast<float>(obj.value("pitch").toDouble(p.pitch));
     p.stretchIndex = obj.value("stretch").toInt(p.stretchIndex);
+    p.stretchMode = obj.value("stretchMode").toInt(p.stretchMode);
     p.start = static_cast<float>(obj.value("start").toDouble(p.start));
     p.end = static_cast<float>(obj.value("end").toDouble(p.end));
     p.sliceCountIndex = obj.value("sliceCount").toInt(p.sliceCountIndex);
@@ -420,6 +422,7 @@ bool ProjectMenuOverlay::loadProject(const QString &name) {
         m_pads->setPan(pad, pp.pan);
         m_pads->setPitch(pad, pp.pitch);
         m_pads->setStretchIndex(pad, pp.stretchIndex);
+        m_pads->setStretchMode(pad, pp.stretchMode);
         m_pads->setStart(pad, pp.start);
         m_pads->setEnd(pad, pp.end);
         m_pads->setSliceCountIndex(pad, pp.sliceCountIndex);

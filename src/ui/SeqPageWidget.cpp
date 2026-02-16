@@ -496,6 +496,31 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
         p.drawLine(QPointF(gridArea.left(), y), QPointF(gridArea.right(), y));
     }
 
+    // Mini piano-roll preview for synth pads.
+    for (int row = 0; row < rows; ++row) {
+        const auto &notes = m_pianoNotes[row];
+        if (notes.isEmpty()) {
+            continue;
+        }
+        const float rowTop = gridArea.top() + row * cellH;
+        const QRectF rowRect(gridArea.left(), rowTop, gridArea.width(), cellH);
+        p.save();
+        p.setClipRect(rowRect.adjusted(Theme::px(1), Theme::px(2), -Theme::px(1), -Theme::px(2)));
+        const QColor baseColor = Theme::withAlpha(m_padColors[row], 140);
+        const float barH = Theme::pxF(3.0f);
+        for (const auto &note : notes) {
+            const float x = gridArea.left() + note.start * cellW;
+            const float w = qMax(cellW, note.length * cellW);
+            const float pitchFrac = qBound(0.0f, static_cast<float>(note.row) / 48.0f, 1.0f);
+            const float y = rowTop + (1.0f - pitchFrac) * (cellH - barH);
+            QRectF r(x + Theme::pxF(1.0f), y, w - Theme::pxF(2.0f), barH);
+            p.setBrush(baseColor);
+            p.setPen(Qt::NoPen);
+            p.drawRect(r);
+        }
+        p.restore();
+    }
+
     // Steps for all pads.
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < cols; ++col) {

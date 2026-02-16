@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QPixmap>
 #include <QString>
+#include <QTimer>
 #include <QVector>
 #include <QWidget>
 
@@ -48,7 +49,11 @@ private:
     QRectF m_normalizeRect;
     QRectF m_deleteRect;
     QRectF m_copyRect;
+    QRectF m_keyButtonRect;
+    QRectF m_stretchModeRect;
     QVector<QRectF> m_paramRects;
+    QTimer m_animTimer;
+    QString m_keyText = "KEY: --";
 
     void syncWaveSource();
     QString iconFileFor(Param::Type type) const;

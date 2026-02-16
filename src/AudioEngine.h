@@ -102,6 +102,7 @@ public:
     void setBpm(int bpm);
     bool startRecording(const QString &path, int totalFrames, int targetSampleRate);
     bool isRecording() const { return m_recording.load(); }
+    float padPlayhead(int padId) const;
 
 private:
     enum class EnvStage {
@@ -242,4 +243,5 @@ private:
     std::vector<float> m_synthScratchR;
     std::vector<float> m_lastOut;
     bool m_lastOutValid = false;
+    std::array<std::atomic<float>, 8> m_padPlayheads{};
 };

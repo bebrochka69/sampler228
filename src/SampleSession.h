@@ -28,6 +28,7 @@ public:
     void play();
     void stop();
     bool isPlaying() const;
+    float playbackProgress() const;
 
     const QVector<float> &waveform() const { return m_waveform; }
     bool hasWaveform() const { return !m_waveform.isEmpty(); }
@@ -69,6 +70,8 @@ private:
     int m_sampleRate = 0;
     int m_channels = 0;
     qint64 m_frames = 0;
+    qint64 m_durationMs = 0;
+    qint64 m_playbackPosMs = 0;
     QString m_infoText;
     QString m_errorText;
     bool m_decoding = false;

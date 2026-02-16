@@ -477,6 +477,7 @@ struct RenderSignature {
     QString path;
     int pitchCents = 0;
     int stretchIndex = 0;
+    int stretchMode = 0;
     int bpm = 120;
     int startMilli = 0;
     int endMilli = 1000;
@@ -485,7 +486,8 @@ struct RenderSignature {
 
     bool operator==(const RenderSignature &other) const {
         return path == other.path && pitchCents == other.pitchCents &&
-               stretchIndex == other.stretchIndex && bpm == other.bpm &&
+               stretchIndex == other.stretchIndex && stretchMode == other.stretchMode &&
+               bpm == other.bpm &&
                startMilli == other.startMilli && endMilli == other.endMilli &&
                sliceCountIndex == other.sliceCountIndex && sliceIndex == other.sliceIndex;
     }
@@ -1084,6 +1086,19 @@ void PadBank::setStretchIndex(int index, int stretchIndex) {
     emit padParamsChanged(index);
 }
 
+void PadBank::setStretchMode(int index, int mode) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    const int clamped = qBound(0, mode, 1);
+    if (m_params[static_cast<size_t>(index)].stretchMode == clamped) {
+        return;
+    }
+    m_params[static_cast<size_t>(index)].stretchMode = clamped;
+    scheduleProcessedRender(index);
+    emit padParamsChanged(index);
+}
+
 void PadBank::setStart(int index, float value) {
     if (index < 0 || index >= padCount()) {
         return;
@@ -1399,6 +1414,50 @@ bool PadBank::isPlaying(int index) const {
     return rt->player && rt->player->playbackState() == QMediaPlayer::PlayingState;
 }
 
+float PadBank::padPlayhead(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return -1.0f;
+    }
+    const PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (rt && rt->useEngine && m_engineAvailable && m_engine && !isSynth(index)) {
+        const float ph = m_engine->padPlayhead(index);
+        if (ph >= 0.0f) {
+            return ph;
+        }
+    }
+    if (rt && rt->player && rt->player->playbackState() == QMediaPlayer::PlayingState &&
+        rt->durationMs > 0) {
+        const qint64 start = rt->segmentStartMs;
+        const qint64 end = (rt->segmentEndMs > start) ? rt->segmentEndMs : rt->durationMs;
+        const qint64 span = end - start;
+        if (span > 0) {
+            const qint64 pos = rt->player->position();
+            const float ratio =
+                static_cast<float>(static_cast<double>(pos - start) / static_cast<double>(span));
+            return qBound(0.0f, ratio, 1.0f);
+        }
+    }
+    return -1.0f;
+}
+
+std::shared_ptr<AudioEngine::Buffer> PadBank::rawBuffer(int index) const {
+    if (index < 0 || index >= padCount()) {
+        return nullptr;
+    }
+    const PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+    if (!rt) {
+        return nullptr;
+    }
+    return rt->rawBuffer;
+}
+
+void PadBank::requestRawBuffer(int index) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    scheduleRawRender(index);
+}
+
 bool PadBank::isPadReady(int index) const {
     if (index < 0 || index >= padCount()) {
         return true;
@@ -1553,6 +1612,7 @@ static RenderSignature makeSignature(const QString &path, const PadBank::PadPara
     sig.path = path;
     sig.pitchCents = qRound(params.pitch * 100.0f);
     sig.stretchIndex = params.stretchIndex;
+    sig.stretchMode = params.stretchMode;
     sig.bpm = bpm;
     if (params.stretchIndex > 0) {
         sig.startMilli = toMilli(params.start);
@@ -1631,7 +1691,7 @@ static QStringList buildFfmpegArgsRaw(const QString &filter, int sampleRate, int
 }
 
 bool PadBank::needsProcessing(const PadParams &params) const {
-    return params.stretchIndex > 0;
+    return params.stretchIndex > 0 && params.stretchMode > 0;
 }
 
 void PadBank::scheduleRawRender(int index) {
@@ -1758,6 +1818,11 @@ void PadBank::scheduleProcessedRender(int index) {
     }
     const PadParams params = m_params[static_cast<size_t>(index)];
     if (!needsProcessing(params)) {
+        if (rt->renderProcess) {
+            rt->renderProcess->kill();
+            rt->renderProcess->deleteLater();
+            rt->renderProcess = nullptr;
+        }
         rt->processedBuffer.reset();
         rt->processedReady = false;
         return;
@@ -1971,17 +2036,26 @@ void PadBank::triggerPad(int index) {
     const double pitchRate = pitchToRate(params.pitch);
     const bool wantsProcessing = !synthPad && needsProcessing(params);
     const bool stretchEnabled = params.stretchIndex > 0;
+    const bool stretchHq = stretchEnabled && params.stretchMode > 0;
     const float normalizeGain = (params.normalize && rt) ? rt->normalizeGain : 1.0f;
     if (rt->useEngine && m_engineAvailable && m_engine) {
         std::shared_ptr<AudioEngine::Buffer> buffer;
+        bool useProcessed = false;
         if (wantsProcessing) {
             const RenderSignature sig = makeSignature(path, params, m_bpm);
             if (rt->processedReady && sig == rt->processedSignature) {
                 buffer = rt->processedBuffer;
+                useProcessed = true;
             } else {
-                rt->pendingTrigger = true;
-                scheduleProcessedRender(index);
-                return;
+                if (rt->rawBuffer && rt->rawBuffer->isValid()) {
+                    buffer = rt->rawBuffer;
+                    useProcessed = false;
+                    scheduleProcessedRender(index);
+                } else {
+                    rt->pendingTrigger = true;
+                    scheduleProcessedRender(index);
+                    return;
+                }
             }
         } else {
             buffer = rt->rawBuffer;
@@ -2011,12 +2085,12 @@ void PadBank::triggerPad(int index) {
                 endFrame = qMin(totalFrames, startFrame + 1);
             }
 
-            if (wantsProcessing) {
+            if (useProcessed) {
                 startFrame = 0;
                 endFrame = totalFrames;
             }
             float tempoFactor = 1.0f;
-            if (!wantsProcessing && stretchEnabled) {
+            if (!useProcessed && stretchEnabled) {
                 const int segmentFrames = qMax(1, endFrame - startFrame);
                 const qint64 segmentMs =
                     static_cast<qint64>(segmentFrames * 1000.0 / qMax(1, buffer->sampleRate));
@@ -2028,7 +2102,7 @@ void PadBank::triggerPad(int index) {
                 tempoFactor = qBound(0.25f, tempoFactor, 4.0f);
             }
 
-            const float rate = wantsProcessing ? 1.0f : static_cast<float>(pitchRate) * tempoFactor;
+            const float rate = useProcessed ? 1.0f : static_cast<float>(pitchRate) * tempoFactor;
             const float volume = params.volume * normalizeGain;
             m_engine->trigger(index, buffer, startFrame, endFrame, params.loop, volume,
                               params.pan, rate, params.fxBus);
@@ -2095,7 +2169,7 @@ void PadBank::triggerPad(int index) {
 
     const double internalRate = qBound(0.25, tempoFactor * pitchRate, 4.0);
 
-    const bool wantsStretch = !isNear(tempoFactor, 1.0);
+    const bool wantsStretch = stretchHq && !isNear(tempoFactor, 1.0);
     const bool needsExternal = rt->useExternal || wantsStretch;
 
     if (!needsExternal && rt->player) {

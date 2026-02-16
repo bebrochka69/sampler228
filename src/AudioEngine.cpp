@@ -71,6 +71,9 @@ AudioEngine::AudioEngine(QObject *parent) : QObject(parent) {
     for (auto &state : m_synthStates) {
         state.fmParams.macros.fill(0.5f);
     }
+    for (auto &ph : m_padPlayheads) {
+        ph.store(-1.0f);
+    }
 }
 
 AudioEngine::~AudioEngine() {
@@ -300,6 +303,16 @@ bool AudioEngine::isPadActive(int padId) const {
         }
     }
     return false;
+}
+
+float AudioEngine::padPlayhead(int padId) const {
+    if (!m_available) {
+        return -1.0f;
+    }
+    if (padId < 0 || padId >= static_cast<int>(m_padPlayheads.size())) {
+        return -1.0f;
+    }
+    return m_padPlayheads[static_cast<size_t>(padId)].load(std::memory_order_relaxed);
 }
 
 void AudioEngine::setBusEffects(int bus, const std::vector<EffectSettings> &effects) {
@@ -852,6 +865,9 @@ void AudioEngine::mix(float *out, int frames) {
         buffer.assign(frames * m_channels, 0.0f);
     }
 
+    std::array<float, 8> padPlayhead{};
+    padPlayhead.fill(-1.0f);
+
     for (auto it = m_voices.begin(); it != m_voices.end();) {
         Voice &voice = *it;
         if (!voice.buffer || !voice.buffer->isValid()) {
@@ -953,11 +969,26 @@ void AudioEngine::mix(float *out, int frames) {
         }
 
         voice.position = pos;
+        if (voice.padId >= 0 && voice.padId < static_cast<int>(padPlayhead.size())) {
+            const int denom = std::max(1, voice.endFrame - voice.startFrame);
+            float ratio = static_cast<float>((pos - voice.startFrame) / static_cast<double>(denom));
+            ratio = std::max(0.0f, std::min(1.0f, ratio));
+            const size_t padIdx = static_cast<size_t>(voice.padId);
+            if (padPlayhead[padIdx] < 0.0f) {
+                padPlayhead[padIdx] = ratio;
+            } else if (ratio > padPlayhead[padIdx]) {
+                padPlayhead[padIdx] = ratio;
+            }
+        }
         if (done) {
             it = m_voices.erase(it);
         } else {
             ++it;
         }
+    }
+
+    for (size_t i = 0; i < m_padPlayheads.size(); ++i) {
+        m_padPlayheads[i].store(padPlayhead[i], std::memory_order_relaxed);
     }
 
     if (frames > 0 && !m_synthStates.empty()) {

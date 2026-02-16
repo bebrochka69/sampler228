@@ -9,6 +9,11 @@
 #include <QShowEvent>
 #include <QtGlobal>
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <memory>
+
 #include "PadBank.h"
 #include "SampleSession.h"
 #include "Theme.h"
@@ -47,6 +52,170 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
     p.drawLine(QPointF(rect.left(), midY), QPointF(rect.right(), midY));
     p.restore();
 }
+
+QString keyNameFromIndex(int idx, bool minor) {
+    static const char *names[] = {"C",  "C#", "D",  "D#", "E",  "F",
+                                  "F#", "G",  "G#", "A",  "A#", "B"};
+    idx = (idx % 12 + 12) % 12;
+    return QString("%1 %2").arg(names[idx]).arg(minor ? "MIN" : "MAJ");
+}
+
+QString detectKeyFromBuffer(const std::shared_ptr<AudioEngine::Buffer> &buffer) {
+    if (!buffer || !buffer->isValid()) {
+        return QString();
+    }
+
+    const int channels = std::max(1, buffer->channels);
+    const int sampleRate = std::max(1, buffer->sampleRate);
+    const int totalFrames = buffer->frames();
+    const int maxFrames = std::min(totalFrames, sampleRate * 4);
+    if (maxFrames <= 0) {
+        return QString();
+    }
+
+    const int targetRate = 8000;
+    int step = std::max(1, sampleRate / targetRate);
+    int usedRate = sampleRate / step;
+    if (usedRate < 2000) {
+        step = 1;
+        usedRate = sampleRate;
+    }
+
+    std::vector<float> mono;
+    mono.reserve(static_cast<size_t>(maxFrames / step + 1));
+    const QVector<float> &samples = buffer->samples;
+    for (int i = 0; i < maxFrames; i += step) {
+        const int base = i * channels;
+        float v = 0.0f;
+        for (int ch = 0; ch < channels; ++ch) {
+            const int idx = base + ch;
+            if (idx < samples.size()) {
+                v += samples[idx];
+            }
+        }
+        mono.push_back(v / static_cast<float>(channels));
+    }
+
+    if (mono.size() < 512) {
+        return QString();
+    }
+
+    const int window = std::min(1024, static_cast<int>(mono.size()));
+    const int hop = window / 2;
+    int minLag = usedRate / 1000;
+    int maxLag = usedRate / 50;
+    minLag = std::max(4, minLag);
+    maxLag = std::min(maxLag, window - 4);
+    if (maxLag <= minLag) {
+        return QString();
+    }
+
+    std::array<double, 12> histogram{};
+    histogram.fill(0.0);
+    int windows = 0;
+
+    for (int start = 0; start + window < static_cast<int>(mono.size()); start += hop) {
+        if (windows++ > 80) {
+            break;
+        }
+        const float *x = mono.data() + start;
+        double energy = 0.0;
+        for (int i = 0; i < window; ++i) {
+            energy += x[i] * x[i];
+        }
+        if (energy < 1e-4) {
+            continue;
+        }
+
+        double bestCorr = 0.0;
+        int bestLag = -1;
+        for (int lag = minLag; lag <= maxLag; ++lag) {
+            double corr = 0.0;
+            for (int i = 0; i < window - lag; ++i) {
+                corr += x[i] * x[i + lag];
+            }
+            if (corr > bestCorr) {
+                bestCorr = corr;
+                bestLag = lag;
+            }
+        }
+
+        if (bestLag <= 0) {
+            continue;
+        }
+
+        const double norm = bestCorr / energy;
+        if (norm < 0.08) {
+            continue;
+        }
+        const double freq = static_cast<double>(usedRate) / static_cast<double>(bestLag);
+        if (freq < 50.0 || freq > 1000.0) {
+            continue;
+        }
+        const double midi = 69.0 + 12.0 * std::log2(freq / 440.0);
+        int pc = static_cast<int>(std::lround(midi)) % 12;
+        if (pc < 0) {
+            pc += 12;
+        }
+        histogram[static_cast<size_t>(pc)] += norm;
+    }
+
+    double sum = 0.0;
+    for (double v : histogram) {
+        sum += v;
+    }
+    if (sum < 0.5) {
+        return QString();
+    }
+    for (double &v : histogram) {
+        v /= sum;
+    }
+
+    static const double majorProfile[12] = {6.35, 2.23, 3.48, 2.33, 4.38, 4.09,
+                                            2.52, 5.19, 2.39, 3.66, 2.29, 2.88};
+    static const double minorProfile[12] = {6.33, 2.68, 3.52, 5.38, 2.60, 3.53,
+                                            2.54, 4.75, 3.98, 2.69, 3.34, 3.17};
+    double majorSum = 0.0;
+    double minorSum = 0.0;
+    for (double v : majorProfile) {
+        majorSum += v;
+    }
+    for (double v : minorProfile) {
+        minorSum += v;
+    }
+
+    int bestMajor = 0;
+    int bestMinor = 0;
+    double bestMajorScore = -1.0;
+    double bestMinorScore = -1.0;
+    for (int key = 0; key < 12; ++key) {
+        double majorScore = 0.0;
+        double minorScore = 0.0;
+        for (int i = 0; i < 12; ++i) {
+            const int idx = (i + key) % 12;
+            majorScore += histogram[static_cast<size_t>(idx)] * majorProfile[i];
+            minorScore += histogram[static_cast<size_t>(idx)] * minorProfile[i];
+        }
+        majorScore /= majorSum;
+        minorScore /= minorSum;
+        if (majorScore > bestMajorScore) {
+            bestMajorScore = majorScore;
+            bestMajor = key;
+        }
+        if (minorScore > bestMinorScore) {
+            bestMinorScore = minorScore;
+            bestMinor = key;
+        }
+    }
+
+    const double bestScore = std::max(bestMajorScore, bestMinorScore);
+    if (bestScore < 0.18) {
+        return QString();
+    }
+    const bool chooseMinor = bestMinorScore > bestMajorScore;
+    const int bestKey = chooseMinor ? bestMinor : bestMajor;
+    return keyNameFromIndex(bestKey, chooseMinor);
+}
 }  // namespace
 
 EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *parent)
@@ -54,6 +223,23 @@ EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *p
     setAutoFillBackground(false);
     setFocusPolicy(Qt::StrongFocus);
 
+    m_animTimer.setInterval(33);
+    connect(&m_animTimer, &QTimer::timeout, this, [this]() {
+        if (!isVisible()) {
+            return;
+        }
+        bool active = false;
+        if (m_pads) {
+            active = m_pads->isPlaying(m_pads->activePad());
+        }
+        if (!active && m_session) {
+            active = m_session->isPlaying();
+        }
+        if (active) {
+            update();
+        }
+    });
+    m_animTimer.start();
 
     m_params = {
         {"VOLUME", Param::Volume},
@@ -73,10 +259,12 @@ EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *p
         connect(m_pads, &PadBank::padParamsChanged, this, [this](int) { update(); });
         connect(m_pads, &PadBank::activePadChanged, this, [this](int) {
             syncWaveSource();
+            m_keyText = "KEY: --";
             update();
         });
         connect(m_pads, &PadBank::padChanged, this, [this](int) {
             syncWaveSource();
+            m_keyText = "KEY: --";
             update();
         });
     }
@@ -326,6 +514,31 @@ void EditPageWidget::mousePressEvent(QMouseEvent *event) {
         return;
     }
 
+    if (m_stretchModeRect.contains(pos) && m_pads) {
+        const int pad = m_pads->activePad();
+        const PadBank::PadParams pp = m_pads->params(pad);
+        const int nextMode = (pp.stretchMode > 0) ? 0 : 1;
+        m_pads->setStretchMode(pad, nextMode);
+        update();
+        return;
+    }
+
+    if (m_keyButtonRect.contains(pos) && m_pads) {
+        const int pad = m_pads->activePad();
+        const QString loading = "KEY: ...";
+        m_keyText = loading;
+        auto buffer = m_pads->rawBuffer(pad);
+        if (!buffer || !buffer->isValid()) {
+            m_pads->requestRawBuffer(pad);
+            m_keyText = "KEY: LOADING";
+        } else {
+            const QString key = detectKeyFromBuffer(buffer);
+            m_keyText = key.isEmpty() ? "KEY: UNKNOWN" : QString("KEY: %1").arg(key);
+        }
+        update();
+        return;
+    }
+
     if (m_normalizeRect.contains(pos) && m_pads) {
         const int pad = m_pads->activePad();
         PadBank::PadParams params = m_pads->params(pad);
@@ -382,16 +595,46 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     const int margin = Theme::px(24);
     const int headerHeight = Theme::px(24);
     const QRectF headerRect(margin, margin, width() - 2 * margin, headerHeight);
+    const float keyW = Theme::pxF(70.0f);
+    const float keyH = Theme::pxF(20.0f);
+    const float stretchW = Theme::pxF(140.0f);
+    m_keyButtonRect = QRectF(headerRect.right() - keyW, headerRect.top(), keyW, keyH);
+    m_stretchModeRect =
+        QRectF(m_keyButtonRect.left() - Theme::pxF(8.0f) - stretchW, headerRect.top(),
+               stretchW, keyH);
     p.setPen(Theme::accent());
     p.setFont(Theme::condensedFont(12, QFont::Bold));
     p.drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, "EDIT / SAMPLE");
     p.setPen(Theme::textMuted());
     p.setFont(Theme::baseFont(8));
-    p.drawText(QRectF(headerRect.left(), headerRect.top(), headerRect.width(), headerRect.height()),
-               Qt::AlignRight | Qt::AlignVCenter, "UP/DOWN select  LEFT/RIGHT adjust  SHIFT=Slice");
+    const QRectF helpRect(headerRect.left(), headerRect.top(),
+                          m_stretchModeRect.left() - headerRect.left() - Theme::px(6),
+                          headerRect.height());
+    p.drawText(helpRect, Qt::AlignRight | Qt::AlignVCenter,
+               "UP/DOWN select  LEFT/RIGHT adjust  SHIFT=Slice");
 
     const QRectF waveRect(margin, headerRect.bottom() + Theme::px(10),
                           width() - 2 * margin, height() * 0.42f);
+
+    p.setBrush(Theme::bg2());
+    p.setPen(QPen(Theme::stroke(), 1.0));
+    p.drawRoundedRect(m_keyButtonRect, Theme::px(6), Theme::px(6));
+    p.setPen(Theme::accentAlt());
+    p.setFont(Theme::baseFont(8, QFont::Bold));
+    p.drawText(m_keyButtonRect, Qt::AlignCenter, "KEY");
+
+    QString stretchLabel = "STRETCH: SIMPLE";
+    if (m_pads) {
+        const PadBank::PadParams pp = m_pads->params(m_pads->activePad());
+        stretchLabel = pp.stretchMode > 0 ? "STRETCH: HQ" : "STRETCH: SIMPLE";
+    }
+    p.setBrush(Theme::bg2());
+    p.setPen(QPen(Theme::stroke(), 1.0));
+    p.drawRoundedRect(m_stretchModeRect, Theme::px(6), Theme::px(6));
+    p.setPen(Theme::text());
+    p.setFont(Theme::baseFont(8, QFont::DemiBold));
+    p.drawText(m_stretchModeRect.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+               Qt::AlignLeft | Qt::AlignVCenter, stretchLabel);
 
     p.setBrush(QColor(128, 35, 60));
     p.setPen(QPen(Theme::accent(), 1.4));
@@ -413,6 +656,14 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
             normGain = m_pads->normalizeGainForPad(m_pads->activePad());
         }
         drawWaveformRibbon(p, waveInner, wave, normGain);
+    }
+
+    if (!m_keyText.isEmpty()) {
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.drawText(QRectF(waveInner.left(), waveInner.bottom() + Theme::px(6),
+                          waveInner.width(), Theme::px(16)),
+                   Qt::AlignLeft | Qt::AlignVCenter, m_keyText);
     }
 
     // Vertical grid lines with stronger center divisions.
@@ -467,6 +718,20 @@ void EditPageWidget::paintEvent(QPaintEvent *event) {
     p.drawLine(QPointF(startX, waveInner.top()), QPointF(startX, waveInner.bottom()));
     p.setPen(QPen(Theme::accent(), 2.0));
     p.drawLine(QPointF(endX, waveInner.top()), QPointF(endX, waveInner.bottom()));
+
+    float playhead = -1.0f;
+    if (m_pads) {
+        playhead = m_pads->padPlayhead(m_pads->activePad());
+    }
+    if (playhead < 0.0f && m_session) {
+        playhead = m_session->playbackProgress();
+    }
+    if (playhead >= 0.0f) {
+        const float clamped = qBound(0.0f, playhead, 1.0f);
+        const float px = waveInner.left() + waveInner.width() * clamped;
+        p.setPen(QPen(Theme::withAlpha(Theme::accent(), 220), 2.0));
+        p.drawLine(QPointF(px, waveInner.top()), QPointF(px, waveInner.bottom()));
+    }
 
     // Parameters list (large text, no boxes).
     const QRectF listRect(margin, waveRect.bottom() + Theme::px(18),

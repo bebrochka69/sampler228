@@ -949,26 +949,43 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     }
 
     if (m_showPresetMenu) {
-        const float menuW = panel.width() * 0.52f;
-        const float menuH = panel.height() * 0.6f;
-        m_presetPanelRect = QRectF(panel.left() + Theme::px(12), header.bottom() + Theme::px(8),
-                                   menuW, menuH);
+        m_presetPanelRect = panel.adjusted(Theme::px(6), Theme::px(6), -Theme::px(6), -Theme::px(6));
         p.setBrush(Theme::bg2());
-        p.setPen(QPen(Theme::stroke(), 1.2));
-        p.drawRoundedRect(m_presetPanelRect, Theme::px(12), Theme::px(12));
+        p.setPen(QPen(Theme::stroke(), 1.4));
+        p.drawRoundedRect(m_presetPanelRect, Theme::px(14), Theme::px(14));
+
+        const QRectF titleRect(m_presetPanelRect.left() + Theme::px(12),
+                               m_presetPanelRect.top() + Theme::px(8),
+                               m_presetPanelRect.width() - Theme::px(24), Theme::px(22));
+        p.setPen(Theme::accent());
+        p.setFont(Theme::condensedFont(12, QFont::Bold));
+        p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter, "PRESET BROWSER");
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.drawText(titleRect, Qt::AlignRight | Qt::AlignVCenter, "P / ESC to close");
+
+        const QRectF contentRect(m_presetPanelRect.left() + Theme::px(10),
+                                 titleRect.bottom() + Theme::px(8),
+                                 m_presetPanelRect.width() - Theme::px(20),
+                                 m_presetPanelRect.height() - Theme::px(20) - titleRect.height());
 
         const bool showBanks = m_categories.size() > 1;
-        const float bankW = showBanks ? m_presetPanelRect.width() * 0.35f : 0.0f;
-        QRectF bankRect = m_presetPanelRect.adjusted(Theme::px(10), Theme::px(10), -Theme::px(10), -Theme::px(10));
-        QRectF presetRect = bankRect;
+        const float bankW = showBanks ? contentRect.width() * 0.28f : 0.0f;
+        QRectF bankRect = contentRect;
+        QRectF presetRect = contentRect;
         if (showBanks) {
-            presetRect.setLeft(bankRect.left() + bankW + Theme::pxF(10.0f));
             bankRect.setWidth(bankW);
+            presetRect.setLeft(bankRect.right() + Theme::pxF(10.0f));
         }
 
         m_categoryRects.clear();
         if (showBanks) {
-            const float rowH = Theme::pxF(28.0f);
+            p.setPen(Theme::textMuted());
+            p.setFont(Theme::baseFont(9, QFont::DemiBold));
+            p.drawText(QRectF(bankRect.left(), bankRect.top() - Theme::px(18),
+                              bankRect.width(), Theme::px(16)),
+                       Qt::AlignLeft | Qt::AlignVCenter, "LIBRARIES");
+            const float rowH = Theme::pxF(30.0f);
             float by = bankRect.top();
             for (int i = 0; i < m_categories.size(); ++i) {
                 QRectF r(bankRect.left(), by, bankRect.width(), rowH - Theme::pxF(4.0f));
@@ -978,8 +995,9 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 p.setPen(QPen(Theme::stroke(), 1.0));
                 p.drawRoundedRect(r, Theme::px(6), Theme::px(6));
                 p.setPen(active ? Theme::bg0() : Theme::text());
-                p.setFont(Theme::baseFont(9, QFont::DemiBold));
-                p.drawText(r, Qt::AlignCenter, m_categories[i]);
+                p.setFont(Theme::baseFont(10, QFont::DemiBold));
+                p.drawText(r.adjusted(Theme::px(6), 0, -Theme::px(4), 0),
+                           Qt::AlignLeft | Qt::AlignVCenter, m_categories[i]);
                 by += rowH;
                 if (by > bankRect.bottom() - Theme::pxF(6.0f)) {
                     break;
@@ -988,9 +1006,9 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         }
 
         m_presetRows.clear();
-        const float rowH = Theme::pxF(28.0f);
-        const int maxVisible =
-            std::max(1, static_cast<int>(std::floor((presetRect.height() - Theme::pxF(4.0f)) / rowH)));
+        const float rowH = Theme::pxF(30.0f);
+        const int maxVisible = std::max(
+            1, static_cast<int>(std::floor((presetRect.height() - Theme::pxF(4.0f)) / rowH)));
         const int maxScroll = std::max(0, m_fluidPresets.size() - maxVisible);
         m_presetScroll = qBound(0, m_presetScroll, maxScroll);
 
@@ -1021,17 +1039,17 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             p.setPen(QPen(Theme::stroke(), 1.0));
             p.drawRoundedRect(row.rect, Theme::px(6), Theme::px(6));
             p.setPen(active ? Theme::bg0() : Theme::text());
-            p.setFont(Theme::baseFont(9, QFont::DemiBold));
-            p.drawText(row.rect.adjusted(Theme::px(6), 0, -Theme::px(4), 0),
+            p.setFont(Theme::baseFont(10, QFont::DemiBold));
+            p.drawText(row.rect.adjusted(Theme::px(8), 0, -Theme::px(6), 0),
                        Qt::AlignLeft | Qt::AlignVCenter, row.label);
         }
 
         if (maxScroll > 0) {
             p.setPen(Theme::textMuted());
-            p.setFont(Theme::baseFont(8, QFont::DemiBold));
+            p.setFont(Theme::baseFont(9, QFont::DemiBold));
             const QString marker = QString("%1/%2").arg(m_presetScroll + 1).arg(maxScroll + 1);
-            p.drawText(QRectF(presetRect.left(), presetRect.bottom() - Theme::px(14),
-                              presetRect.width(), Theme::px(12)),
+            p.drawText(QRectF(presetRect.left(), presetRect.bottom() - Theme::px(16),
+                              presetRect.width(), Theme::px(14)),
                        Qt::AlignRight | Qt::AlignVCenter, marker);
         }
     } else {

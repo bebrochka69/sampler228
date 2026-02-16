@@ -35,6 +35,7 @@ public:
         float pan = 0.0f;
         float pitch = 0.0f;
         int stretchIndex = 0;
+        int stretchMode = 0;
         float start = 0.0f;
         float end = 1.0f;
         int sliceCountIndex = 0;
@@ -89,6 +90,7 @@ public:
     void setPan(int index, float value);
     void setPitch(int index, float semitones);
     void setStretchIndex(int index, int stretchIndex);
+    void setStretchMode(int index, int mode);
     void setStart(int index, float value);
     void setEnd(int index, float value);
     void setSliceCountIndex(int index, int sliceCountIndex);
@@ -112,6 +114,9 @@ public:
 
     bool isPlaying(int index) const;
     bool isPadReady(int index) const;
+    float padPlayhead(int index) const;
+    std::shared_ptr<AudioEngine::Buffer> rawBuffer(int index) const;
+    void requestRawBuffer(int index);
     void triggerPad(int index);
     void triggerPadMidi(int index, int midiNote, int lengthSteps);
     void stopPad(int index);

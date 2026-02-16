@@ -136,6 +136,15 @@ bool SampleSession::isPlaying() const {
     return m_player && m_player->playbackState() == QMediaPlayer::PlayingState;
 }
 
+float SampleSession::playbackProgress() const {
+    if (m_durationMs <= 0) {
+        return -1.0f;
+    }
+    const float ratio =
+        static_cast<float>(static_cast<double>(m_playbackPosMs) / static_cast<double>(m_durationMs));
+    return qBound(0.0f, ratio, 1.0f);
+}
+
 void SampleSession::startDecode() {
     m_decoder.stop();
     m_decoding = true;
@@ -151,6 +160,8 @@ void SampleSession::resetDecodeState() {
     m_sampleRate = 0;
     m_channels = 0;
     m_frames = 0;
+    m_durationMs = 0;
+    m_playbackPosMs = 0;
     m_infoText = "No sample selected";
     emit waveformChanged();
     emit infoChanged();
@@ -179,9 +190,24 @@ void SampleSession::handleBufferReady() {
 
     const char *data = buffer.constData<char>();
     const bool fast = (m_decodeMode == DecodeMode::Fast);
+    auto downsamplePcm = [this]() {
+        if (m_pcm.size() < 2) {
+            return;
+        }
+        QVector<float> compact;
+        compact.reserve((m_pcm.size() + 1) / 2);
+        for (int i = 0; i < m_pcm.size(); i += 2) {
+            float v = m_pcm[i];
+            if (i + 1 < m_pcm.size()) {
+                v = qMax(v, m_pcm[i + 1]);
+            }
+            compact.push_back(v);
+        }
+        m_pcm.swap(compact);
+    };
+
     if (fast && m_pcm.size() >= kFastPcmLimit) {
-        m_frames += buffer.frameCount();
-        return;
+        downsamplePcm();
     }
 
     int stride = 1;
@@ -203,6 +229,12 @@ void SampleSession::handleBufferReady() {
         m_pcm.push_back(maxValue);
     }
 
+    if (fast) {
+        while (m_pcm.size() > kFastPcmLimit) {
+            downsamplePcm();
+        }
+    }
+
     m_frames += buffer.frameCount();
 }
 
@@ -219,6 +251,9 @@ void SampleSession::handleDecodeError(QAudioDecoder::Error error) {
 }
 
 void SampleSession::handlePlayerState(QMediaPlayer::PlaybackState state) {
+    if (state != QMediaPlayer::PlayingState) {
+        m_playbackPosMs = 0;
+    }
     emit playbackChanged(state == QMediaPlayer::PlayingState);
 }
 
@@ -245,6 +280,14 @@ void SampleSession::ensureAudioOutput() {
     m_player = new QMediaPlayer(this);
     m_player->setAudioOutput(m_audioOutput);
     connect(m_player, &QMediaPlayer::playbackStateChanged, this, &SampleSession::handlePlayerState);
+    connect(m_player, &QMediaPlayer::positionChanged, this, [this](qint64 pos) {
+        m_playbackPosMs = pos;
+    });
+    connect(m_player, &QMediaPlayer::durationChanged, this, [this](qint64 duration) {
+        if (duration > 0) {
+            m_durationMs = duration;
+        }
+    });
     connect(m_player, &QMediaPlayer::errorOccurred, this,
             [this](QMediaPlayer::Error error, const QString &errorString) {
                 if (error == QMediaPlayer::NoError) {
@@ -323,6 +366,7 @@ void SampleSession::playExternal() {
     proc->setProcessChannelMode(QProcess::MergedChannels);
 
     connect(proc, &QProcess::started, this, [this]() {
+        m_playbackPosMs = 0;
         if (!m_errorText.isEmpty()) {
             m_errorText.clear();
             emit errorChanged(m_errorText);
@@ -362,6 +406,7 @@ void SampleSession::stopExternal() {
     proc->disconnect(this);
     proc->kill();
     proc->deleteLater();
+    m_playbackPosMs = 0;
     emit playbackChanged(false);
 }
 
@@ -372,7 +417,9 @@ void SampleSession::rebuildWaveform() {
         return;
     }
 
-    const int target = 240;
+    const int maxTarget = 1200;
+    const int minTarget = 240;
+    const int target = qBound(minTarget, m_pcm.size(), maxTarget);
     m_waveform.resize(target);
     const int total = m_pcm.size();
 
@@ -386,6 +433,7 @@ void SampleSession::rebuildWaveform() {
     }
 
     const qint64 ms = (m_frames * 1000) / m_sampleRate;
+    m_durationMs = ms;
     QTime time(0, 0);
     time = time.addMSecs(static_cast<int>(ms));
     const QString length = (ms >= 3600000) ? time.toString("hh:mm:ss") : time.toString("mm:ss.zzz");
