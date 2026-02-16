@@ -523,6 +523,9 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
 
     // Steps for all pads.
     for (int row = 0; row < rows; ++row) {
+        if (!m_pianoNotes[row].isEmpty()) {
+            continue;
+        }
         for (int col = 0; col < cols; ++col) {
             if (!m_steps[row][col]) {
                 continue;

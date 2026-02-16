@@ -68,7 +68,7 @@ QString detectKeyFromBuffer(const std::shared_ptr<AudioEngine::Buffer> &buffer) 
     const int channels = std::max(1, buffer->channels);
     const int sampleRate = std::max(1, buffer->sampleRate);
     const int totalFrames = buffer->frames();
-    const int maxFrames = std::min(totalFrames, sampleRate * 4);
+    const int maxFrames = std::min(totalFrames, sampleRate * 2);
     if (maxFrames <= 0) {
         return QString();
     }
@@ -115,7 +115,7 @@ QString detectKeyFromBuffer(const std::shared_ptr<AudioEngine::Buffer> &buffer) 
     int windows = 0;
 
     for (int start = 0; start + window < static_cast<int>(mono.size()); start += hop) {
-        if (windows++ > 80) {
+        if (windows++ > 40) {
             break;
         }
         const float *x = mono.data() + start;
@@ -234,6 +234,15 @@ EditPageWidget::EditPageWidget(SampleSession *session, PadBank *pads, QWidget *p
         }
         if (!active && m_session) {
             active = m_session->isPlaying();
+        }
+        if (m_pads && (m_keyText == "KEY: LOADING" || m_keyText == "KEY: ...")) {
+            const int pad = m_pads->activePad();
+            auto buffer = m_pads->rawBuffer(pad);
+            if (buffer && buffer->isValid()) {
+                const QString key = detectKeyFromBuffer(buffer);
+                m_keyText = key.isEmpty() ? "KEY: UNKNOWN" : QString("KEY: %1").arg(key);
+                update();
+            }
         }
         if (active) {
             update();
@@ -578,8 +587,7 @@ void EditPageWidget::syncWaveSource() {
     if (padPath.isEmpty()) {
         return;
     }
-    const SampleSession::DecodeMode mode =
-        Theme::liteMode() ? SampleSession::DecodeMode::Fast : SampleSession::DecodeMode::Full;
+    const SampleSession::DecodeMode mode = SampleSession::DecodeMode::Full;
     if (padPath != m_session->sourcePath() || m_session->decodeMode() != mode) {
         m_session->setSource(padPath, mode);
     }
