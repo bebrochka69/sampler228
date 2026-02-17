@@ -1041,14 +1041,6 @@ void AudioEngine::mix(float *out, int frames) {
             } else {
                 synth.core.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
             }
-            // Tiny stereo spread: 1-sample delay on right to avoid mono collapse.
-            float prevR = synth.stereoDelay;
-            for (int i = 0; i < frames; ++i) {
-                const float r = m_synthScratchR[i];
-                m_synthScratchR[i] = r * 0.7f + prevR * 0.3f;
-                prevR = r;
-            }
-            synth.stereoDelay = prevR;
 
             const bool useFilter = (synth.kind == SynthKind::SimpleFm);
             const float baseCutoff = synth.filterCutoff;
@@ -1410,12 +1402,14 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                 const float rate = 0.1f + p2 * 0.8f;
                 const float mix = p3;
                 for (int i = 0; i < frames; ++i) {
-                    const float lfo = (std::sin(fx.phase) + 1.0f) * 0.5f;
-                    const int delay = static_cast<int>((0.005f + depth * lfo) * m_sampleRate);
+                    const float lfoL = (std::sin(fx.phase) + 1.0f) * 0.5f;
+                    const float lfoR = (std::sin(fx.phase + static_cast<float>(M_PI) * 0.5f) + 1.0f) * 0.5f;
+                    const int delayL = static_cast<int>((0.005f + depth * lfoL) * m_sampleRate);
+                    const int delayR = static_cast<int>((0.005f + depth * lfoR) * m_sampleRate);
                     for (int ch = 0; ch < m_channels; ++ch) {
                         const int writeIdx = (fx.indexA * m_channels + ch) % fx.bufA.size();
                         fx.bufA[writeIdx] = buffer[i * m_channels + ch];
-                        int readIndex = fx.indexA - delay;
+                        int readIndex = fx.indexA - (ch == 0 ? delayL : delayR);
                         if (readIndex < 0) {
                             readIndex += fx.bufA.size() / m_channels;
                         }
@@ -1498,13 +1492,17 @@ void AudioEngine::processBus(int busIndex, float *buffer, int frames, float side
                     fx.indexA = 0;
                 }
                 const int framesDelay = fx.bufA.size() / m_channels;
+                int stereoOffset = stereo ? std::max(1, delaySamples / 8) : 0;
+                stereoOffset = std::min(stereoOffset, std::max(1, framesDelay - 1));
                 for (int i = 0; i < frames; ++i) {
-                    const int readIndex = (fx.indexA - delaySamples + framesDelay) % framesDelay;
+                    const int readIndexL = (fx.indexA - delaySamples + framesDelay) % framesDelay;
+                    const int readIndexR =
+                        (fx.indexA - delaySamples - stereoOffset + framesDelay * 2) % framesDelay;
                     const int writeIndex = fx.indexA;
                     float inL = buffer[i * m_channels];
                     float inR = (m_channels > 1) ? buffer[i * m_channels + 1] : inL;
-                    float dl = fx.bufA[readIndex * m_channels];
-                    float dr = (m_channels > 1) ? fx.bufA[readIndex * m_channels + 1] : dl;
+                    float dl = fx.bufA[readIndexL * m_channels];
+                    float dr = (m_channels > 1) ? fx.bufA[readIndexR * m_channels + 1] : dl;
                     float fbL = stereo ? dr : dl;
                     float fbR = stereo ? dl : dr;
                     fx.bufA[writeIndex * m_channels] = inL + fbL * feedback;
