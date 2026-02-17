@@ -11,6 +11,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QProcess>
 #include <QSaveFile>
 #include <QtGlobal>
 
@@ -210,6 +211,19 @@ void ProjectMenuOverlay::ensureMediaDirs() {
     }
     root.mkpath("PROJECT");
     root.mkpath("RENDER");
+}
+
+void ProjectMenuOverlay::openBluetoothMenu() {
+#ifdef Q_OS_LINUX
+    QString cmd = qEnvironmentVariable("GROOVEBOX_BT_CMD");
+    if (cmd.isEmpty()) {
+        cmd = QStringLiteral(
+            "if command -v openvt >/dev/null 2>&1; then "
+            "sudo openvt -c 2 -s -w -- bluetoothctl; "
+            "else sudo bluetoothctl; fi");
+    }
+    QProcess::startDetached(QStringLiteral("sh"), {QStringLiteral("-c"), cmd});
+#endif
 }
 
 void ProjectMenuOverlay::refreshProjects() {
@@ -594,6 +608,9 @@ void ProjectMenuOverlay::paintEvent(QPaintEvent *event) {
     QRectF rateRow = drawRowBase("RENDER QUALITY", rateLabel);
     m_rateRect = rateRow;
 
+    QRectF btRow = drawRowBase("BLUETOOTH", "OPEN");
+    m_bluetoothRect = btRow;
+
     const QString media = mediaRoot();
     drawRowBase("MEDIA", QFontMetrics(Theme::baseFont(9, QFont::DemiBold))
                              .elidedText(media, Qt::ElideLeft, rowW - Theme::px(24)));
@@ -733,6 +750,10 @@ void ProjectMenuOverlay::mousePressEvent(QMouseEvent *event) {
     if (m_rateRect.contains(pos)) {
         m_renderRate = (m_renderRate == 48000) ? 44100 : 48000;
         update();
+        return;
+    }
+    if (m_bluetoothRect.contains(pos)) {
+        openBluetoothMenu();
         return;
     }
 

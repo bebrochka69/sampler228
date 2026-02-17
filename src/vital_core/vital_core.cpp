@@ -50,6 +50,7 @@ public:
 
 struct VitalCore::Impl {
 #if defined(GROOVEBOX_WITH_VITAL)
+    std::unique_ptr<juce::ScopedJuceInitialiser_GUI> juceInit;
     VitalHeadless synth;
     AudioSampleBuffer buffer;
     Params params;
@@ -62,6 +63,9 @@ struct VitalCore::Impl {
     void ensureInit() {
         if (initialized) {
             return;
+        }
+        if (!juceInit) {
+            juceInit = std::make_unique<juce::ScopedJuceInitialiser_GUI>();
         }
         synth.getEngine()->setSampleRate(sampleRate);
         synth.getEngine()->setBpm(120.0f);
@@ -84,6 +88,7 @@ struct VitalCore::Impl {
                 synth.valueChanged(name, 0.0f);
             }
         }
+        setControl("oversampling", 0.0f);
 
         initialized = true;
     }

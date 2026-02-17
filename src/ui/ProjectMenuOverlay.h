@@ -31,6 +31,7 @@ private:
     QString projectDir() const;
     QString renderDir() const;
     void ensureMediaDirs();
+    void openBluetoothMenu();
 
     void newProject();
     bool saveProject(const QString &name);
@@ -58,6 +59,7 @@ private:
     QRectF m_bpmPlusRect;
     QRectF m_metronomeRect;
     QRectF m_rateRect;
+    QRectF m_bluetoothRect;
 
     QRectF m_newRect;
     QRectF m_saveRect;
