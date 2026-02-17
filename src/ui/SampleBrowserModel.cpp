@@ -93,6 +93,24 @@ void SampleBrowserModel::refresh() {
         m_roots.push_back(std::move(node));
         return true;
     };
+    auto addSamplesIfFound = [&](const QString &root) {
+        if (root.isEmpty()) {
+            return;
+        }
+        QDir dir(root);
+        if (!dir.exists()) {
+            return;
+        }
+        const QStringList names = {"samples", "Samples", "SAMPLES"};
+        for (const QString &name : names) {
+            const QString path = dir.filePath(name);
+            if (QDir(path).exists()) {
+                addRootIfExists(path, "USB SAMPLES", true, true);
+                break;
+            }
+        }
+    };
+
     const QList<QStorageInfo> volumes = QStorageInfo::mountedVolumes();
     for (const QStorageInfo &volume : volumes) {
         if (!isUsbMount(volume)) {
@@ -108,6 +126,7 @@ void SampleBrowserModel::refresh() {
             name = QFileInfo(root).fileName();
         }
         addRootIfExists(root, name, true, true);
+        addSamplesIfFound(root);
     }
 
     scanProcMounts(seenRoots, addRootIfExists);
@@ -136,9 +155,11 @@ void SampleBrowserModel::refresh() {
     scanMountRoot("/mnt");
     // Prefer explicit USB mount points, but keep scans shallow for responsiveness.
     addRootIfExists("/mnt/usb", "USB", true, true);
-    addRootIfExists("/mnt/usb/samples", "USB SAMPLES", false, false);
+    addRootIfExists("/mnt/usb/samples", "USB SAMPLES", true, true);
+    addRootIfExists("/mnt/usb/Samples", "USB SAMPLES", true, true);
     addRootIfExists("/media/usb", "USB", true, true);
-    addRootIfExists("/media/usb/samples", "USB SAMPLES", false, false);
+    addRootIfExists("/media/usb/samples", "USB SAMPLES", true, true);
+    addRootIfExists("/media/usb/Samples", "USB SAMPLES", true, true);
 
     if (m_roots.empty()) {
         const QString home = QDir::homePath();
