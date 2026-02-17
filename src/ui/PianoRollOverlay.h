@@ -78,6 +78,7 @@ private:
     DragMode m_dragMode = DragNone;
     int m_dragNoteIndex = -1;
     QPointF m_pressPos;
+    float m_pressNoteOffset = 0.0f;
     float m_pressScroll = 0.0f;
     float m_pressScrollY = 0.0f;
     Note m_pressNote;

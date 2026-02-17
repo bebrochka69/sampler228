@@ -2021,6 +2021,7 @@ void PadBank::triggerPad(int index) {
             isMiniDexedType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]));
         m_engine->setSynthEnabled(index, true);
         m_engine->setSynthParams(index, params.volume, params.pan, params.fxBus);
+        m_engine->synthAllNotesOff(index);
         m_engine->synthNoteOn(index, baseMidi, velocity);
         const int lengthMs = isDx7
                                  ? qBound(500, static_cast<int>(3000 + sp.release * 3500.0f), 8000)

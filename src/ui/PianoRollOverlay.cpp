@@ -140,7 +140,11 @@ int PianoRollOverlay::noteAt(const QPointF &pos) const {
 
 bool PianoRollOverlay::hitNoteRightEdge(const Note &note, float x) const {
     const float edge = xFromStep(note.start + note.length);
-    return std::abs(x - edge) <= Theme::pxF(6.0f);
+    const float startX = xFromStep(note.start);
+    const float width = std::max(1.0f, edge - startX);
+    float handle = std::max(Theme::pxF(10.0f), width * 0.35f);
+    handle = std::min(handle, width * 0.6f);
+    return x >= (edge - handle);
 }
 
 void PianoRollOverlay::zoomBy(float factor) {
@@ -371,7 +375,8 @@ void PianoRollOverlay::mousePressEvent(QMouseEvent *event) {
     const QRectF keys = keyboardRect();
     if (keys.contains(pos) && m_pads) {
         const int row = rowFromY(pos.y());
-        const int midi = m_baseMidi + (m_totalRows - 1 - row);
+        int midi = m_baseMidi + (m_totalRows - 1 - row) - 12;
+        midi = qBound(0, midi, 127);
         m_pads->triggerPadMidi(m_activePad, midi, 4);
         return;
     }
@@ -397,6 +402,9 @@ void PianoRollOverlay::mousePressEvent(QMouseEvent *event) {
             return;
         }
         m_pressNote = note;
+        const float startX = xFromStep(note.start);
+        const float width = std::max(1.0f, xFromStep(note.start + note.length) - startX);
+        m_pressNoteOffset = qBound(0.0f, (pos.x() - startX) / width, 1.0f);
         if (hitNoteRightEdge(note, pos.x())) {
             m_dragMode = DragResize;
         } else {
@@ -430,7 +438,8 @@ void PianoRollOverlay::mouseMoveEvent(QMouseEvent *event) {
     if (m_dragMode == DragMove) {
         const int step = stepFromX(pos.x());
         const int row = rowFromY(pos.y());
-        notes[m_dragNoteIndex].start = clampStep(step - m_pressNote.length / 2);
+        const int offset = static_cast<int>(std::round(m_pressNoteOffset * m_pressNote.length));
+        notes[m_dragNoteIndex].start = clampStep(step - offset);
         notes[m_dragNoteIndex].row = row;
         setPlayheadStep(notes[m_dragNoteIndex].start);
         emitStepsChanged();

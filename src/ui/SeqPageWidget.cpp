@@ -187,7 +187,8 @@ void SeqPageWidget::triggerStep(int step) {
                 if (note.start != step) {
                     continue;
                 }
-                const int midi = baseMidi + (rows - 1 - note.row);
+                int midi = baseMidi + (rows - 1 - note.row) - 12;
+                midi = qBound(0, midi, 127);
                 m_pads->triggerPadMidi(pad, midi, note.length);
             }
             continue;
