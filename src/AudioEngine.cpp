@@ -1042,6 +1042,28 @@ void AudioEngine::mix(float *out, int frames) {
                 synth.core.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
             }
 
+            float diff = 0.0f;
+            float mag = 0.0f;
+            for (int i = 0; i < frames; ++i) {
+                diff += std::abs(m_synthScratchL[i] - m_synthScratchR[i]);
+                mag += std::abs(m_synthScratchL[i]) + std::abs(m_synthScratchR[i]);
+            }
+            const bool nearlyMono = (mag > 0.0f) && (diff / mag < 0.02f);
+            if (nearlyMono) {
+                const float a = 0.6f;
+                float x1 = synth.apX;
+                float y1 = synth.apY;
+                for (int i = 0; i < frames; ++i) {
+                    const float x0 = m_synthScratchR[i];
+                    const float y0 = -a * x0 + x1 + a * y1;
+                    m_synthScratchR[i] = y0;
+                    x1 = x0;
+                    y1 = y0;
+                }
+                synth.apX = x1;
+                synth.apY = y1;
+            }
+
             const bool useFilter = (synth.kind == SynthKind::SimpleFm);
             const float baseCutoff = synth.filterCutoff;
             const float baseRes = synth.filterResonance;

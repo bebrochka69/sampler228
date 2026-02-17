@@ -199,6 +199,8 @@ private:
         float env = 0.0f;
         EnvStage envStage = EnvStage::Attack;
         bool releaseRequested = false;
+        float apX = 0.0f;
+        float apY = 0.0f;
     };
 
     void start();
