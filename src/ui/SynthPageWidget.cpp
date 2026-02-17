@@ -5,6 +5,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QWheelEvent>
+#include <QHash>
 
 #include <algorithm>
 #include <cmath>
@@ -155,6 +156,62 @@ bool isFmBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
     return upper == QStringLiteral("FM") || upper == QStringLiteral("SERUM");
 }
+
+QString classifyPresetType(const QString &name) {
+    const QString upper = name.toUpper();
+    auto hasAny = [&](const QStringList &keys) {
+        for (const QString &key : keys) {
+            if (upper.contains(key)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    if (hasAny({"BASS", "SUB", "808", "LOW", "REESE", "ACID"})) {
+        return "BASS";
+    }
+    if (hasAny({"LEAD", "SOLO", "SAW", "SYNC", "RAVE"})) {
+        return "LEAD";
+    }
+    if (hasAny({"PAD", "ATM", "AMBI", "WARM", "WIDE"})) {
+        return "PAD";
+    }
+    if (hasAny({"PLUCK", "PICK", "HARP", "ZITHER"})) {
+        return "PLUCK";
+    }
+    if (hasAny({"KEY", "PIANO", "EP", "EPIANO", "CLAV", "MALLET"})) {
+        return "KEYS";
+    }
+    if (hasAny({"ARP", "ARPEG", "SEQ", "SEQUENCE"})) {
+        return "ARP";
+    }
+    if (hasAny({"FX", "SFX", "NOISE", "SWEEP", "RISE", "FALL", "HIT", "IMPACT", "WHOOSH"})) {
+        return "FX";
+    }
+    if (hasAny({"DRUM", "KICK", "SNARE", "HAT", "CLAP", "TOM", "PERC"})) {
+        return "DRUM";
+    }
+    if (hasAny({"VOC", "VOICE", "VOX", "CHOIR"})) {
+        return "VOCAL";
+    }
+    if (hasAny({"BRASS", "TRUMP", "TROMB", "HORN"})) {
+        return "BRASS";
+    }
+    if (hasAny({"STRING", "VIOL", "CELLO"})) {
+        return "STRINGS";
+    }
+    if (hasAny({"BELL", "CHIME", "GLASS"})) {
+        return "BELL";
+    }
+    if (hasAny({"ORGAN", "HAMMOND", "B3"})) {
+        return "ORGAN";
+    }
+    if (hasAny({"GTR", "GUITAR"})) {
+        return "GUITAR";
+    }
+    return "OTHER";
+}
 }  // namespace
 
 SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
@@ -208,58 +265,103 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
 }
 
 void SynthPageWidget::reloadBanks(bool syncSelection) {
-    if (m_pads) {
-        m_categories = PadBank::synthBanks();
-    } else {
-        m_categories.clear();
-    }
+    m_allPresets.clear();
+    m_categories.clear();
 
     const QString id = synthIdOrDefault(m_pads, m_activePad);
     const QString type = synthTypeFromId(id).trimmed().toUpper();
-    if (!m_categories.isEmpty()) {
-        if (type == "SERUM" || type == "FM") {
-            m_categories = {QStringLiteral("SERUM")};
-        } else {
-            QStringList filtered;
-            for (const QString &bank : m_categories) {
-                const QString upper = bank.trimmed().toUpper();
-                if (upper != "SERUM" && upper != "FM") {
-                    filtered << bank;
-                }
-            }
-            if (!filtered.isEmpty()) {
-                m_categories = filtered;
+    QStringList banks;
+    if (m_pads) {
+        banks = PadBank::synthBanks();
+    }
+    if (type == "SERUM" || type == "FM") {
+        banks = {QStringLiteral("SERUM")};
+    } else {
+        QStringList filtered;
+        for (const QString &bank : banks) {
+            const QString upper = bank.trimmed().toUpper();
+            if (upper != "SERUM" && upper != "FM") {
+                filtered << bank;
             }
         }
+        if (!filtered.isEmpty()) {
+            banks = filtered;
+        }
     }
-    if (m_categories.isEmpty()) {
-        m_categories << (type == "SERUM" || type == "FM" ? "SERUM" : "INTERNAL");
+    if (banks.isEmpty()) {
+        banks << (type == "SERUM" || type == "FM" ? "SERUM" : "INTERNAL");
     }
-    if (syncSelection) {
-        const QString bank = synthBank(id);
-        for (int i = 0; i < m_categories.size(); ++i) {
-            if (QString::compare(m_categories[i], bank, Qt::CaseInsensitive) == 0) {
-                m_selectedCategory = i;
+
+    for (const QString &bank : banks) {
+        const QStringList presets = m_pads ? PadBank::synthPresetsForBank(bank) : QStringList();
+        for (const QString &preset : presets) {
+            PresetEntry entry;
+            entry.preset = preset;
+            entry.bank = bank;
+            entry.category = classifyPresetType(preset);
+            m_allPresets.push_back(entry);
+        }
+    }
+    if (m_allPresets.isEmpty()) {
+        PresetEntry entry;
+        entry.preset = "INIT";
+        entry.bank = (type == "SERUM" || type == "FM") ? "SERUM" : "INTERNAL";
+        entry.category = "OTHER";
+        m_allPresets.push_back(entry);
+    }
+
+    QHash<QString, int> nameCounts;
+    for (const auto &entry : m_allPresets) {
+        nameCounts[entry.preset.toUpper()] += 1;
+    }
+    for (auto &entry : m_allPresets) {
+        const int count = nameCounts.value(entry.preset.toUpper(), 0);
+        entry.label = (count > 1) ? QString("%1  [%2]").arg(entry.preset, entry.bank)
+                                  : entry.preset;
+    }
+
+    const QStringList order = {"BASS", "LEAD", "PAD",    "PLUCK",  "KEYS", "ARP",
+                               "FX",   "DRUM", "VOCAL",  "BRASS",  "STRINGS",
+                               "BELL", "ORGAN", "GUITAR", "OTHER"};
+    for (const QString &cat : order) {
+        bool has = false;
+        for (const auto &entry : m_allPresets) {
+            if (entry.category == cat) {
+                has = true;
                 break;
             }
         }
+        if (has) {
+            m_categories << cat;
+        }
+    }
+    if (m_categories.isEmpty()) {
+        m_categories << "OTHER";
+    }
+
+    if (syncSelection) {
+        const QString bank = synthBank(id);
+        const QString program = synthProgram(id);
+        QString cat;
+        for (const auto &entry : m_allPresets) {
+            if (QString::compare(entry.bank, bank, Qt::CaseInsensitive) == 0 &&
+                QString::compare(entry.preset, program, Qt::CaseInsensitive) == 0) {
+                cat = entry.category;
+                break;
+            }
+        }
+        if (cat.isEmpty()) {
+            cat = classifyPresetType(program);
+        }
+        int idx = m_categories.indexOf(cat);
+        if (idx < 0) {
+            idx = 0;
+        }
+        m_selectedCategory = idx;
+        m_presetScroll = 0;
     }
     if (m_selectedCategory < 0 || m_selectedCategory >= m_categories.size()) {
         m_selectedCategory = 0;
-    }
-
-    const QString bankName =
-        m_categories.value(qBound(0, m_selectedCategory, m_categories.size() - 1));
-    if (m_pads) {
-        m_fluidPresets = PadBank::synthPresetsForBank(bankName);
-    } else {
-        m_fluidPresets.clear();
-    }
-    if (m_fluidPresets.isEmpty()) {
-        m_fluidPresets << "INIT";
-    }
-    if (syncSelection) {
-        m_presetScroll = 0;
     }
 }
 
@@ -370,8 +472,7 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
 
         for (const PresetRow &row : m_presetRows) {
             if (!row.header && row.rect.contains(pos) && m_pads) {
-                const QString bank =
-                    m_categories.value(qBound(0, m_selectedCategory, m_categories.size() - 1));
+                const QString bank = row.bank;
                 const QString type = isFmBank(bank) ? QStringLiteral("SERUM") : QStringLiteral("DX7");
                 const QString presetId = row.presetId;
                 const QString payload =
@@ -1007,19 +1108,29 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
 
         m_presetRows.clear();
         const float rowH = Theme::pxF(30.0f);
+        const QString selectedCat =
+            m_categories.value(qBound(0, m_selectedCategory, m_categories.size() - 1));
+        QVector<PresetEntry> filtered;
+        filtered.reserve(m_allPresets.size());
+        for (const auto &entry : m_allPresets) {
+            if (entry.category == selectedCat) {
+                filtered.push_back(entry);
+            }
+        }
         const int maxVisible = std::max(
             1, static_cast<int>(std::floor((presetRect.height() - Theme::pxF(4.0f)) / rowH)));
-        const int maxScroll = std::max(0, m_fluidPresets.size() - maxVisible);
+        const int maxScroll = std::max(0, filtered.size() - maxVisible);
         m_presetScroll = qBound(0, m_presetScroll, maxScroll);
 
         float py = presetRect.top();
         int drawn = 0;
-        for (int idx = m_presetScroll; idx < m_fluidPresets.size(); ++idx) {
-            const QString &item = m_fluidPresets[idx];
+        for (int idx = m_presetScroll; idx < filtered.size(); ++idx) {
+            const PresetEntry &item = filtered[idx];
             PresetRow row;
             row.header = false;
-            row.label = item;
-            row.presetId = item;
+            row.label = item.label;
+            row.presetId = item.preset;
+            row.bank = item.bank;
             row.rect = QRectF(presetRect.left(), py, presetRect.width(), rowH - Theme::pxF(4.0f));
             m_presetRows.push_back(row);
             py += rowH;
@@ -1031,10 +1142,10 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
 
         for (const PresetRow &row : m_presetRows) {
             const bool bankMatch =
-                QString::compare(m_categories.value(qBound(0, m_selectedCategory, m_categories.size() - 1)),
-                                 bankName, Qt::CaseInsensitive) == 0;
-            const bool active = bankMatch &&
-                                QString::compare(programName, row.presetId, Qt::CaseInsensitive) == 0;
+                QString::compare(row.bank, bankName, Qt::CaseInsensitive) == 0 ||
+                (isFmBank(row.bank) && isFmBank(bankName));
+            const bool active =
+                bankMatch && QString::compare(programName, row.presetId, Qt::CaseInsensitive) == 0;
             p.setBrush(active ? Theme::accentAlt() : Theme::bg3());
             p.setPen(QPen(Theme::stroke(), 1.0));
             p.drawRoundedRect(row.rect, Theme::px(6), Theme::px(6));

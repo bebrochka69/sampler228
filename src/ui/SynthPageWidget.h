@@ -29,8 +29,16 @@ private:
     struct PresetRow {
         QString label;
         QString presetId;
+        QString bank;
         bool header = false;
         QRectF rect;
+    };
+
+    struct PresetEntry {
+        QString preset;
+        QString bank;
+        QString category;
+        QString label;
     };
 
     struct EditParam {
@@ -45,7 +53,7 @@ private:
 
     PadBank *m_pads = nullptr;
     int m_activePad = 0;
-    QStringList m_fluidPresets;
+    QVector<PresetEntry> m_allPresets;
     QVector<PresetRow> m_presetRows;
     QVector<EditParam> m_editParams;
     int m_selectedEditParam = 0;
