@@ -166,6 +166,7 @@ if(UNIX AND EXISTS ${VITAL_ROOT})
             -mfpu=neon-fp-armv8
             -mfloat-abi=hard
         )
+        target_compile_definitions(vital_core PRIVATE NEON_ARM32=1)
     endif()
     target_include_directories(vital_core PRIVATE
         ${VITAL_ROOT}/headless/JuceLibraryCode
