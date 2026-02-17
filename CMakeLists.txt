@@ -153,6 +153,8 @@ if(UNIX AND EXISTS ${VITAL_ROOT})
         -ftree-vectorize
         -ftree-slp-vectorize
         -funroll-loops
+        -Wno-free-nonheap-object
+        -Wno-error=free-nonheap-object
     )
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
         target_compile_options(vital_core PRIVATE
