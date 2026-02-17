@@ -124,6 +124,10 @@ if(UNIX AND EXISTS ${VITAL_ROOT})
         src/vital_core/vital_core.cpp
         src/vital_core/vital_core.h
     )
+    set_target_properties(vital_core PROPERTIES
+        CXX_STANDARD 14
+        CXX_STANDARD_REQUIRED ON
+    )
     target_compile_definitions(vital_core PRIVATE
         GROOVEBOX_WITH_VITAL=1
         HEADLESS=1
@@ -144,6 +148,25 @@ if(UNIX AND EXISTS ${VITAL_ROOT})
         JucePlugin_Build_Standalone=0
         JucePlugin_Build_Unity=0
     )
+    target_compile_options(vital_core PRIVATE
+        -ffast-math
+        -ftree-vectorize
+        -ftree-slp-vectorize
+        -funroll-loops
+    )
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+        target_compile_options(vital_core PRIVATE
+            -march=armv8-a
+            -mtune=cortex-a53
+        )
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|armv6|armv7")
+        target_compile_options(vital_core PRIVATE
+            -march=armv8-a
+            -mtune=cortex-a53
+            -mfpu=neon-fp-armv8
+            -mfloat-abi=hard
+        )
+    endif()
     target_include_directories(vital_core PRIVATE
         ${VITAL_ROOT}/headless/JuceLibraryCode
         ${VITAL_ROOT}/third_party/JUCE/modules
