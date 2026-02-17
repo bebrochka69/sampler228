@@ -6,6 +6,7 @@
 
 #if defined(GROOVEBOX_WITH_VITAL)
 #include "JuceHeader.h"
+#include "sound_engine.h"
 #include "synth_base.h"
 #include "synth_constants.h"
 #include "synth_parameters.h"
