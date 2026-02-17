@@ -54,8 +54,10 @@ void SimpleFmCore::setParams(const Params &params) {
     computeDetuneOffsets(params_.osc1Voices, params_.osc1Detune, detune1_);
     computeDetuneOffsets(params_.osc2Voices, params_.osc2Detune, detune2_);
 
-    computePan(params_.osc1Pan, params_.osc1Gain, osc1GainL_, osc1GainR_);
-    computePan(params_.osc2Pan, params_.osc2Gain, osc2GainL_, osc2GainR_);
+    computeUnisonPan(params_.osc1Voices, params_.osc1Detune, params_.osc1Pan, params_.osc1Gain,
+                     osc1PanL_, osc1PanR_);
+    computeUnisonPan(params_.osc2Voices, params_.osc2Detune, params_.osc2Pan, params_.osc2Gain,
+                     osc2PanL_, osc2PanR_);
 
     for (auto &voice : voices_) {
         if (voice.active) {
@@ -91,15 +93,49 @@ void SimpleFmCore::computeDetuneOffsets(int voices, float detune, float *out) co
     if (!out) {
         return;
     }
+    for (int i = 0; i < 8; ++i) {
+        out[i] = 0.0f;
+    }
     const float detuneSemis = detune * 0.5f;
     if (voices <= 1) {
-        out[0] = 0.0f;
         return;
     }
     const float center = (voices - 1) * 0.5f;
     for (int i = 0; i < voices; ++i) {
         const float spread = (static_cast<float>(i) - center) / center;
         out[i] = spread * detuneSemis;
+    }
+}
+
+void SimpleFmCore::computeUnisonPan(int voices, float detune, float basePan, float baseGain,
+                                    float *outL, float *outR) const {
+    if (!outL || !outR) {
+        return;
+    }
+    for (int i = 0; i < 8; ++i) {
+        outL[i] = 0.0f;
+        outR[i] = 0.0f;
+    }
+    voices = std::max(1, std::min(8, voices));
+    if (voices <= 1) {
+        float l = 0.0f;
+        float r = 0.0f;
+        computePan(basePan, baseGain, l, r);
+        outL[0] = l;
+        outR[0] = r;
+        return;
+    }
+
+    const float width = clamp01(detune);
+    const float center = (voices - 1) * 0.5f;
+    for (int i = 0; i < voices; ++i) {
+        const float spread = (static_cast<float>(i) - center) / center;
+        const float pan = clampPan(basePan + spread * width);
+        float l = 0.0f;
+        float r = 0.0f;
+        computePan(pan, baseGain, l, r);
+        outL[i] = l;
+        outR[i] = r;
     }
 }
 
@@ -182,9 +218,16 @@ void SimpleFmCore::noteOn(int note, int velocity) {
     voice.baseFreq = freq;
     voice.feedbackZ = 0.0f;
     voice.amp = static_cast<float>(velocity) / 127.0f;
+    auto randPhase = [&](uint32_t &state) {
+        state = 1664525u * state + 1013904223u;
+        const float t = static_cast<float>(state & 0x00FFFFFFu) / 16777216.0f;
+        return t * kTwoPi;
+    };
+    const bool rand1 = (params_.osc1Voices > 1) || (params_.osc1Detune > 0.0001f);
+    const bool rand2 = (params_.osc2Voices > 1) || (params_.osc2Detune > 0.0001f);
     for (int i = 0; i < 8; ++i) {
-        voice.phase1[i] = 0.0f;
-        voice.phase2[i] = 0.0f;
+        voice.phase1[i] = (rand1 && i < params_.osc1Voices) ? randPhase(voice.noise) : 0.0f;
+        voice.phase2[i] = (rand2 && i < params_.osc2Voices) ? randPhase(voice.noise) : 0.0f;
     }
     updateVoiceIncrements(voice);
 }
@@ -226,13 +269,17 @@ void SimpleFmCore::render(float *outL, float *outR, int frames) {
             }
 
             float modSum = 0.0f;
-            float osc2Sum = 0.0f;
+            float osc2L = 0.0f;
+            float osc2R = 0.0f;
+            const float osc2Norm = 1.0f / std::max(1, params_.osc2Voices);
             for (int u = 0; u < params_.osc2Voices; ++u) {
                 float wave = oscWave(params_.osc2Wave, voice.phase2[u], voice);
                 const float mod = wave + params_.feedback * voice.feedbackZ;
                 voice.feedbackZ = mod;
-                osc2Sum += wave;
                 modSum += mod;
+                const float sample = wave * osc2Norm;
+                osc2L += sample * osc2PanL_[u];
+                osc2R += sample * osc2PanR_[u];
                 voice.phase2[u] += voice.inc2[u];
                 if (voice.phase2[u] >= kTwoPi) {
                     voice.phase2[u] -= kTwoPi;
@@ -240,24 +287,22 @@ void SimpleFmCore::render(float *outL, float *outR, int frames) {
             }
             const float modSignal = (params_.osc2Voices > 0) ? (modSum / params_.osc2Voices) : 0.0f;
 
-            float osc1Sum = 0.0f;
+            float osc1L = 0.0f;
+            float osc1R = 0.0f;
+            const float osc1Norm = 1.0f / std::max(1, params_.osc1Voices);
             for (int u = 0; u < params_.osc1Voices; ++u) {
                 float wave = oscWave(params_.osc1Wave, voice.phase1[u] + params_.fmAmount * modSignal, voice);
-                osc1Sum += wave;
+                const float sample = wave * osc1Norm;
+                osc1L += sample * osc1PanL_[u];
+                osc1R += sample * osc1PanR_[u];
                 voice.phase1[u] += voice.inc1[u];
                 if (voice.phase1[u] >= kTwoPi) {
                     voice.phase1[u] -= kTwoPi;
                 }
             }
 
-            const float osc1Out = (params_.osc1Voices > 0) ? (osc1Sum / params_.osc1Voices) : 0.0f;
-            const float osc2Out = (params_.osc2Voices > 0) ? (osc2Sum / params_.osc2Voices) : 0.0f;
-
-            const float left = osc1Out * osc1GainL_ + osc2Out * osc2GainL_;
-            const float right = osc1Out * osc1GainR_ + osc2Out * osc2GainR_;
-
-            sumL += left * voice.amp;
-            sumR += right * voice.amp;
+            sumL += (osc1L + osc2L) * voice.amp;
+            sumR += (osc1R + osc2R) * voice.amp;
         }
         outL[i] = sumL;
         outR[i] = sumR;

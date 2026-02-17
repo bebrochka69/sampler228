@@ -51,15 +51,17 @@ private:
     void updateVoiceIncrements(Voice &voice);
     float oscWave(int wave, float phase, Voice &voice) const;
     void computeDetuneOffsets(int voices, float detune, float *out) const;
+    void computeUnisonPan(int voices, float detune, float basePan, float baseGain,
+                          float *outL, float *outR) const;
 
     int sampleRate_ = 48000;
     int voiceCursor_ = 0;
     Params params_;
     float detune1_[8]{};
     float detune2_[8]{};
-    float osc1GainL_ = 0.8f;
-    float osc1GainR_ = 0.8f;
-    float osc2GainL_ = 0.6f;
-    float osc2GainR_ = 0.6f;
+    float osc1PanL_[8]{};
+    float osc1PanR_[8]{};
+    float osc2PanL_[8]{};
+    float osc2PanR_[8]{};
     std::vector<Voice> voices_;
 };
