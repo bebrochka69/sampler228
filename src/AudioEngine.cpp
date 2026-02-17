@@ -1041,6 +1041,14 @@ void AudioEngine::mix(float *out, int frames) {
             } else {
                 synth.core.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
             }
+            // Tiny stereo spread: 1-sample delay on right to avoid mono collapse.
+            float prevR = synth.stereoDelay;
+            for (int i = 0; i < frames; ++i) {
+                const float r = m_synthScratchR[i];
+                m_synthScratchR[i] = r * 0.7f + prevR * 0.3f;
+                prevR = r;
+            }
+            synth.stereoDelay = prevR;
 
             const bool useFilter = (synth.kind == SynthKind::SimpleFm);
             const float baseCutoff = synth.filterCutoff;

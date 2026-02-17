@@ -199,6 +199,7 @@ private:
         float env = 0.0f;
         EnvStage envStage = EnvStage::Attack;
         bool releaseRequested = false;
+        float stereoDelay = 0.0f;
     };
 
     void start();

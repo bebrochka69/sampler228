@@ -165,10 +165,7 @@ void SimpleFmCore::noteOn(int note, int velocity) {
         noteOff(note);
         return;
     }
-    int index = findVoiceForNote(note);
-    if (index < 0) {
-        index = findFreeVoice();
-    }
+    int index = findFreeVoice();
     if (index < 0) {
         index = voiceCursor_++ % static_cast<int>(voices_.size());
     }
@@ -194,8 +191,9 @@ void SimpleFmCore::noteOn(int note, int velocity) {
 
 void SimpleFmCore::noteOff(int note) {
     for (auto &voice : voices_) {
-        if (voice.active && voice.midi == note) {
+        if (voice.active && voice.keydown && voice.midi == note) {
             voice.keydown = false;
+            break;
         }
     }
 }

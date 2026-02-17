@@ -642,10 +642,7 @@ void Dx7Core::noteOn(int note, int velocity) {
         return;
     }
 
-    int index = findVoiceForNote(note);
-    if (index < 0) {
-        index = findFreeVoice();
-    }
+    int index = findFreeVoice();
     if (index < 0 && !impl_->voices.empty()) {
         index = impl_->voiceCursor++ % static_cast<int>(impl_->voices.size());
     }
@@ -680,6 +677,7 @@ void Dx7Core::noteOff(int note) {
             if (voice.note) {
                 voice.note->keyup();
             }
+            break;
         }
     }
 }
