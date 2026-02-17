@@ -53,11 +53,14 @@ QString defaultMiniDexedType();
 
 QString synthTypeFromName(const QString &name) {
     const QString upper = name.trimmed().toUpper();
-    if (upper.startsWith("SERUM")) {
-        return "SERUM";
+    if (upper.startsWith("VITALYA") || upper.startsWith("VITAL")) {
+        return "VITALYA";
     }
     if (upper.startsWith("FM")) {
-        return "SERUM";
+        return "VITALYA";
+    }
+    if (upper.startsWith("SERUM")) {
+        return "VITALYA";
     }
     if (upper.startsWith("DX7")) {
         return "DX7";
@@ -69,7 +72,7 @@ QString synthTypeFromName(const QString &name) {
         const int colon = upper.indexOf(':');
         return upper.left(colon).trimmed();
     }
-    return QStringLiteral("SERUM");
+    return QStringLiteral("VITALYA");
 }
 
 QString synthPresetFromName(const QString &name) {
@@ -93,7 +96,7 @@ bool isMiniDexedType(const QString &type) {
 
 bool isFmType(const QString &type) {
     const QString t = type.trimmed().toUpper();
-    return t == "FM" || t == "SERUM";
+    return t == "FM" || t == "SERUM" || t == "VITALYA" || t == "VITAL";
 }
 
 QString defaultMiniDexedType() {
@@ -899,7 +902,7 @@ void PadBank::setSynth(int index, const QString &name) {
 
     if (isFmType(type)) {
         if (!synthName.contains(":")) {
-            synthName = makeSynthName(QStringLiteral("SERUM"), QStringLiteral("INIT"));
+            synthName = makeSynthName(QStringLiteral("VITALYA"), QStringLiteral("INIT"));
         }
         const QString presetToken = synthPresetFromName(synthName);
         QString presetName = presetToken;
@@ -913,9 +916,9 @@ void PadBank::setSynth(int index, const QString &name) {
         }
 
         m_isSynth[static_cast<size_t>(index)] = true;
-        const QString typeName = type.trimmed().isEmpty() ? QStringLiteral("SERUM") : type;
+        const QString typeName = type.trimmed().isEmpty() ? QStringLiteral("VITALYA") : type;
         m_synthNames[static_cast<size_t>(index)] = makeSynthName(typeName, presetName);
-        m_synthBanks[static_cast<size_t>(index)] = "SERUM";
+        m_synthBanks[static_cast<size_t>(index)] = "VITALYA";
         m_synthPrograms[static_cast<size_t>(index)] = 0;
         m_paths[static_cast<size_t>(index)].clear();
         m_synthBaseMidi[static_cast<size_t>(index)] = 60;
@@ -933,8 +936,8 @@ void PadBank::setSynth(int index, const QString &name) {
         }
         if (m_engineAvailable && m_engine) {
             const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
-            m_engine->setSynthKind(index, AudioEngine::SynthKind::SimpleFm);
-            m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
+            m_engine->setSynthKind(index, AudioEngine::SynthKind::Vital);
+            m_engine->setPadAdsr(index, 0.0f, 0.0f, 1.0f, 0.0f);
             m_engine->setSynthVoices(index, sp.voices);
             m_engine->setFmParams(index, buildFmParams(sp));
             const PadParams &pp = m_params[static_cast<size_t>(index)];
@@ -1200,7 +1203,13 @@ void PadBank::setSynthAdsr(int index, float attack, float decay, float sustain, 
     sp.sustain = clamp01(sustain);
     sp.release = clamp01(release);
     if (m_engineAvailable && m_engine) {
-        m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
+        const QString type = synthTypeFromName(m_synthNames[static_cast<size_t>(index)]);
+        if (isFmType(type)) {
+            m_engine->setPadAdsr(index, 0.0f, 0.0f, 1.0f, 0.0f);
+            m_engine->setFmParams(index, buildFmParams(sp));
+        } else {
+            m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
+        }
     }
     emit padParamsChanged(index);
 }
@@ -1288,6 +1297,10 @@ static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     fm.osc2Gain = sp.osc2Gain;
     fm.osc1Pan = sp.osc1Pan;
     fm.osc2Pan = sp.osc2Pan;
+    fm.attack = sp.attack;
+    fm.decay = sp.decay;
+    fm.sustain = sp.sustain;
+    fm.release = sp.release;
     fm.macros = sp.macros;
     return fm;
 }
@@ -2464,13 +2477,13 @@ QStringList PadBank::synthBanks() {
     if (list.isEmpty()) {
         list << "INTERNAL";
     }
-    list << "SERUM";
+    list << "VITALYA";
     return list;
 }
 
 QStringList PadBank::synthPresetsForBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
-    if (upper == "FM" || upper == "SERUM") {
+    if (upper == "FM" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL") {
         const QStringList presets = fmPresetNames();
         return presets.isEmpty() ? QStringList{"INIT"} : presets;
     }
@@ -2495,7 +2508,7 @@ QStringList PadBank::serumWaves() {
 }
 
 QStringList PadBank::synthTypes() {
-    return {defaultMiniDexedType(), "SERUM"};
+    return {defaultMiniDexedType(), "VITALYA"};
 }
 
 bool PadBank::hasMiniDexed() {

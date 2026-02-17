@@ -367,6 +367,34 @@ void AudioEngine::setBusGain(int bus, float gain) {
 void AudioEngine::setBpm(int bpm) {
     const int next = qBound(30, bpm, 300);
     m_bpm.store(static_cast<float>(next));
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto &state : m_synthStates) {
+        if (!state.enabled || state.kind != SynthKind::Vital) {
+            continue;
+        }
+        VitalCore::Params vitalParams;
+        vitalParams.fmAmount = state.fmParams.fmAmount;
+        vitalParams.ratio = state.fmParams.ratio;
+        vitalParams.feedback = state.fmParams.feedback;
+        vitalParams.osc1Wave = state.fmParams.osc1Wave;
+        vitalParams.osc2Wave = state.fmParams.osc2Wave;
+        vitalParams.osc1Voices = state.fmParams.osc1Voices;
+        vitalParams.osc2Voices = state.fmParams.osc2Voices;
+        vitalParams.osc1Detune = state.fmParams.osc1Detune;
+        vitalParams.osc2Detune = state.fmParams.osc2Detune;
+        vitalParams.osc1Gain = state.fmParams.osc1Gain;
+        vitalParams.osc2Gain = state.fmParams.osc2Gain;
+        vitalParams.osc1Pan = state.fmParams.osc1Pan;
+        vitalParams.osc2Pan = state.fmParams.osc2Pan;
+        vitalParams.cutoff = state.fmParams.cutoff;
+        vitalParams.resonance = state.fmParams.resonance;
+        vitalParams.filterType = state.fmParams.filterType;
+        vitalParams.attack = state.fmParams.attack;
+        vitalParams.decay = state.fmParams.decay;
+        vitalParams.sustain = state.fmParams.sustain;
+        vitalParams.release = state.fmParams.release;
+        state.vital.setParams(vitalParams, static_cast<float>(next));
+    }
 }
 
 static bool writeWavFile(const QString &path, const std::vector<float> &samples,
@@ -475,7 +503,11 @@ void AudioEngine::setSynthEnabled(int padId, bool enabled) {
     if (!enabled) {
         for (size_t n = 0; n < state.activeNotes.size(); ++n) {
             if (state.activeNotes[n]) {
-                state.core.noteOff(static_cast<int>(n));
+                if (state.kind == SynthKind::Vital) {
+                    state.vital.noteOff(static_cast<int>(n));
+                } else {
+                    state.core.noteOff(static_cast<int>(n));
+                }
                 state.activeNotes[n] = false;
             }
         }
@@ -548,21 +580,28 @@ void AudioEngine::setFmParams(int padId, const FmParams &params) {
     const float lfoDepth = macroShift(params.lfoDepth, params.macros[5], 0.7f);
     const float lfoRate = std::max(0.01f, params.lfoRate + (params.macros[6] - 0.5f) * 0.6f);
 
-    SimpleFmCore::Params fmParams;
-    fmParams.fmAmount = fm;
-    fmParams.ratio = ratio;
-    fmParams.feedback = feedback;
-    fmParams.osc1Wave = params.osc1Wave;
-    fmParams.osc2Wave = params.osc2Wave;
-    fmParams.osc1Voices = params.osc1Voices;
-    fmParams.osc2Voices = params.osc2Voices;
-    fmParams.osc1Detune = params.osc1Detune;
-    fmParams.osc2Detune = params.osc2Detune;
-    fmParams.osc1Gain = params.osc1Gain;
-    fmParams.osc2Gain = params.osc2Gain;
-    fmParams.osc1Pan = params.osc1Pan;
-    fmParams.osc2Pan = params.osc2Pan;
-    state.fm.setParams(fmParams);
+    VitalCore::Params vitalParams;
+    vitalParams.fmAmount = fm;
+    vitalParams.ratio = ratio;
+    vitalParams.feedback = feedback;
+    vitalParams.osc1Wave = params.osc1Wave;
+    vitalParams.osc2Wave = params.osc2Wave;
+    vitalParams.osc1Voices = params.osc1Voices;
+    vitalParams.osc2Voices = params.osc2Voices;
+    vitalParams.osc1Detune = params.osc1Detune;
+    vitalParams.osc2Detune = params.osc2Detune;
+    vitalParams.osc1Gain = params.osc1Gain;
+    vitalParams.osc2Gain = params.osc2Gain;
+    vitalParams.osc1Pan = params.osc1Pan;
+    vitalParams.osc2Pan = params.osc2Pan;
+    vitalParams.cutoff = cutoff;
+    vitalParams.resonance = resonance;
+    vitalParams.filterType = params.filterType;
+    vitalParams.attack = params.attack;
+    vitalParams.decay = params.decay;
+    vitalParams.sustain = params.sustain;
+    vitalParams.release = params.release;
+    state.vital.setParams(vitalParams, m_bpm.load());
     state.filterCutoff = cutoff;
     state.filterResonance = resonance;
     state.filterType = params.filterType;
@@ -607,8 +646,8 @@ void AudioEngine::synthNoteOn(int padId, int midiNote, int velocity) {
     const bool hadActive =
         std::any_of(state.activeNotes.begin(), state.activeNotes.end(), [](bool v) { return v; });
     ensureSynthInit(state);
-    if (state.kind == SynthKind::SimpleFm) {
-        state.fm.noteOn(midiNote, velocity);
+    if (state.kind == SynthKind::Vital) {
+        state.vital.noteOn(midiNote, velocity);
     } else {
         state.core.noteOn(midiNote, velocity);
     }
@@ -635,8 +674,8 @@ void AudioEngine::synthNoteOff(int padId, int midiNote) {
         return;
     }
     ensureSynthInit(state);
-    if (state.kind == SynthKind::SimpleFm) {
-        state.fm.noteOff(midiNote);
+    if (state.kind == SynthKind::Vital) {
+        state.vital.noteOff(midiNote);
     } else {
         state.core.noteOff(midiNote);
     }
@@ -663,8 +702,8 @@ void AudioEngine::synthAllNotesOff(int padId) {
     ensureSynthInit(state);
     for (size_t n = 0; n < state.activeNotes.size(); ++n) {
         if (state.activeNotes[n]) {
-            if (state.kind == SynthKind::SimpleFm) {
-                state.fm.noteOff(static_cast<int>(n));
+            if (state.kind == SynthKind::Vital) {
+                state.vital.noteOff(static_cast<int>(n));
             } else {
                 state.core.noteOff(static_cast<int>(n));
             }
@@ -815,23 +854,30 @@ void AudioEngine::ensureSynthInit(SynthState &state) {
     if (state.initialized) {
         return;
     }
-    if (state.kind == SynthKind::SimpleFm) {
-        state.fm.init(m_sampleRate, state.voices);
-        SimpleFmCore::Params fmParams;
-        fmParams.fmAmount = state.fmParams.fmAmount;
-        fmParams.ratio = state.fmParams.ratio;
-        fmParams.feedback = state.fmParams.feedback;
-        fmParams.osc1Wave = state.fmParams.osc1Wave;
-        fmParams.osc2Wave = state.fmParams.osc2Wave;
-        fmParams.osc1Voices = state.fmParams.osc1Voices;
-        fmParams.osc2Voices = state.fmParams.osc2Voices;
-        fmParams.osc1Detune = state.fmParams.osc1Detune;
-        fmParams.osc2Detune = state.fmParams.osc2Detune;
-        fmParams.osc1Gain = state.fmParams.osc1Gain;
-        fmParams.osc2Gain = state.fmParams.osc2Gain;
-        fmParams.osc1Pan = state.fmParams.osc1Pan;
-        fmParams.osc2Pan = state.fmParams.osc2Pan;
-        state.fm.setParams(fmParams);
+    if (state.kind == SynthKind::Vital) {
+        state.vital.init(m_sampleRate, state.voices);
+        VitalCore::Params vitalParams;
+        vitalParams.fmAmount = state.fmParams.fmAmount;
+        vitalParams.ratio = state.fmParams.ratio;
+        vitalParams.feedback = state.fmParams.feedback;
+        vitalParams.osc1Wave = state.fmParams.osc1Wave;
+        vitalParams.osc2Wave = state.fmParams.osc2Wave;
+        vitalParams.osc1Voices = state.fmParams.osc1Voices;
+        vitalParams.osc2Voices = state.fmParams.osc2Voices;
+        vitalParams.osc1Detune = state.fmParams.osc1Detune;
+        vitalParams.osc2Detune = state.fmParams.osc2Detune;
+        vitalParams.osc1Gain = state.fmParams.osc1Gain;
+        vitalParams.osc2Gain = state.fmParams.osc2Gain;
+        vitalParams.osc1Pan = state.fmParams.osc1Pan;
+        vitalParams.osc2Pan = state.fmParams.osc2Pan;
+        vitalParams.cutoff = state.fmParams.cutoff;
+        vitalParams.resonance = state.fmParams.resonance;
+        vitalParams.filterType = state.fmParams.filterType;
+        vitalParams.attack = state.fmParams.attack;
+        vitalParams.decay = state.fmParams.decay;
+        vitalParams.sustain = state.fmParams.sustain;
+        vitalParams.release = state.fmParams.release;
+        state.vital.setParams(vitalParams, m_bpm.load());
         state.initialized = true;
         return;
     }
@@ -1024,9 +1070,10 @@ void AudioEngine::mix(float *out, int frames) {
                 releaseSec > 0.0f ? 1.0f / (releaseSec * m_sampleRate) : 1.0f;
 
             const bool isDx7 = (synth.kind == SynthKind::Dx7);
+            const bool isVital = (synth.kind == SynthKind::Vital);
             const bool neutralEnv =
                 (attack <= 0.001f && decay <= 0.001f && release <= 0.001f && sustain >= 0.999f);
-            const bool useExternalEnv = !(isDx7 && neutralEnv);
+            const bool useExternalEnv = !isVital && !(isDx7 && neutralEnv);
 
             const bool hasNotes = std::any_of(synth.activeNotes.begin(),
                                              synth.activeNotes.end(),
@@ -1036,13 +1083,13 @@ void AudioEngine::mix(float *out, int frames) {
                 synth.envStage = EnvStage::Attack;
                 continue;
             }
-            if (synth.kind == SynthKind::SimpleFm) {
-                synth.fm.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
+            if (synth.kind == SynthKind::Vital) {
+                synth.vital.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
             } else {
                 synth.core.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
             }
 
-            const bool useFilter = (synth.kind == SynthKind::SimpleFm);
+            const bool useFilter = false;
             const float baseCutoff = synth.filterCutoff;
             const float baseRes = synth.filterResonance;
             const float lfoDepth = synth.lfoDepth;
@@ -1059,7 +1106,7 @@ void AudioEngine::mix(float *out, int frames) {
                 staticR = 1.0f / (2.0f * q);
             }
 
-            float dx7Peak = 0.0f;
+            float tailPeak = 0.0f;
             for (int i = 0; i < frames; ++i) {
                 float env = 1.0f;
                 if (useExternalEnv) {
@@ -1173,14 +1220,14 @@ void AudioEngine::mix(float *out, int frames) {
                 if (m_channels > 1) {
                     busOut[idx + 1] += right * synth.gainR * env;
                 }
-                if (isDx7 && !useExternalEnv && !hasNotes) {
+                if ((isDx7 || isVital) && !useExternalEnv && !hasNotes) {
                     const float peakL = std::fabs(left * synth.gainL);
                     const float peakR = std::fabs(right * synth.gainR);
-                    dx7Peak = std::max(dx7Peak, std::max(peakL, peakR));
+                    tailPeak = std::max(tailPeak, std::max(peakL, peakR));
                 }
             }
-            if (isDx7 && !useExternalEnv && !hasNotes) {
-                if (dx7Peak < 0.00008f) {
+            if ((isDx7 || isVital) && !useExternalEnv && !hasNotes) {
+                if (tailPeak < 0.00008f) {
                     synth.releaseRequested = false;
                     synth.env = 0.0f;
                 }

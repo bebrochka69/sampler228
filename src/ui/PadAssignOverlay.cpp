@@ -74,8 +74,8 @@ protected:
                 const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("DX7");
                 QString preset;
                 const QString upper = type.trimmed().toUpper();
-                if (upper == "FM" || upper == "SERUM") {
-                    const QStringList presets = PadBank::synthPresetsForBank("SERUM");
+                if (upper == "FM" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL") {
+                    const QStringList presets = PadBank::synthPresetsForBank("VITALYA");
                     preset = presets.isEmpty() ? QString("INIT") : presets.first();
                 } else {
                     const QStringList presets = PadBank::synthPresets();

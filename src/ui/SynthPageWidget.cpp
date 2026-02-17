@@ -72,11 +72,12 @@ QString defaultSynthBank() {
         return QStringLiteral("INTERNAL");
     }
     const QString type = defaultSynthType().trimmed().toUpper();
-    if (type == "SERUM" || type == "FM") {
-        return QStringLiteral("SERUM");
+    if (type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM") {
+        return QStringLiteral("VITALYA");
     }
     for (const QString &bank : banks) {
-        if (bank.trimmed().toUpper() != "SERUM" && bank.trimmed().toUpper() != "FM") {
+        const QString upper = bank.trimmed().toUpper();
+        if (upper != "SERUM" && upper != "FM" && upper != "VITALYA" && upper != "VITAL") {
             return bank;
         }
     }
@@ -114,8 +115,8 @@ QString synthTypeFromId(const QString &id);
 
 QString synthBank(const QString &id) {
     const QString type = synthTypeFromId(id).trimmed().toUpper();
-    if (type == "SERUM" || type == "FM") {
-        return QStringLiteral("SERUM");
+    if (type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM") {
+        return QStringLiteral("VITALYA");
     }
     const QString preset = synthPreset(id);
     const int slash = preset.indexOf('/');
@@ -125,7 +126,7 @@ QString synthBank(const QString &id) {
     const QStringList banks = PadBank::synthBanks();
     for (const QString &bank : banks) {
         const QString upper = bank.trimmed().toUpper();
-        if (upper != "SERUM" && upper != "FM") {
+        if (upper != "SERUM" && upper != "FM" && upper != "VITALYA" && upper != "VITAL") {
             return bank;
         }
     }
@@ -154,7 +155,8 @@ QString synthTypeFromId(const QString &id) {
 
 bool isFmBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
-    return upper == QStringLiteral("FM") || upper == QStringLiteral("SERUM");
+    return upper == QStringLiteral("FM") || upper == QStringLiteral("SERUM") ||
+           upper == QStringLiteral("VITALYA") || upper == QStringLiteral("VITAL");
 }
 
 QString classifyPresetType(const QString &name) {
@@ -274,13 +276,13 @@ void SynthPageWidget::reloadBanks(bool syncSelection) {
     if (m_pads) {
         banks = PadBank::synthBanks();
     }
-    if (type == "SERUM" || type == "FM") {
-        banks = {QStringLiteral("SERUM")};
+    if (type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM") {
+        banks = {QStringLiteral("VITALYA")};
     } else {
         QStringList filtered;
         for (const QString &bank : banks) {
             const QString upper = bank.trimmed().toUpper();
-            if (upper != "SERUM" && upper != "FM") {
+            if (upper != "SERUM" && upper != "FM" && upper != "VITALYA" && upper != "VITAL") {
                 filtered << bank;
             }
         }
@@ -289,7 +291,9 @@ void SynthPageWidget::reloadBanks(bool syncSelection) {
         }
     }
     if (banks.isEmpty()) {
-        banks << (type == "SERUM" || type == "FM" ? "SERUM" : "INTERNAL");
+        banks << ((type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM")
+                      ? "VITALYA"
+                      : "INTERNAL");
     }
 
     for (const QString &bank : banks) {
@@ -305,7 +309,9 @@ void SynthPageWidget::reloadBanks(bool syncSelection) {
     if (m_allPresets.isEmpty()) {
         PresetEntry entry;
         entry.preset = "INIT";
-        entry.bank = (type == "SERUM" || type == "FM") ? "SERUM" : "INTERNAL";
+        entry.bank = (type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM")
+                         ? "VITALYA"
+                         : "INTERNAL";
         entry.category = "OTHER";
         m_allPresets.push_back(entry);
     }
@@ -473,10 +479,10 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
         for (const PresetRow &row : m_presetRows) {
             if (!row.header && row.rect.contains(pos) && m_pads) {
                 const QString bank = row.bank;
-                const QString type = isFmBank(bank) ? QStringLiteral("SERUM") : QStringLiteral("DX7");
+                const QString type = isFmBank(bank) ? QStringLiteral("VITALYA") : QStringLiteral("DX7");
                 const QString presetId = row.presetId;
                 const QString payload =
-                    (type == "SERUM" || bank.isEmpty()) ? presetId
+                    (type == "VITALYA" || bank.isEmpty()) ? presetId
                                                         : QString("%1/%2").arg(bank, presetId);
                 m_pads->setSynth(m_activePad, QString("%1:%2").arg(type, payload));
                 m_showPresetMenu = false;

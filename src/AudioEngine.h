@@ -11,14 +11,14 @@
 #include <vector>
 
 #include "dx7_core.h"
-#include "simple_fm.h"
+#include "vital_core/vital_core.h"
 
 class AudioEngine : public QObject {
     Q_OBJECT
 public:
     enum class SynthKind {
         Dx7,
-        SimpleFm
+        Vital
     };
 
     struct FmParams {
@@ -40,6 +40,10 @@ public:
         float osc2Gain = 0.6f;
         float osc1Pan = -0.1f;
         float osc2Pan = 0.1f;
+        float attack = 0.15f;
+        float decay = 0.25f;
+        float sustain = 0.7f;
+        float release = 0.25f;
         std::array<float, 8> macros{};
     };
     struct EffectSettings {
@@ -173,7 +177,7 @@ private:
 
     struct SynthState {
         Dx7Core core;
-        SimpleFmCore fm;
+        VitalCore vital;
         SynthKind kind = SynthKind::Dx7;
         bool enabled = false;
         bool initialized = false;

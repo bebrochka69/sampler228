@@ -106,9 +106,78 @@ set(DX7_CORE_HEADERS
 add_library(dx7_core STATIC ${DX7_CORE_SOURCES} ${DX7_CORE_HEADERS})
 target_include_directories(dx7_core PUBLIC src/dx7_core)
 
+set(VITAL_ROOT ${CMAKE_SOURCE_DIR}/vital-main)
+if(UNIX AND EXISTS ${VITAL_ROOT})
+    set(VITAL_SOURCES
+        ${VITAL_ROOT}/src/unity_build/common.cpp
+        ${VITAL_ROOT}/src/unity_build/synthesis.cpp
+        ${VITAL_ROOT}/headless/JuceLibraryCode/include_juce_audio_basics.cpp
+        ${VITAL_ROOT}/headless/JuceLibraryCode/include_juce_audio_formats.cpp
+        ${VITAL_ROOT}/headless/JuceLibraryCode/include_juce_core.cpp
+        ${VITAL_ROOT}/headless/JuceLibraryCode/include_juce_data_structures.cpp
+        ${VITAL_ROOT}/headless/JuceLibraryCode/include_juce_dsp.cpp
+        ${VITAL_ROOT}/headless/JuceLibraryCode/include_juce_events.cpp
+    )
+
+    add_library(vital_core STATIC
+        ${VITAL_SOURCES}
+        src/vital_core/vital_core.cpp
+        src/vital_core/vital_core.h
+    )
+    target_compile_definitions(vital_core PRIVATE
+        GROOVEBOX_WITH_VITAL=1
+        HEADLESS=1
+        NO_AUTH=1
+        JUCE_USE_XRANDR=0
+        JUCE_USE_CURL=0
+        JUCE_DSP_USE_SHARED_FFTW=0
+        JUCE_DSP_USE_STATIC_FFTW=0
+        JUCE_APP_VERSION="99999.9.9"
+        JUCE_APP_VERSION_HEX=0x869f0909
+        JUCE_STANDALONE_APPLICATION=0
+        JucePlugin_Build_VST=0
+        JucePlugin_Build_VST3=0
+        JucePlugin_Build_AU=0
+        JucePlugin_Build_AUv3=0
+        JucePlugin_Build_RTAS=0
+        JucePlugin_Build_AAX=0
+        JucePlugin_Build_Standalone=0
+        JucePlugin_Build_Unity=0
+    )
+    target_include_directories(vital_core PRIVATE
+        ${VITAL_ROOT}/headless/JuceLibraryCode
+        ${VITAL_ROOT}/third_party/JUCE/modules
+        ${VITAL_ROOT}/src/common
+        ${VITAL_ROOT}/src/common/wavetable
+        ${VITAL_ROOT}/src/interface/editor_components
+        ${VITAL_ROOT}/src/interface/editor_sections
+        ${VITAL_ROOT}/src/interface/look_and_feel
+        ${VITAL_ROOT}/src/interface/wavetable
+        ${VITAL_ROOT}/src/interface/wavetable/editors
+        ${VITAL_ROOT}/src/interface/wavetable/overlays
+        ${VITAL_ROOT}/src/standalone
+        ${VITAL_ROOT}/src/synthesis/synth_engine
+        ${VITAL_ROOT}/src/synthesis/effects
+        ${VITAL_ROOT}/src/synthesis/filters
+        ${VITAL_ROOT}/src/synthesis/framework
+        ${VITAL_ROOT}/src/synthesis/lookups
+        ${VITAL_ROOT}/src/synthesis/modulators
+        ${VITAL_ROOT}/src/synthesis/modules
+        ${VITAL_ROOT}/src/synthesis/producers
+        ${VITAL_ROOT}/src/synthesis/utilities
+        ${VITAL_ROOT}/third_party
+    )
+    target_link_libraries(vital_core PRIVATE pthread dl rt)
+else()
+    add_library(vital_core STATIC
+        src/vital_core/vital_core.cpp
+        src/vital_core/vital_core.h
+    )
+endif()
+
 add_executable(GrooveBoxUI ${SOURCES} ${HEADERS})
 
-target_link_libraries(GrooveBoxUI PRIVATE Qt6::Widgets Qt6::Multimedia dx7_core)
+target_link_libraries(GrooveBoxUI PRIVATE Qt6::Widgets Qt6::Multimedia dx7_core vital_core)
 
 if(UNIX AND NOT APPLE)
     # Force ALSA usage on Linux; GrooveBox relies on ALSA for realtime audio + MIDI.
