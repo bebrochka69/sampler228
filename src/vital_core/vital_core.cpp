@@ -202,12 +202,22 @@ void VitalCore::render(float *outL, float *outR, int frames) {
         return;
     }
     impl_->ensureInit();
-    impl_->buffer.setSize(2, frames, false, false, true);
-    impl_->synth.renderToBuffer(impl_->buffer, frames);
-    const float *left = impl_->buffer.getReadPointer(0);
-    const float *right = impl_->buffer.getReadPointer(1);
-    std::copy(left, left + frames, outL);
-    std::copy(right, right + frames, outR);
+    const int maxBlock = vital::kMaxBufferSize;
+    if (impl_->buffer.getNumSamples() < maxBlock || impl_->buffer.getNumChannels() < 2) {
+        impl_->buffer.setSize(2, maxBlock, false, false, true);
+    }
+    int remaining = frames;
+    int offset = 0;
+    while (remaining > 0) {
+        const int chunk = std::min(remaining, maxBlock);
+        impl_->synth.renderToBuffer(impl_->buffer, chunk);
+        const float *left = impl_->buffer.getReadPointer(0);
+        const float *right = impl_->buffer.getReadPointer(1);
+        std::copy(left, left + chunk, outL + offset);
+        std::copy(right, right + chunk, outR + offset);
+        offset += chunk;
+        remaining -= chunk;
+    }
 #else
     if (!outL || !outR || frames <= 0) {
         return;
