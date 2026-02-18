@@ -32,7 +32,7 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
 
     p.save();
     p.setClipRect(rect);
-    p.setPen(QPen(QColor(25, 220, 255), 1.2));
+    p.setPen(QPen(Theme::accent(), 1.2));
     for (int x = 0; x < steps; ++x) {
         const int i0 = (x * count) / steps;
         const int i1 = qMin(count - 1, ((x + 1) * count) / steps);
@@ -45,7 +45,7 @@ void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &s
         const float yTop = bottom - maxV * amp;
         p.drawLine(QPointF(px, bottom), QPointF(px, yTop));
     }
-    p.setPen(QPen(QColor(180, 200, 220, 120), 1.0));
+    p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 120), 1.0));
     p.drawLine(QPointF(rect.left(), bottom), QPointF(rect.right(), bottom));
     p.restore();
 }

@@ -76,9 +76,13 @@ struct VitalCore::Impl {
         if (auto *creator = synth.getWavetableCreator(1)) {
             creator->initPredefinedWaves();
         }
+        setControl("osc_2_on", 0.0f);
         setControl("osc_3_on", 0.0f);
         setControl("sample_on", 0.0f);
+        setControl("filter_1_on", 0.0f);
         setControl("filter_2_on", 0.0f);
+        setControl("osc_1_destination", static_cast<float>(vital::constants::kDirectOut));
+        setControl("osc_2_destination", static_cast<float>(vital::constants::kDirectOut));
 
         // Disable built-in FX by default.
         const char *fxOff[] = {"chorus_on", "delay_on", "reverb_on", "distortion_on",
@@ -113,35 +117,18 @@ struct VitalCore::Impl {
         setControl("polyphony", static_cast<float>(voices));
 
         setControl("osc_1_on", 1.0f);
-        setControl("osc_2_on", 1.0f);
-        setControl("osc_1_unison_voices",
-                   static_cast<float>(std::max(1, std::min(16, params.osc1Voices))));
-        setControl("osc_2_unison_voices",
-                   static_cast<float>(std::max(1, std::min(16, params.osc2Voices))));
-        setControl("osc_1_unison_detune", clamp01(params.osc1Detune) * 10.0f);
-        setControl("osc_2_unison_detune", clamp01(params.osc2Detune) * 10.0f);
-        setControl("osc_1_stereo_spread", clamp01(params.osc1Detune));
-        setControl("osc_2_stereo_spread", clamp01(params.osc2Detune));
+        setControl("osc_2_on", 0.0f);
+        setControl("osc_1_unison_voices", 1.0f);
+        setControl("osc_1_unison_detune", 0.0f);
+        setControl("osc_1_stereo_spread", 0.0f);
         setControl("osc_1_level", clamp01(params.osc1Gain));
-        setControl("osc_2_level", clamp01(params.osc2Gain));
         setControl("osc_1_pan", std::max(-1.0f, std::min(1.0f, params.osc1Pan)));
-        setControl("osc_2_pan", std::max(-1.0f, std::min(1.0f, params.osc2Pan)));
 
         if (osc1Wave != params.osc1Wave) {
             osc1Wave = params.osc1Wave;
             applyWave(1, osc1Wave);
         }
-        if (osc2Wave != params.osc2Wave) {
-            osc2Wave = params.osc2Wave;
-            applyWave(2, osc2Wave);
-        }
-
-        setControl("filter_1_on", 1.0f);
-        const float cutoff = 8.0f + clamp01(params.cutoff) * 128.0f;
-        setControl("filter_1_cutoff", cutoff);
-        setControl("filter_1_resonance", clamp01(params.resonance));
-        setControl("filter_1_model", static_cast<float>(filterModelForType(params.filterType)));
-        setControl("filter_1_style", 0.0f);
+        setControl("filter_1_on", 0.0f);
 
         setControl("env_1_delay", 0.0f);
         setControl("env_1_hold", 0.0f);

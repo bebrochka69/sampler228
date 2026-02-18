@@ -2484,8 +2484,7 @@ QStringList PadBank::synthBanks() {
 QStringList PadBank::synthPresetsForBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
     if (upper == "FM" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL") {
-        const QStringList presets = fmPresetNames();
-        return presets.isEmpty() ? QStringList{"INIT"} : presets;
+        return {"INIT"};
     }
     scanDx7Banks();
     if (g_dx7Banks.isEmpty()) {

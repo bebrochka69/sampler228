@@ -13,8 +13,8 @@ SeqPageWidget::SeqPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), 
     setFocusPolicy(Qt::StrongFocus);
 
 
-    m_padColors = {Theme::accent(), Theme::accentAlt(), QColor(110, 170, 255), QColor(255, 188, 64),
-                   QColor(210, 120, 255), QColor(90, 220, 120), QColor(255, 90, 110), QColor(120, 200, 210)};
+    m_padColors = {Theme::accent(), Theme::accentAlt(), QColor(80, 200, 140), QColor(255, 150, 80),
+                   QColor(120, 220, 160), QColor(70, 180, 120), QColor(200, 255, 150), QColor(60, 140, 110)};
 
     for (int pad = 0; pad < 8; ++pad) {
         for (int step = 0; step < 64; ++step) {
@@ -451,8 +451,8 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     Theme::applyRenderHints(p);
 
     const QRectF grid = gridRect();
-    p.setBrush(QColor(28, 28, 32));
-    p.setPen(QPen(QColor(70, 70, 80), 1.0));
+    p.setBrush(Theme::bg2());
+    p.setPen(QPen(Theme::stroke(), 1.0));
     p.drawRoundedRect(grid, Theme::px(6), Theme::px(6));
 
     const int cols = 64;
@@ -487,13 +487,13 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
     for (int col = 0; col <= cols; ++col) {
         const float x = gridArea.left() + col * cellW;
         const bool major = (col % 4 == 0);
-        p.setPen(QPen(major ? QColor(80, 80, 90) : QColor(50, 50, 70),
-                      major ? 1.4 : 1.0));
+        p.setPen(QPen(Theme::withAlpha(Theme::stroke(), major ? 200 : 120),
+                      major ? 1.2 : 1.0));
         p.drawLine(QPointF(x, gridArea.top()), QPointF(x, gridArea.bottom()));
     }
     for (int row = 0; row <= rows; ++row) {
         const float y = gridArea.top() + row * cellH;
-        p.setPen(QPen(QColor(55, 55, 70), 1.0));
+        p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 120), 1.0));
         p.drawLine(QPointF(gridArea.left(), y), QPointF(gridArea.right(), y));
     }
 
@@ -533,7 +533,7 @@ void SeqPageWidget::paintEvent(QPaintEvent *event) {
             }
             const QRectF cell(gridArea.left() + col * cellW, gridArea.top() + row * cellH,
                               cellW, cellH);
-            p.setBrush(QColor(180, 70, 100));
+            p.setBrush(Theme::withAlpha(Theme::accent(), 200));
             p.setPen(Qt::NoPen);
             p.drawRect(cell.adjusted(Theme::px(2), Theme::px(4),
                                      -Theme::px(2), -Theme::px(4)));

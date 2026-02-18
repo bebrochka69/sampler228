@@ -234,11 +234,11 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
 
     const QRectF keys = keyboardRect();
     const QRectF grid = timelineRect();
-    p.setBrush(QColor(24, 24, 28));
-    p.setPen(QPen(QColor(60, 60, 70), 1.0));
+    p.setBrush(Theme::bg2());
+    p.setPen(QPen(Theme::stroke(), 1.0));
     p.drawRoundedRect(keys.adjusted(0, 0, 0, 0), Theme::px(6), Theme::px(6));
-    p.setBrush(QColor(28, 28, 32));
-    p.setPen(QPen(QColor(70, 70, 80), 1.0));
+    p.setBrush(Theme::bg2());
+    p.setPen(QPen(Theme::stroke(), 1.0));
     p.drawRoundedRect(grid, Theme::px(8), Theme::px(8));
 
     const float cellW = cellWidth();
@@ -274,8 +274,8 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
         const int note = midi % 12;
         const bool black = (note == 1 || note == 3 || note == 6 || note == 8 || note == 10);
         const QRectF keyRect(keys.left(), y, keys.width(), rH);
-        p.setBrush(black ? QColor(40, 40, 48) : QColor(70, 70, 78));
-        p.setPen(QPen(QColor(50, 50, 58), 1.0));
+        p.setBrush(black ? Theme::bg3() : Theme::bg2());
+        p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 140), 1.0));
         p.drawRect(keyRect);
         if (note == 0) {
             p.setPen(Theme::text());
@@ -283,7 +283,7 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
             p.drawText(keyRect.adjusted(Theme::px(6), 0, -Theme::px(4), 0),
                        Qt::AlignVCenter | Qt::AlignLeft, noteLabel(row));
         }
-        p.setPen(QPen(QColor(55, 55, 70), 1.0));
+        p.setPen(QPen(Theme::withAlpha(Theme::stroke(), 120), 1.0));
         p.drawLine(QPointF(grid.left(), y), QPointF(grid.right(), y));
     }
 
@@ -291,8 +291,8 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
     for (int step = startStep; step <= endStep; ++step) {
         const float x = xFromStep(step);
         const bool major = (step % 4 == 0);
-        p.setPen(QPen(major ? QColor(80, 80, 90) : QColor(50, 50, 70),
-                      major ? 1.4 : 1.0));
+        p.setPen(QPen(Theme::withAlpha(Theme::stroke(), major ? 200 : 120),
+                      major ? 1.2 : 1.0));
         p.drawLine(QPointF(x, grid.top()), QPointF(x, grid.bottom()));
     }
 
@@ -307,10 +307,10 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
         if (r.right() < grid.left() || r.left() > grid.right()) {
             continue;
         }
-        p.setBrush(QColor(140, 220, 160));
+        p.setBrush(Theme::accent());
         p.setPen(Qt::NoPen);
         p.drawRoundedRect(r, Theme::px(6), Theme::px(6));
-        p.setPen(QColor(24, 30, 26));
+        p.setPen(Theme::bg0());
         p.setFont(Theme::baseFont(8, QFont::DemiBold));
         p.drawText(r.adjusted(Theme::px(4), 0, -Theme::px(4), 0),
                    Qt::AlignVCenter | Qt::AlignLeft, noteLabel(note.row));
@@ -319,7 +319,7 @@ void PianoRollOverlay::paintEvent(QPaintEvent *) {
     // Playhead line (moves to last edited note).
     const float playX = xFromStep(m_playheadStep);
     if (playX >= grid.left() && playX <= grid.right()) {
-        p.setPen(QPen(QColor(250, 210, 80), 2.0));
+        p.setPen(QPen(Theme::accentAlt(), 2.0));
         p.drawLine(QPointF(playX, grid.top()), QPointF(playX, grid.bottom()));
     }
 }
