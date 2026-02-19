@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(GrooveBoxUI LANGUAGES CXX)
+project(GrooveBoxUI LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -125,5 +125,12 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 target_include_directories(GrooveBoxUI PRIVATE src src/third_party/kissfft)
+
+# Ensure kissfft C sources are compiled as C (avoid C++ name mangling).
+set_source_files_properties(
+    src/third_party/kissfft/kiss_fft.c
+    src/third_party/kissfft/kiss_fftr.c
+    PROPERTIES LANGUAGE C
+)
 
 # ALSA handled above for Linux
