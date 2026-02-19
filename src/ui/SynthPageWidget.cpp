@@ -33,15 +33,17 @@ enum EditParamType {
     EditSustain = 15,
     EditRelease = 16,
     EditLfoRate = 17,
-    EditLfoDepth = 18
+    EditLfoDepth = 18,
+    EditOctave = 19
 };
 
 constexpr float kTwoPi = 6.28318530717958647692f;
 constexpr float kAdsrMaxSeconds = 2.37842f;
 
-bool isVitalType(const QString &type) {
+bool isSimpleType(const QString &type) {
     const QString upper = type.trimmed().toUpper();
-    return upper == "VITALYA" || upper == "VITAL" || upper == "SERUM" || upper == "FM";
+    return upper == "SIMPLE" || upper == "VITALYA" || upper == "VITAL" || upper == "SERUM" ||
+           upper == "FM";
 }
 
 QVector<int> visibleParamIndicesForType(const QString &type) {
@@ -51,9 +53,8 @@ QVector<int> visibleParamIndicesForType(const QString &type) {
         indices << EditAttack << EditDecay << EditSustain << EditRelease;
         return indices;
     }
-    if (isVitalType(upper)) {
-        indices << EditOsc1Wave << EditOsc1Gain;
-        indices << EditAttack << EditDecay << EditSustain << EditRelease;
+    if (isSimpleType(upper)) {
+        indices << EditOctave << EditOsc1Voices << EditOsc1Detune << EditOsc1Gain;
         return indices;
     }
     indices << EditOsc1Wave << EditOsc1Voices << EditOsc1Detune << EditOsc1Gain << EditOsc1Pan;
@@ -83,12 +84,12 @@ QString defaultSynthBank() {
         return QStringLiteral("INTERNAL");
     }
     const QString type = defaultSynthType().trimmed().toUpper();
-    if (type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM") {
-        return QStringLiteral("VITALYA");
+    if (isSimpleType(type)) {
+        return QStringLiteral("SIMPLE");
     }
     for (const QString &bank : banks) {
         const QString upper = bank.trimmed().toUpper();
-        if (upper != "SERUM" && upper != "FM" && upper != "VITALYA" && upper != "VITAL") {
+        if (!isSimpleType(upper)) {
             return bank;
         }
     }
@@ -126,8 +127,8 @@ QString synthTypeFromId(const QString &id);
 
 QString synthBank(const QString &id) {
     const QString type = synthTypeFromId(id).trimmed().toUpper();
-    if (type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM") {
-        return QStringLiteral("VITALYA");
+    if (isSimpleType(type)) {
+        return QStringLiteral("SIMPLE");
     }
     const QString preset = synthPreset(id);
     const int slash = preset.indexOf('/');
@@ -137,7 +138,7 @@ QString synthBank(const QString &id) {
     const QStringList banks = PadBank::synthBanks();
     for (const QString &bank : banks) {
         const QString upper = bank.trimmed().toUpper();
-        if (upper != "SERUM" && upper != "FM" && upper != "VITALYA" && upper != "VITAL") {
+        if (!isSimpleType(upper)) {
             return bank;
         }
     }
@@ -159,15 +160,15 @@ QString synthTypeFromId(const QString &id) {
     }
     const int colon = id.indexOf(':');
     if (colon >= 0) {
-        return id.left(colon).trimmed().toUpper();
+        const QString type = id.left(colon).trimmed().toUpper();
+        return isSimpleType(type) ? QStringLiteral("SIMPLE") : type;
     }
     return defaultSynthType();
 }
 
 bool isFmBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
-    return upper == QStringLiteral("FM") || upper == QStringLiteral("SERUM") ||
-           upper == QStringLiteral("VITALYA") || upper == QStringLiteral("VITAL");
+    return isSimpleType(upper);
 }
 
 QString classifyPresetType(const QString &name) {
@@ -257,6 +258,7 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
         {"RELEASE", EditRelease},
         {"LFO RATE", EditLfoRate},
         {"LFO DEPTH", EditLfoDepth},
+        {"OCT", EditOctave},
     };
 
     if (m_pads) {
@@ -287,13 +289,13 @@ void SynthPageWidget::reloadBanks(bool syncSelection) {
     if (m_pads) {
         banks = PadBank::synthBanks();
     }
-    if (type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM") {
-        banks = {QStringLiteral("VITALYA")};
+    if (isSimpleType(type)) {
+        banks = {QStringLiteral("SIMPLE")};
     } else {
         QStringList filtered;
         for (const QString &bank : banks) {
             const QString upper = bank.trimmed().toUpper();
-            if (upper != "SERUM" && upper != "FM" && upper != "VITALYA" && upper != "VITAL") {
+            if (!isSimpleType(upper)) {
                 filtered << bank;
             }
         }
@@ -302,8 +304,8 @@ void SynthPageWidget::reloadBanks(bool syncSelection) {
         }
     }
     if (banks.isEmpty()) {
-        banks << ((type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM")
-                      ? "VITALYA"
+        banks << (isSimpleType(type)
+                      ? "SIMPLE"
                       : "INTERNAL");
     }
 
@@ -320,8 +322,8 @@ void SynthPageWidget::reloadBanks(bool syncSelection) {
     if (m_allPresets.isEmpty()) {
         PresetEntry entry;
         entry.preset = "INIT";
-        entry.bank = (type == "VITALYA" || type == "VITAL" || type == "SERUM" || type == "FM")
-                         ? "VITALYA"
+        entry.bank = isSimpleType(type)
+                         ? "SIMPLE"
                          : "INTERNAL";
         entry.category = "OTHER";
         m_allPresets.push_back(entry);
@@ -397,7 +399,7 @@ void SynthPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad));
-    const bool presetsAllowed = !isVitalType(type);
+    const bool presetsAllowed = !isSimpleType(type);
     if (key == Qt::Key_P) {
         if (presetsAllowed) {
             m_showPresetMenu = !m_showPresetMenu;
@@ -461,7 +463,7 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad));
-    const bool presetsAllowed = !isVitalType(type);
+    const bool presetsAllowed = !isSimpleType(type);
 
     if (m_busRect.contains(pos) && m_pads) {
         const int nextBus = (m_pads->fxBus(m_activePad) + 1) % 6;
@@ -498,10 +500,10 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
         for (const PresetRow &row : m_presetRows) {
             if (!row.header && row.rect.contains(pos) && m_pads) {
                 const QString bank = row.bank;
-                const QString type = isFmBank(bank) ? QStringLiteral("VITALYA") : QStringLiteral("DX7");
+                const QString type = isFmBank(bank) ? QStringLiteral("SIMPLE") : QStringLiteral("DX7");
                 const QString presetId = row.presetId;
                 const QString payload =
-                    (type == "VITALYA" || bank.isEmpty()) ? presetId
+                    (type == "SIMPLE" || bank.isEmpty()) ? presetId
                                                         : QString("%1/%2").arg(bank, presetId);
                 m_pads->setSynth(m_activePad, QString("%1:%2").arg(type, payload));
                 m_showPresetMenu = false;
@@ -577,7 +579,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
 
     const QString id = synthIdOrDefault(m_pads, m_activePad);
     const QString synthType = synthTypeFromId(id);
-    const bool presetsAllowed = !isVitalType(synthType);
+    const bool presetsAllowed = !isSimpleType(synthType);
 
     const float buttonW = Theme::pxF(96.0f);
     const float buttonH = header.height() - Theme::pxF(4.0f);
@@ -631,7 +633,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
 
     const QString synthTypeUpper = synthType.trimmed().toUpper();
     const bool isDx7 = (synthTypeUpper == "DX7");
-    const bool isVital = isVitalType(synthTypeUpper);
+    const bool isSimple = isSimpleType(synthTypeUpper);
 
     const float gap = Theme::pxF(12.0f);
     QRectF content(panel.left() + Theme::px(12), header.bottom() + Theme::px(10),
@@ -696,6 +698,8 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 return QString("%1%").arg(qRound(clamp01(sp.osc2Gain) * 100.0f));
             case EditOsc2Pan:
                 return QString::number(sp.osc2Pan, 'f', 2);
+            case EditOctave:
+                return QString("%1").arg(sp.octave >= 0 ? QString("+%1").arg(sp.octave) : QString::number(sp.octave));
             case EditCutoff:
                 return QString("%1%").arg(qRound(clamp01(sp.cutoff) * 100.0f));
             case EditResonance:
@@ -703,19 +707,19 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             case EditFilterType:
                 return filterPresets.value(sp.filterType, "FILTER");
             case EditAttack: {
-                const float sec = isVital ? clamp01(sp.attack) * kAdsrMaxSeconds
+                const float sec = isSimple ? clamp01(sp.attack) * kAdsrMaxSeconds
                                           : (0.005f + clamp01(sp.attack) * 1.2f);
                 return QString("%1 ms").arg(qRound(sec * 1000.0f));
             }
             case EditDecay: {
-                const float sec = isVital ? clamp01(sp.decay) * kAdsrMaxSeconds
+                const float sec = isSimple ? clamp01(sp.decay) * kAdsrMaxSeconds
                                           : (0.01f + clamp01(sp.decay) * 1.2f);
                 return QString("%1 ms").arg(qRound(sec * 1000.0f));
             }
             case EditSustain:
                 return QString("%1%").arg(qRound(clamp01(sp.sustain) * 100.0f));
             case EditRelease: {
-                const float sec = isVital ? clamp01(sp.release) * kAdsrMaxSeconds
+                const float sec = isSimple ? clamp01(sp.release) * kAdsrMaxSeconds
                                           : (0.02f + clamp01(sp.release) * 1.6f);
                 return QString("%1 ms").arg(qRound(sec * 1000.0f));
             }
@@ -744,9 +748,9 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         QRectF adsrWave = inner;
         adsrWave.setHeight(graphH);
         {
-            const float a = isVital ? clamp01(sp.attack) : (0.1f + clamp01(sp.attack) * 0.45f);
-            const float d = isVital ? clamp01(sp.decay) : (0.1f + clamp01(sp.decay) * 0.35f);
-            const float r = isVital ? clamp01(sp.release) : (0.1f + clamp01(sp.release) * 0.4f);
+            const float a = isSimple ? clamp01(sp.attack) : (0.1f + clamp01(sp.attack) * 0.45f);
+            const float d = isSimple ? clamp01(sp.decay) : (0.1f + clamp01(sp.decay) * 0.35f);
+            const float r = isSimple ? clamp01(sp.release) : (0.1f + clamp01(sp.release) * 0.4f);
             float total = a + d + r + 0.1f;
             float scale = 1.0f;
             if (total > 0.95f) {
@@ -821,127 +825,20 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             param.rect = QRectF();
         }
         m_filterPresetRects.clear();
-        if (isVital) {
+        if (isSimple) {
             const float artW = content.width() * 0.38f;
             QRectF leftRect(content.left(), content.top(),
                             content.width() - artW - gap, content.height());
             QRectF artRect(leftRect.right() + gap, content.top(), artW, content.height());
 
-            const float oscH = leftRect.height() * 0.45f;
-            QRectF oscRect(leftRect.left(), leftRect.top(), leftRect.width(), oscH);
-            QRectF adsrRect(leftRect.left(), oscRect.bottom() + gap,
-                            leftRect.width(), leftRect.bottom() - oscRect.bottom() - gap);
+            drawPanel(leftRect, "OSC 1");
+            QRectF paramsRect = leftRect.adjusted(Theme::px(10), Theme::px(28), -Theme::px(10),
+                                                  -Theme::px(10));
+            const float paramGap = Theme::pxF(8.0f);
+            const float cellW = (paramsRect.width() - paramGap) / 2.0f;
+            const float cellH = (paramsRect.height() - paramGap) / 2.0f;
 
-            drawPanel(oscRect, "OSC 1");
-            QRectF waveRect = oscRect.adjusted(Theme::px(8), Theme::px(22), -Theme::px(8), -Theme::px(8));
-            const float waveH = waveRect.height() * 0.7f;
-            QRectF waveArea = waveRect;
-            waveArea.setHeight(waveH);
-
-            EditParam &waveParamRef = m_editParams[EditOsc1Wave];
-            waveParamRef.rect = QRectF(waveArea.left(), waveArea.top(), waveArea.width(), Theme::px(18));
-            const QString waveName = waves.value(sp.osc1Wave, "WAVE");
-            const bool waveSelected = (EditOsc1Wave == m_selectedEditParam);
-            p.setBrush(waveSelected ? Theme::accentAlt() : Theme::bg3());
-            p.setPen(QPen(Theme::stroke(), 1.0));
-            p.drawRoundedRect(waveParamRef.rect, Theme::px(6), Theme::px(6));
-            p.setPen(waveSelected ? Theme::bg0() : Theme::text());
-            p.setFont(Theme::baseFont(9, QFont::DemiBold));
-            p.drawText(waveParamRef.rect.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
-                       Qt::AlignLeft | Qt::AlignVCenter, waveName);
-
-            QRectF waveGraph = waveArea.adjusted(0, Theme::px(18), 0, 0);
-            drawWave(waveGraph, Theme::accent(), [sp](float t) {
-                const float phase = kTwoPi * t;
-                switch (sp.osc1Wave) {
-                    case 0:
-                        return std::sin(phase);
-                    case 1:
-                        return 2.0f * (t - 0.5f);
-                    case 2:
-                        return std::sin(phase) >= 0.0f ? 1.0f : -1.0f;
-                    case 3:
-                        return 1.0f - 4.0f * std::fabs(t - 0.5f);
-                    case 4:
-                        return std::sin(phase) * 0.3f;
-                    case 5:
-                        return (t < 0.3f) ? 1.0f : -1.0f;
-                    case 6:
-                        return std::sin(phase) * 0.8f;
-                    case 7:
-                        return std::sin(phase) + 0.5f * std::sin(phase * 2.0f);
-                    case 8:
-                        return std::sin(phase) + 0.5f * std::sin(phase * 3.0f);
-                    case 9:
-                        return std::sin(phase) + 0.7f * std::sin(phase * 5.0f);
-                    default:
-                        return std::sin(phase);
-                }
-            });
-
-            QRectF levelRect = waveRect;
-            levelRect.setTop(waveArea.bottom() + Theme::pxF(6.0f));
-            levelRect.setHeight(waveRect.bottom() - levelRect.top());
-            EditParam &levelParam = m_editParams[EditOsc1Gain];
-            levelParam.rect = levelRect;
-            const bool levelSelected = (EditOsc1Gain == m_selectedEditParam);
-            p.setBrush(levelSelected ? Theme::accentAlt() : Theme::bg3());
-            p.setPen(QPen(Theme::stroke(), 1.0));
-            p.drawRoundedRect(levelRect, Theme::px(6), Theme::px(6));
-            p.setPen(levelSelected ? Theme::bg0() : Theme::text());
-            p.setFont(Theme::baseFont(8, QFont::DemiBold));
-            p.drawText(levelRect.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
-                       Qt::AlignLeft | Qt::AlignVCenter, levelParam.label);
-            p.setPen(levelSelected ? Theme::bg0() : Theme::textMuted());
-            p.drawText(levelRect.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
-                       Qt::AlignRight | Qt::AlignVCenter, formatValue(levelParam.type));
-
-            drawPanel(adsrRect, "ADSR");
-            QRectF adsrInner = adsrRect.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
-            QRectF adsrWave = adsrInner;
-            adsrWave.setHeight(adsrInner.height() * 0.6f);
-            {
-                const float a = clamp01(sp.attack);
-                const float d = clamp01(sp.decay);
-                const float r = clamp01(sp.release);
-                float total = a + d + r + 0.1f;
-                float scale = 1.0f;
-                if (total > 0.95f) {
-                    scale = 0.95f / (a + d + r);
-                }
-                const float aa = a * scale;
-                const float dd = d * scale;
-                const float rr = r * scale;
-                float sustainLen = 1.0f - (aa + dd + rr);
-                sustainLen = std::max(0.05f, sustainLen);
-                const float s = clamp01(sp.sustain);
-
-                const float x0 = adsrWave.left();
-                const float x1 = x0 + adsrWave.width() * aa;
-                const float x2 = x1 + adsrWave.width() * dd;
-                const float x3 = x2 + adsrWave.width() * sustainLen;
-                const float x4 = adsrWave.right();
-
-                const float y0 = adsrWave.bottom();
-                const float y1 = adsrWave.top();
-                const float y2 = adsrWave.top() + (1.0f - s) * adsrWave.height();
-
-                QPainterPath env;
-                env.moveTo(x0, y0);
-                env.lineTo(x1, y1);
-                env.lineTo(x2, y2);
-                env.lineTo(x3, y2);
-                env.lineTo(x4, y0);
-                p.setPen(QPen(Theme::accent(), Theme::pxF(1.6f)));
-                p.drawPath(env);
-            }
-
-            QRectF adsrParams = adsrInner;
-            adsrParams.setTop(adsrWave.bottom() + Theme::pxF(6.0f));
-            const float adsrGap = Theme::pxF(6.0f);
-            const float adsrW = (adsrParams.width() - adsrGap) / 2.0f;
-            const float adsrH = (adsrParams.height() - adsrGap) / 2.0f;
-            auto drawSmallParam = [&](const QRectF &cell, int paramType) {
+            auto drawParamCell = [&](const QRectF &cell, int paramType) {
                 EditParam &param = m_editParams[paramType];
                 param.rect = cell;
                 const bool selected = (paramType == m_selectedEditParam);
@@ -949,22 +846,22 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 p.setPen(QPen(Theme::stroke(), 1.0));
                 p.drawRoundedRect(cell, Theme::px(6), Theme::px(6));
                 p.setPen(selected ? Theme::bg0() : Theme::text());
-                p.setFont(Theme::baseFont(8, QFont::DemiBold));
-                p.drawText(cell.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+                p.setFont(Theme::baseFont(10, QFont::DemiBold));
+                p.drawText(cell.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
                            Qt::AlignLeft | Qt::AlignVCenter, param.label);
                 p.setPen(selected ? Theme::bg0() : Theme::textMuted());
-                p.drawText(cell.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+                p.drawText(cell.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
                            Qt::AlignRight | Qt::AlignVCenter, formatValue(param.type));
             };
 
-            drawSmallParam(QRectF(adsrParams.left(), adsrParams.top(), adsrW, adsrH), EditAttack);
-            drawSmallParam(QRectF(adsrParams.left() + adsrW + adsrGap, adsrParams.top(), adsrW, adsrH),
-                           EditDecay);
-            drawSmallParam(QRectF(adsrParams.left(), adsrParams.top() + adsrH + adsrGap, adsrW, adsrH),
-                           EditSustain);
-            drawSmallParam(QRectF(adsrParams.left() + adsrW + adsrGap,
-                                  adsrParams.top() + adsrH + adsrGap, adsrW, adsrH),
-                           EditRelease);
+            drawParamCell(QRectF(paramsRect.left(), paramsRect.top(), cellW, cellH), EditOctave);
+            drawParamCell(QRectF(paramsRect.left() + cellW + paramGap, paramsRect.top(), cellW, cellH),
+                          EditOsc1Voices);
+            drawParamCell(QRectF(paramsRect.left(), paramsRect.top() + cellH + paramGap, cellW, cellH),
+                          EditOsc1Detune);
+            drawParamCell(QRectF(paramsRect.left() + cellW + paramGap,
+                                 paramsRect.top() + cellH + paramGap, cellW, cellH),
+                          EditOsc1Gain);
 
             drawPanel(artRect, "PHOTO SLOT");
             QRectF artInner = artRect.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
@@ -1399,6 +1296,8 @@ float SynthPageWidget::currentEditValue(const EditParam &param) const {
             return sp.osc2Gain;
         case EditOsc2Pan:
             return sp.osc2Pan;
+        case EditOctave:
+            return static_cast<float>(sp.octave);
         case EditCutoff:
             return sp.cutoff;
         case EditResonance:
@@ -1432,14 +1331,13 @@ void SynthPageWidget::adjustEditParam(int delta) {
     PadBank::SynthParams sp = m_pads->synthParams(pad);
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad)).trimmed().toUpper();
     const bool isDx7 = (type == "DX7");
-    const bool isVital = isVitalType(type);
+    const bool isSimple = isSimpleType(type);
     if (isDx7 && !(param.type == EditAttack || param.type == EditDecay ||
                    param.type == EditSustain || param.type == EditRelease)) {
         return;
     }
-    if (isVital && !(param.type == EditOsc1Wave || param.type == EditOsc1Gain ||
-                     param.type == EditAttack || param.type == EditDecay ||
-                     param.type == EditSustain || param.type == EditRelease)) {
+    if (isSimple && !(param.type == EditOctave || param.type == EditOsc1Voices ||
+                     param.type == EditOsc1Detune || param.type == EditOsc1Gain)) {
         return;
     }
     const int waveCount = PadBank::serumWaves().size();
@@ -1474,6 +1372,10 @@ void SynthPageWidget::adjustEditParam(int delta) {
             sp.osc1Pan = qBound(-1.0f, step(sp.osc1Pan, 0.1f), 1.0f);
             m_pads->setSynthOsc(pad, 0, sp.osc1Wave, sp.osc1Voices, sp.osc1Detune,
                                 sp.osc1Gain, sp.osc1Pan);
+            break;
+        case EditOctave:
+            sp.octave = qBound(-2, sp.octave + delta, 2);
+            m_pads->setSynthOctave(pad, sp.octave);
             break;
         case EditOsc2Wave:
             sp.osc2Wave = (sp.osc2Wave + delta + waveCount) % qMax(1, waveCount);
@@ -1513,19 +1415,19 @@ void SynthPageWidget::adjustEditParam(int delta) {
             m_pads->setSynthFilterType(pad, sp.filterType);
             break;
         case EditAttack:
-            sp.attack = clamp01(step(sp.attack, isVital ? 0.01f : 0.02f));
+            sp.attack = clamp01(step(sp.attack, isSimple ? 0.01f : 0.02f));
             m_pads->setSynthAdsr(pad, sp.attack, sp.decay, sp.sustain, sp.release);
             break;
         case EditDecay:
-            sp.decay = clamp01(step(sp.decay, isVital ? 0.01f : 0.02f));
+            sp.decay = clamp01(step(sp.decay, isSimple ? 0.01f : 0.02f));
             m_pads->setSynthAdsr(pad, sp.attack, sp.decay, sp.sustain, sp.release);
             break;
         case EditSustain:
-            sp.sustain = clamp01(step(sp.sustain, isVital ? 0.01f : 0.02f));
+            sp.sustain = clamp01(step(sp.sustain, isSimple ? 0.01f : 0.02f));
             m_pads->setSynthAdsr(pad, sp.attack, sp.decay, sp.sustain, sp.release);
             break;
         case EditRelease:
-            sp.release = clamp01(step(sp.release, isVital ? 0.01f : 0.02f));
+            sp.release = clamp01(step(sp.release, isSimple ? 0.01f : 0.02f));
             m_pads->setSynthAdsr(pad, sp.attack, sp.decay, sp.sustain, sp.release);
             break;
         case EditLfoRate:

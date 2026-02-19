@@ -50,7 +50,7 @@ public:
         float decay = 0.25f;
         float sustain = 0.7f;
         float release = 0.25f;
-        int wave = 0;
+        int wave = 1;
         int voices = 8;
         float detune = 0.12f;
         int octave = 0;
@@ -62,7 +62,7 @@ public:
         int filterType = 0;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
-        int osc1Wave = 0;
+        int osc1Wave = 1;
         int osc2Wave = 1;
         int osc1Voices = 1;
         int osc2Voices = 1;

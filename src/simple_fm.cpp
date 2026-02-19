@@ -41,9 +41,10 @@ void SimpleFmCore::setParams(const Params &params) {
     params_.fmAmount = std::max(0.0f, params_.fmAmount);
     params_.ratio = std::max(0.01f, params_.ratio);
     params_.feedback = std::max(0.0f, params_.feedback);
+    params_.octave = std::max(-4, std::min(4, params_.octave));
 
     params_.osc1Voices = std::max(1, std::min(8, params_.osc1Voices));
-    params_.osc2Voices = std::max(1, std::min(8, params_.osc2Voices));
+    params_.osc2Voices = std::max(0, std::min(8, params_.osc2Voices));
     params_.osc1Detune = clamp01(params_.osc1Detune);
     params_.osc2Detune = clamp01(params_.osc2Detune);
     params_.osc1Gain = clamp01(params_.osc1Gain);
@@ -116,8 +117,11 @@ void SimpleFmCore::computeUnisonPan(int voices, float detune, float basePan, flo
         outL[i] = 0.0f;
         outR[i] = 0.0f;
     }
-    voices = std::max(1, std::min(8, voices));
+    voices = std::max(0, std::min(8, voices));
     if (voices <= 1) {
+        if (voices <= 0) {
+            return;
+        }
         float l = 0.0f;
         float r = 0.0f;
         computePan(basePan, baseGain, l, r);
@@ -210,7 +214,7 @@ void SimpleFmCore::noteOn(int note, int velocity) {
     }
 
     Voice &voice = voices_[static_cast<size_t>(index)];
-    const float freq = midiToFreq(note);
+    const float freq = midiToFreq(note + params_.octave * 12);
     voice.midi = note;
     voice.velocity = velocity;
     voice.keydown = true;
@@ -252,6 +256,8 @@ void SimpleFmCore::render(float *outL, float *outR, int frames) {
     }
 
     const float releaseStep = 1.0f / (0.08f * static_cast<float>(sampleRate_));
+    const bool useOsc2 = (params_.osc2Voices > 0) &&
+                         ((params_.osc2Gain > 0.0001f) || (params_.fmAmount > 0.0001f));
 
     for (int i = 0; i < frames; ++i) {
         float sumL = 0.0f;
@@ -268,24 +274,27 @@ void SimpleFmCore::render(float *outL, float *outR, int frames) {
                 }
             }
 
-            float modSum = 0.0f;
+            float modSignal = 0.0f;
             float osc2L = 0.0f;
             float osc2R = 0.0f;
-            const float osc2Norm = 1.0f / std::max(1, params_.osc2Voices);
-            for (int u = 0; u < params_.osc2Voices; ++u) {
-                float wave = oscWave(params_.osc2Wave, voice.phase2[u], voice);
-                const float mod = wave + params_.feedback * voice.feedbackZ;
-                voice.feedbackZ = mod;
-                modSum += mod;
-                const float sample = wave * osc2Norm;
-                osc2L += sample * osc2PanL_[u];
-                osc2R += sample * osc2PanR_[u];
-                voice.phase2[u] += voice.inc2[u];
-                if (voice.phase2[u] >= kTwoPi) {
-                    voice.phase2[u] -= kTwoPi;
+            if (useOsc2) {
+                float modSum = 0.0f;
+                const float osc2Norm = 1.0f / std::max(1, params_.osc2Voices);
+                for (int u = 0; u < params_.osc2Voices; ++u) {
+                    float wave = oscWave(params_.osc2Wave, voice.phase2[u], voice);
+                    const float mod = wave + params_.feedback * voice.feedbackZ;
+                    voice.feedbackZ = mod;
+                    modSum += mod;
+                    const float sample = wave * osc2Norm;
+                    osc2L += sample * osc2PanL_[u];
+                    osc2R += sample * osc2PanR_[u];
+                    voice.phase2[u] += voice.inc2[u];
+                    if (voice.phase2[u] >= kTwoPi) {
+                        voice.phase2[u] -= kTwoPi;
+                    }
                 }
+                modSignal = (params_.osc2Voices > 0) ? (modSum / params_.osc2Voices) : 0.0f;
             }
-            const float modSignal = (params_.osc2Voices > 0) ? (modSum / params_.osc2Voices) : 0.0f;
 
             float osc1L = 0.0f;
             float osc1R = 0.0f;

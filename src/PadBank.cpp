@@ -53,14 +53,10 @@ QString defaultMiniDexedType();
 
 QString synthTypeFromName(const QString &name) {
     const QString upper = name.trimmed().toUpper();
-    if (upper.startsWith("VITALYA") || upper.startsWith("VITAL")) {
-        return "VITALYA";
-    }
-    if (upper.startsWith("FM")) {
-        return "VITALYA";
-    }
-    if (upper.startsWith("SERUM")) {
-        return "VITALYA";
+    if (upper.startsWith("VITALYA") || upper.startsWith("VITAL") ||
+        upper.startsWith("FM") || upper.startsWith("SERUM") ||
+        upper.startsWith("SIMPLE")) {
+        return "SIMPLE";
     }
     if (upper.startsWith("DX7")) {
         return "DX7";
@@ -72,7 +68,7 @@ QString synthTypeFromName(const QString &name) {
         const int colon = upper.indexOf(':');
         return upper.left(colon).trimmed();
     }
-    return QStringLiteral("VITALYA");
+    return QStringLiteral("SIMPLE");
 }
 
 QString synthPresetFromName(const QString &name) {
@@ -96,7 +92,7 @@ bool isMiniDexedType(const QString &type) {
 
 bool isFmType(const QString &type) {
     const QString t = type.trimmed().toUpper();
-    return t == "FM" || t == "SERUM" || t == "VITALYA" || t == "VITAL";
+    return t == "SIMPLE" || t == "FM" || t == "SERUM" || t == "VITALYA" || t == "VITAL";
 }
 
 QString defaultMiniDexedType() {
@@ -902,7 +898,7 @@ void PadBank::setSynth(int index, const QString &name) {
 
     if (isFmType(type)) {
         if (!synthName.contains(":")) {
-            synthName = makeSynthName(QStringLiteral("VITALYA"), QStringLiteral("INIT"));
+            synthName = makeSynthName(QStringLiteral("SIMPLE"), QStringLiteral("INIT"));
         }
         const QString presetToken = synthPresetFromName(synthName);
         QString presetName = presetToken;
@@ -916,9 +912,9 @@ void PadBank::setSynth(int index, const QString &name) {
         }
 
         m_isSynth[static_cast<size_t>(index)] = true;
-        const QString typeName = type.trimmed().isEmpty() ? QStringLiteral("VITALYA") : type;
+        const QString typeName = type.trimmed().isEmpty() ? QStringLiteral("SIMPLE") : type;
         m_synthNames[static_cast<size_t>(index)] = makeSynthName(typeName, presetName);
-        m_synthBanks[static_cast<size_t>(index)] = "VITALYA";
+        m_synthBanks[static_cast<size_t>(index)] = "SIMPLE";
         m_synthPrograms[static_cast<size_t>(index)] = 0;
         m_paths[static_cast<size_t>(index)].clear();
         m_synthBaseMidi[static_cast<size_t>(index)] = 60;
@@ -936,7 +932,7 @@ void PadBank::setSynth(int index, const QString &name) {
         }
         if (m_engineAvailable && m_engine) {
             const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
-            m_engine->setSynthKind(index, AudioEngine::SynthKind::Vital);
+            m_engine->setSynthKind(index, AudioEngine::SynthKind::Simple);
             m_engine->setPadAdsr(index, 0.0f, 0.0f, 1.0f, 0.0f);
             m_engine->setSynthVoices(index, sp.voices);
             m_engine->setFmParams(index, buildFmParams(sp));
@@ -1224,9 +1220,16 @@ void PadBank::setSynthWave(int index, int wave) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.wave = qBound(0, wave, 4);
     if (isSynth(index)) {
-        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
-        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
-                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+        if (isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+            sp.osc1Wave = sp.wave;
+            if (m_engineAvailable && m_engine) {
+                m_engine->setFmParams(index, buildFmParams(sp));
+            }
+        } else {
+            PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+            rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                                m_synthBaseMidi[static_cast<size_t>(index)], sp);
+        }
     }
     emit padParamsChanged(index);
 }
@@ -1253,9 +1256,16 @@ void PadBank::setSynthDetune(int index, float detune) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.detune = qBound(0.0f, detune, 1.0f);
     if (isSynth(index)) {
-        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
-        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
-                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+        if (isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+            sp.osc1Detune = sp.detune;
+            if (m_engineAvailable && m_engine) {
+                m_engine->setFmParams(index, buildFmParams(sp));
+            }
+        } else {
+            PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+            rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                                m_synthBaseMidi[static_cast<size_t>(index)], sp);
+        }
     }
     emit padParamsChanged(index);
 }
@@ -1270,33 +1280,40 @@ void PadBank::setSynthOctave(int index, int octave) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.octave = qBound(-2, octave, 2);
     if (isSynth(index)) {
-        PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
-        rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
-                            m_synthBaseMidi[static_cast<size_t>(index)], sp);
+        if (isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+            if (m_engineAvailable && m_engine) {
+                m_engine->setFmParams(index, buildFmParams(sp));
+            }
+        } else {
+            PadRuntime *rt = m_runtime[static_cast<size_t>(index)];
+            rebuildSynthRuntime(rt, m_synthNames[static_cast<size_t>(index)], m_engineRate,
+                                m_synthBaseMidi[static_cast<size_t>(index)], sp);
+        }
     }
     emit padParamsChanged(index);
 }
 
 static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     AudioEngine::FmParams fm;
-    fm.fmAmount = sp.fmAmount;
-    fm.ratio = sp.ratio;
-    fm.feedback = sp.feedback;
+    fm.fmAmount = 0.0f;
+    fm.ratio = 1.0f;
+    fm.feedback = 0.0f;
+    fm.octave = sp.octave;
     fm.cutoff = sp.cutoff;
     fm.resonance = sp.resonance;
     fm.filterType = sp.filterType;
     fm.lfoRate = sp.lfoRate;
     fm.lfoDepth = sp.lfoDepth;
     fm.osc1Wave = sp.osc1Wave;
-    fm.osc2Wave = sp.osc2Wave;
+    fm.osc2Wave = 0;
     fm.osc1Voices = sp.osc1Voices;
-    fm.osc2Voices = sp.osc2Voices;
+    fm.osc2Voices = 0;
     fm.osc1Detune = sp.osc1Detune;
-    fm.osc2Detune = sp.osc2Detune;
+    fm.osc2Detune = 0.0f;
     fm.osc1Gain = sp.osc1Gain;
-    fm.osc2Gain = sp.osc2Gain;
+    fm.osc2Gain = 0.0f;
     fm.osc1Pan = sp.osc1Pan;
-    fm.osc2Pan = sp.osc2Pan;
+    fm.osc2Pan = 0.0f;
     fm.attack = sp.attack;
     fm.decay = sp.decay;
     fm.sustain = sp.sustain;
@@ -2477,13 +2494,13 @@ QStringList PadBank::synthBanks() {
     if (list.isEmpty()) {
         list << "INTERNAL";
     }
-    list << "VITALYA";
+    list << "SIMPLE";
     return list;
 }
 
 QStringList PadBank::synthPresetsForBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
-    if (upper == "FM" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL") {
+    if (upper == "SIMPLE" || upper == "FM" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL") {
         return {"INIT"};
     }
     scanDx7Banks();
@@ -2507,7 +2524,7 @@ QStringList PadBank::serumWaves() {
 }
 
 QStringList PadBank::synthTypes() {
-    return {defaultMiniDexedType(), "VITALYA"};
+    return {defaultMiniDexedType(), "SIMPLE"};
 }
 
 bool PadBank::hasMiniDexed() {
