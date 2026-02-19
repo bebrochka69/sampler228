@@ -54,7 +54,7 @@ QVector<int> visibleParamIndicesForType(const QString &type) {
         return indices;
     }
     if (isSimpleType(upper)) {
-        indices << EditOctave << EditOsc1Voices << EditOsc1Detune << EditOsc1Gain;
+        indices << EditOsc1Wave << EditOctave << EditOsc1Voices << EditOsc1Detune << EditOsc1Gain;
         return indices;
     }
     indices << EditOsc1Wave << EditOsc1Voices << EditOsc1Detune << EditOsc1Gain << EditOsc1Pan;
@@ -707,20 +707,17 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             case EditFilterType:
                 return filterPresets.value(sp.filterType, "FILTER");
             case EditAttack: {
-                const float sec = isSimple ? clamp01(sp.attack) * kAdsrMaxSeconds
-                                          : (0.005f + clamp01(sp.attack) * 1.2f);
+                const float sec = (0.005f + clamp01(sp.attack) * 1.2f);
                 return QString("%1 ms").arg(qRound(sec * 1000.0f));
             }
             case EditDecay: {
-                const float sec = isSimple ? clamp01(sp.decay) * kAdsrMaxSeconds
-                                          : (0.01f + clamp01(sp.decay) * 1.2f);
+                const float sec = (0.01f + clamp01(sp.decay) * 1.2f);
                 return QString("%1 ms").arg(qRound(sec * 1000.0f));
             }
             case EditSustain:
                 return QString("%1%").arg(qRound(clamp01(sp.sustain) * 100.0f));
             case EditRelease: {
-                const float sec = isSimple ? clamp01(sp.release) * kAdsrMaxSeconds
-                                          : (0.02f + clamp01(sp.release) * 1.6f);
+                const float sec = (0.02f + clamp01(sp.release) * 1.6f);
                 return QString("%1 ms").arg(qRound(sec * 1000.0f));
             }
             case EditLfoRate: {
@@ -835,8 +832,10 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             QRectF paramsRect = leftRect.adjusted(Theme::px(10), Theme::px(28), -Theme::px(10),
                                                   -Theme::px(10));
             const float paramGap = Theme::pxF(8.0f);
-            const float cellW = (paramsRect.width() - paramGap) / 2.0f;
-            const float cellH = (paramsRect.height() - paramGap) / 2.0f;
+            const int cols = 2;
+            const int rows = 3;
+            const float cellW = (paramsRect.width() - paramGap * (cols - 1)) / cols;
+            const float cellH = (paramsRect.height() - paramGap * (rows - 1)) / rows;
 
             auto drawParamCell = [&](const QRectF &cell, int paramType) {
                 EditParam &param = m_editParams[paramType];
@@ -854,13 +853,16 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                            Qt::AlignRight | Qt::AlignVCenter, formatValue(param.type));
             };
 
-            drawParamCell(QRectF(paramsRect.left(), paramsRect.top(), cellW, cellH), EditOctave);
+            drawParamCell(QRectF(paramsRect.left(), paramsRect.top(), cellW, cellH), EditOsc1Wave);
             drawParamCell(QRectF(paramsRect.left() + cellW + paramGap, paramsRect.top(), cellW, cellH),
-                          EditOsc1Voices);
+                          EditOctave);
             drawParamCell(QRectF(paramsRect.left(), paramsRect.top() + cellH + paramGap, cellW, cellH),
-                          EditOsc1Detune);
+                          EditOsc1Voices);
             drawParamCell(QRectF(paramsRect.left() + cellW + paramGap,
                                  paramsRect.top() + cellH + paramGap, cellW, cellH),
+                          EditOsc1Detune);
+            drawParamCell(QRectF(paramsRect.left(), paramsRect.top() + (cellH + paramGap) * 2,
+                                 cellW, cellH),
                           EditOsc1Gain);
 
             drawPanel(artRect, "PHOTO SLOT");
@@ -1336,8 +1338,9 @@ void SynthPageWidget::adjustEditParam(int delta) {
                    param.type == EditSustain || param.type == EditRelease)) {
         return;
     }
-    if (isSimple && !(param.type == EditOctave || param.type == EditOsc1Voices ||
-                     param.type == EditOsc1Detune || param.type == EditOsc1Gain)) {
+    if (isSimple && !(param.type == EditOsc1Wave || param.type == EditOctave ||
+                     param.type == EditOsc1Voices || param.type == EditOsc1Detune ||
+                     param.type == EditOsc1Gain)) {
         return;
     }
     const int waveCount = PadBank::serumWaves().size();
