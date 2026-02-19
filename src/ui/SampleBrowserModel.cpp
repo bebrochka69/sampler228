@@ -9,6 +9,31 @@
 #include <functional>
 
 namespace {
+QString canonicalOrClean(const QString &path) {
+    QFileInfo info(path);
+    const QString canonical = info.canonicalFilePath();
+    if (!canonical.isEmpty()) {
+        return canonical;
+    }
+    return QDir::cleanPath(path);
+}
+
+bool isMountRoot(const QString &path) {
+    if (path.isEmpty()) {
+        return false;
+    }
+    QStorageInfo info(path);
+    if (!info.isValid() || !info.isReady()) {
+        return false;
+    }
+    const QString root = canonicalOrClean(info.rootPath());
+    const QString probe = canonicalOrClean(path);
+    if (root.isEmpty() || probe.isEmpty()) {
+        return false;
+    }
+    return root == probe && root != "/";
+}
+
 bool isUsbMount(const QStorageInfo &info) {
     if (!info.isValid() || !info.isReady()) {
         return false;
@@ -34,7 +59,9 @@ void scanProcMounts(QSet<QString> &seenRoots,
             continue;
         }
         const QString device = parts[0];
-        const QString mountPoint = parts[1];
+        QString mountPoint = parts[1];
+        mountPoint.replace("\\040", " ");
+        mountPoint.replace("\\011", "\t");
         if (!device.startsWith("/dev/sd") && !device.startsWith("/dev/usb")) {
             continue;
         }
@@ -47,15 +74,6 @@ void scanProcMounts(QSet<QString> &seenRoots,
         }
         addRoot(mountPoint, QFileInfo(mountPoint).fileName(), true, true);
     }
-}
-
-QString canonicalOrClean(const QString &path) {
-    QFileInfo info(path);
-    const QString canonical = info.canonicalFilePath();
-    if (!canonical.isEmpty()) {
-        return canonical;
-    }
-    return QDir::cleanPath(path);
 }
 }  // namespace
 
@@ -140,8 +158,14 @@ void SampleBrowserModel::refresh() {
         const QFileInfoList entries =
             dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
         for (const QFileInfo &info : entries) {
-            // Avoid heavy recursive scans during refresh; only list root folders.
-            addRootIfExists(info.absoluteFilePath(), info.fileName(), false, false);
+            const QString path = info.absoluteFilePath();
+            // If it's a real mount root, expand + pre-scan it for visibility.
+            if (isMountRoot(path)) {
+                addRootIfExists(path, info.fileName(), true, true);
+            } else {
+                // Avoid heavy recursive scans during refresh; only list root folders.
+                addRootIfExists(path, info.fileName(), false, false);
+            }
         }
     };
 
@@ -153,13 +177,17 @@ void SampleBrowserModel::refresh() {
     scanMountRoot("/media");
     scanMountRoot("/run/media");
     scanMountRoot("/mnt");
-    // Prefer explicit USB mount points, but keep scans shallow for responsiveness.
-    addRootIfExists("/mnt/usb", "USB", true, true);
-    addRootIfExists("/mnt/usb/samples", "USB SAMPLES", true, true);
-    addRootIfExists("/mnt/usb/Samples", "USB SAMPLES", true, true);
-    addRootIfExists("/media/usb", "USB", true, true);
-    addRootIfExists("/media/usb/samples", "USB SAMPLES", true, true);
-    addRootIfExists("/media/usb/Samples", "USB SAMPLES", true, true);
+    // Prefer explicit USB mount points only if they are real mounts.
+    if (isMountRoot("/mnt/usb")) {
+        addRootIfExists("/mnt/usb", "USB", true, true);
+        addRootIfExists("/mnt/usb/samples", "USB SAMPLES", true, true);
+        addRootIfExists("/mnt/usb/Samples", "USB SAMPLES", true, true);
+    }
+    if (isMountRoot("/media/usb")) {
+        addRootIfExists("/media/usb", "USB", true, true);
+        addRootIfExists("/media/usb/samples", "USB SAMPLES", true, true);
+        addRootIfExists("/media/usb/Samples", "USB SAMPLES", true, true);
+    }
 
     if (m_roots.empty()) {
         const QString home = QDir::homePath();
