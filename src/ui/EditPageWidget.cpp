@@ -13,11 +13,13 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <vector>
 
 #include "PadBank.h"
 #include "SampleSession.h"
 #include "Theme.h"
 #include "WaveformRenderer.h"
+#include "kiss_fftr.h"
 
 namespace {
 void drawWaveformRibbon(QPainter &p, const QRectF &rect, const QVector<float> &samples, float gain) {
@@ -97,13 +99,26 @@ QString detectKeyFromBuffer(const std::shared_ptr<AudioEngine::Buffer> &buffer) 
         return QString();
     }
 
-    const int window = std::min(1024, static_cast<int>(mono.size()));
+    int window = 4096;
+    if (mono.size() < static_cast<size_t>(window)) window = 2048;
+    if (mono.size() < static_cast<size_t>(window)) window = 1024;
+    if (mono.size() < static_cast<size_t>(window)) window = 512;
+    if (mono.size() < static_cast<size_t>(window)) {
+        return QString();
+    }
     const int hop = window / 2;
-    int minLag = usedRate / 1000;
-    int maxLag = usedRate / 50;
-    minLag = std::max(4, minLag);
-    maxLag = std::min(maxLag, window - 4);
-    if (maxLag <= minLag) {
+
+    std::vector<float> windowFunc(static_cast<size_t>(window));
+    const float kPi = 3.14159265f;
+    for (int i = 0; i < window; ++i) {
+        windowFunc[static_cast<size_t>(i)] =
+            0.5f - 0.5f * std::cos(2.0f * kPi * i / (window - 1));
+    }
+
+    std::vector<kiss_fft_scalar> fftIn(static_cast<size_t>(window));
+    std::vector<kiss_fft_cpx> fftOut(static_cast<size_t>(window / 2 + 1));
+    kiss_fftr_cfg cfg = kiss_fftr_alloc(window, 0, nullptr, nullptr);
+    if (!cfg) {
         return QString();
     }
 
@@ -111,6 +126,8 @@ QString detectKeyFromBuffer(const std::shared_ptr<AudioEngine::Buffer> &buffer) 
     histogram.fill(0.0);
     int windows = 0;
 
+    const double minFreq = 50.0;
+    const double maxFreq = 2000.0;
     for (int start = 0; start + window < static_cast<int>(mono.size()); start += hop) {
         if (windows++ > 40) {
             break;
@@ -118,44 +135,36 @@ QString detectKeyFromBuffer(const std::shared_ptr<AudioEngine::Buffer> &buffer) 
         const float *x = mono.data() + start;
         double energy = 0.0;
         for (int i = 0; i < window; ++i) {
-            energy += x[i] * x[i];
+            const float v = x[i] * windowFunc[static_cast<size_t>(i)];
+            fftIn[static_cast<size_t>(i)] = v;
+            energy += v * v;
         }
         if (energy < 1e-4) {
             continue;
         }
 
-        double bestCorr = 0.0;
-        int bestLag = -1;
-        for (int lag = minLag; lag <= maxLag; ++lag) {
-            double corr = 0.0;
-            for (int i = 0; i < window - lag; ++i) {
-                corr += x[i] * x[i + lag];
-            }
-            if (corr > bestCorr) {
-                bestCorr = corr;
-                bestLag = lag;
-            }
-        }
+        kiss_fftr(cfg, fftIn.data(), fftOut.data());
 
-        if (bestLag <= 0) {
-            continue;
+        for (int bin = 1; bin <= window / 2; ++bin) {
+            const double freq = static_cast<double>(bin) * usedRate / window;
+            if (freq < minFreq || freq > maxFreq) {
+                continue;
+            }
+            const kiss_fft_cpx &c = fftOut[static_cast<size_t>(bin)];
+            const double mag = std::sqrt(c.r * c.r + c.i * c.i);
+            if (mag <= 0.0) {
+                continue;
+            }
+            const double midi = 69.0 + 12.0 * std::log2(freq / 440.0);
+            int pc = static_cast<int>(std::lround(midi)) % 12;
+            if (pc < 0) {
+                pc += 12;
+            }
+            histogram[static_cast<size_t>(pc)] += mag;
         }
-
-        const double norm = bestCorr / energy;
-        if (norm < 0.08) {
-            continue;
-        }
-        const double freq = static_cast<double>(usedRate) / static_cast<double>(bestLag);
-        if (freq < 50.0 || freq > 1000.0) {
-            continue;
-        }
-        const double midi = 69.0 + 12.0 * std::log2(freq / 440.0);
-        int pc = static_cast<int>(std::lround(midi)) % 12;
-        if (pc < 0) {
-            pc += 12;
-        }
-        histogram[static_cast<size_t>(pc)] += norm;
     }
+
+    kiss_fftr_free(cfg);
 
     double sum = 0.0;
     for (double v : histogram) {

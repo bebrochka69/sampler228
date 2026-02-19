@@ -40,6 +40,8 @@ set(SOURCES
     src/ui/SystemStats.cpp
     src/ui/SampleBrowserModel.cpp
     src/ui/WaveformRenderer.cpp
+    src/third_party/kissfft/kiss_fft.c
+    src/third_party/kissfft/kiss_fftr.c
 )
 
 set(HEADERS
@@ -66,6 +68,8 @@ set(HEADERS
     src/ui/SystemStats.h
     src/ui/SampleBrowserModel.h
     src/ui/WaveformRenderer.h
+    src/third_party/kissfft/kiss_fft.h
+    src/third_party/kissfft/kiss_fftr.h
 )
 
 set(DX7_CORE_SOURCES
@@ -120,6 +124,6 @@ if(UNIX AND NOT APPLE)
         target_compile_definitions(GrooveBoxUI PRIVATE GROOVEBOX_WITH_JACK=1)
     endif()
 endif()
-target_include_directories(GrooveBoxUI PRIVATE src)
+target_include_directories(GrooveBoxUI PRIVATE src src/third_party/kissfft)
 
 # ALSA handled above for Linux
