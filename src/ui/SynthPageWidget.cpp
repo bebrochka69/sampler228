@@ -54,7 +54,8 @@ QVector<int> visibleParamIndicesForType(const QString &type) {
         return indices;
     }
     if (isSimpleType(upper)) {
-        indices << EditOsc1Wave << EditOctave << EditOsc1Voices << EditOsc1Detune << EditOsc1Gain;
+        indices << EditOsc1Wave << EditOctave << EditOsc1Voices << EditOsc1Detune << EditOsc1Gain
+                << EditOsc2Wave << EditOsc2Voices << EditOsc2Detune << EditOsc2Gain;
         return indices;
     }
     indices << EditOsc1Wave << EditOsc1Voices << EditOsc1Detune << EditOsc1Gain << EditOsc1Pan;
@@ -832,7 +833,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             QRectF paramsRect = leftRect.adjusted(Theme::px(10), Theme::px(28), -Theme::px(10),
                                                   -Theme::px(10));
             const float paramGap = Theme::pxF(8.0f);
-            const int cols = 2;
+            const int cols = 3;
             const int rows = 3;
             const float cellW = (paramsRect.width() - paramGap * (cols - 1)) / cols;
             const float cellH = (paramsRect.height() - paramGap * (rows - 1)) / rows;
@@ -844,26 +845,35 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
                 p.setPen(QPen(Theme::stroke(), 1.0));
                 p.drawRoundedRect(cell, Theme::px(6), Theme::px(6));
+                QString label = param.label;
+                if (paramType == EditOsc2Wave) label = "WAVE2";
+                if (paramType == EditOsc2Voices) label = "VOI2";
+                if (paramType == EditOsc2Detune) label = "DET2";
+                if (paramType == EditOsc2Gain) label = "VOL2";
                 p.setPen(selected ? Theme::bg0() : Theme::text());
                 p.setFont(Theme::baseFont(10, QFont::DemiBold));
                 p.drawText(cell.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
-                           Qt::AlignLeft | Qt::AlignVCenter, param.label);
+                           Qt::AlignLeft | Qt::AlignVCenter, label);
                 p.setPen(selected ? Theme::bg0() : Theme::textMuted());
                 p.drawText(cell.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
                            Qt::AlignRight | Qt::AlignVCenter, formatValue(param.type));
             };
 
-            drawParamCell(QRectF(paramsRect.left(), paramsRect.top(), cellW, cellH), EditOsc1Wave);
-            drawParamCell(QRectF(paramsRect.left() + cellW + paramGap, paramsRect.top(), cellW, cellH),
-                          EditOctave);
-            drawParamCell(QRectF(paramsRect.left(), paramsRect.top() + cellH + paramGap, cellW, cellH),
-                          EditOsc1Voices);
-            drawParamCell(QRectF(paramsRect.left() + cellW + paramGap,
-                                 paramsRect.top() + cellH + paramGap, cellW, cellH),
-                          EditOsc1Detune);
-            drawParamCell(QRectF(paramsRect.left(), paramsRect.top() + (cellH + paramGap) * 2,
-                                 cellW, cellH),
-                          EditOsc1Gain);
+            auto cellRect = [&](int col, int row) {
+                return QRectF(paramsRect.left() + col * (cellW + paramGap),
+                              paramsRect.top() + row * (cellH + paramGap),
+                              cellW, cellH);
+            };
+
+            drawParamCell(cellRect(0, 0), EditOsc1Wave);
+            drawParamCell(cellRect(1, 0), EditOsc1Voices);
+            drawParamCell(cellRect(2, 0), EditOsc1Detune);
+            drawParamCell(cellRect(0, 1), EditOsc1Gain);
+            drawParamCell(cellRect(1, 1), EditOctave);
+            drawParamCell(cellRect(2, 1), EditOsc2Wave);
+            drawParamCell(cellRect(0, 2), EditOsc2Voices);
+            drawParamCell(cellRect(1, 2), EditOsc2Detune);
+            drawParamCell(cellRect(2, 2), EditOsc2Gain);
 
             drawPanel(artRect, "PHOTO SLOT");
             QRectF artInner = artRect.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
@@ -1340,7 +1350,9 @@ void SynthPageWidget::adjustEditParam(int delta) {
     }
     if (isSimple && !(param.type == EditOsc1Wave || param.type == EditOctave ||
                      param.type == EditOsc1Voices || param.type == EditOsc1Detune ||
-                     param.type == EditOsc1Gain)) {
+                     param.type == EditOsc1Gain || param.type == EditOsc2Wave ||
+                     param.type == EditOsc2Voices || param.type == EditOsc2Detune ||
+                     param.type == EditOsc2Gain)) {
         return;
     }
     const int waveCount = PadBank::serumWaves().size();

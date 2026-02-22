@@ -44,7 +44,7 @@ void SimpleFmCore::setParams(const Params &params) {
     params_.octave = std::max(-4, std::min(4, params_.octave));
 
     params_.osc1Voices = std::max(1, std::min(8, params_.osc1Voices));
-    params_.osc2Voices = std::max(0, std::min(8, params_.osc2Voices));
+    params_.osc2Voices = std::max(1, std::min(8, params_.osc2Voices));
     params_.osc1Detune = clamp01(params_.osc1Detune);
     params_.osc2Detune = clamp01(params_.osc2Detune);
     params_.osc1Gain = clamp01(params_.osc1Gain);
@@ -117,11 +117,8 @@ void SimpleFmCore::computeUnisonPan(int voices, float detune, float basePan, flo
         outL[i] = 0.0f;
         outR[i] = 0.0f;
     }
-    voices = std::max(0, std::min(8, voices));
+    voices = std::max(1, std::min(8, voices));
     if (voices <= 1) {
-        if (voices <= 0) {
-            return;
-        }
         float l = 0.0f;
         float r = 0.0f;
         computePan(basePan, baseGain, l, r);

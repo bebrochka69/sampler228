@@ -1305,13 +1305,13 @@ static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     fm.lfoRate = sp.lfoRate;
     fm.lfoDepth = sp.lfoDepth;
     fm.osc1Wave = sp.osc1Wave;
-    fm.osc2Wave = 0;
+    fm.osc2Wave = sp.osc2Wave;
     fm.osc1Voices = sp.osc1Voices;
-    fm.osc2Voices = 0;
+    fm.osc2Voices = sp.osc2Voices;
     fm.osc1Detune = sp.osc1Detune;
-    fm.osc2Detune = 0.0f;
+    fm.osc2Detune = sp.osc2Detune;
     fm.osc1Gain = sp.osc1Gain;
-    fm.osc2Gain = 0.0f;
+    fm.osc2Gain = sp.osc2Gain;
     fm.osc1Pan = sp.osc1Pan;
     fm.osc2Pan = 0.0f;
     fm.attack = sp.attack;

@@ -546,14 +546,14 @@ void AudioEngine::setFmParams(int padId, const FmParams &params) {
     simpleParams.feedback = 0.0f;
     simpleParams.octave = params.octave;
     simpleParams.osc1Wave = params.osc1Wave;
+    simpleParams.osc2Wave = params.osc2Wave;
     simpleParams.osc1Voices = params.osc1Voices;
+    simpleParams.osc2Voices = params.osc2Voices;
     simpleParams.osc1Detune = params.osc1Detune;
+    simpleParams.osc2Detune = params.osc2Detune;
     simpleParams.osc1Gain = params.osc1Gain;
+    simpleParams.osc2Gain = params.osc2Gain;
     simpleParams.osc1Pan = 0.0f;
-    simpleParams.osc2Wave = 0;
-    simpleParams.osc2Voices = 0;
-    simpleParams.osc2Detune = 0.0f;
-    simpleParams.osc2Gain = 0.0f;
     simpleParams.osc2Pan = 0.0f;
     state.simple.setParams(simpleParams);
 }
@@ -811,14 +811,14 @@ void AudioEngine::ensureSynthInit(SynthState &state) {
         simpleParams.feedback = 0.0f;
         simpleParams.octave = state.fmParams.octave;
         simpleParams.osc1Wave = state.fmParams.osc1Wave;
+        simpleParams.osc2Wave = state.fmParams.osc2Wave;
         simpleParams.osc1Voices = state.fmParams.osc1Voices;
+        simpleParams.osc2Voices = state.fmParams.osc2Voices;
         simpleParams.osc1Detune = state.fmParams.osc1Detune;
+        simpleParams.osc2Detune = state.fmParams.osc2Detune;
         simpleParams.osc1Gain = state.fmParams.osc1Gain;
+        simpleParams.osc2Gain = state.fmParams.osc2Gain;
         simpleParams.osc1Pan = 0.0f;
-        simpleParams.osc2Wave = 0;
-        simpleParams.osc2Voices = 0;
-        simpleParams.osc2Detune = 0.0f;
-        simpleParams.osc2Gain = 0.0f;
         simpleParams.osc2Pan = 0.0f;
         state.simple.setParams(simpleParams);
         state.initialized = true;
