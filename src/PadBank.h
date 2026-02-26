@@ -9,6 +9,7 @@
 #include "AudioEngine.h"
 
 class QTimer;
+class QProcess;
 
 class PadBank : public QObject {
     Q_OBJECT

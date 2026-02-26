@@ -2483,6 +2483,7 @@ bool PadBank::previewSample(const QString &path, int *durationMs) {
     m_previewPath = path;
     m_previewSampleRate = rate;
 
+    PadBank *self = this;
     m_previewProcess = new QProcess(this);
     QProcess *proc = m_previewProcess;
     proc->setProgram(ffmpeg);
@@ -2496,45 +2497,47 @@ bool PadBank::previewSample(const QString &path, int *durationMs) {
          "-"});
     proc->setProcessChannelMode(QProcess::SeparateChannels);
 
-    connect(proc, &QProcess::readyReadStandardOutput, this, [this, proc]() {
-        if (m_previewProcess != proc) {
+    connect(proc, &QProcess::readyReadStandardOutput, this, [self, proc]() {
+        if (self->m_previewProcess != proc) {
             return;
         }
-        m_previewBytes.append(proc->readAllStandardOutput());
+        self->m_previewBytes.append(proc->readAllStandardOutput());
     });
 
     connect(proc, static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
-            this, [this, durationMs, proc](int, QProcess::ExitStatus) {
-                if (m_previewProcess != proc) {
+            this, [self, durationMs, proc](int, QProcess::ExitStatus) {
+                if (self->m_previewProcess != proc) {
                     return;
                 }
-                const QByteArray bytes = m_previewBytes;
-                m_previewBytes.clear();
+                const QByteArray bytes = self->m_previewBytes;
+                self->m_previewBytes.clear();
                 proc->deleteLater();
-                m_previewProcess = nullptr;
+                self->m_previewProcess = nullptr;
 
-                auto buffer = decodePcm16(bytes, m_previewSampleRate, 2);
+                auto buffer = decodePcm16(bytes, self->m_previewSampleRate, 2);
                 if (!buffer || !buffer->isValid()) {
                     return;
                 }
-                m_previewBuffer = buffer;
+                self->m_previewBuffer = buffer;
                 const int frames = buffer->frames();
                 const int ms =
                     qMax(1, static_cast<int>((frames * 1000.0) / qMax(1, buffer->sampleRate)));
                 if (durationMs) {
                     *durationMs = ms;
                 }
-                m_engine->trigger(-2, buffer, 0, frames, false, 1.0f, 0.0f, 1.0f, 0);
-                m_previewActive = true;
-                QTimer::singleShot(ms, this, [this]() { m_previewActive = false; });
+                if (self->m_engine) {
+                    self->m_engine->trigger(-2, buffer, 0, frames, false, 1.0f, 0.0f, 1.0f, 0);
+                }
+                self->m_previewActive = true;
+                QTimer::singleShot(ms, self, [self]() { self->m_previewActive = false; });
             });
 
-    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError) {
-                if (m_previewProcess == proc) {
+    connect(proc, &QProcess::errorOccurred, this, [self, proc](QProcess::ProcessError) {
+                if (self->m_previewProcess == proc) {
                     proc->deleteLater();
-                    m_previewProcess = nullptr;
+                    self->m_previewProcess = nullptr;
                 }
-                m_previewBytes.clear();
+                self->m_previewBytes.clear();
             });
 
     proc->start();
