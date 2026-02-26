@@ -657,6 +657,11 @@ PadBank::~PadBank() {
         delete rt;
         m_runtime[i] = nullptr;
     }
+    if (m_previewProcess) {
+        m_previewProcess->kill();
+        m_previewProcess->deleteLater();
+        m_previewProcess = nullptr;
+    }
 }
 
 void PadBank::setActivePad(int index) {
@@ -2402,6 +2407,39 @@ void PadBank::setBusGain(int bus, float gain) {
     }
 }
 
+bool PadBank::setAudioDevice(const QString &device) {
+    if (!device.trimmed().isEmpty()) {
+        qputenv("GROOVEBOX_ALSA_DEVICE", device.trimmed().toUtf8());
+    } else {
+        qunsetenv("GROOVEBOX_ALSA_DEVICE");
+    }
+#ifdef GROOVEBOX_WITH_ALSA
+    if (m_engine) {
+        const bool ok = m_engine->setAlsaDevice(device);
+        m_engineAvailable = m_engine->isAvailable();
+        if (m_engineAvailable) {
+            m_engineRate = m_engine->sampleRate();
+        }
+        for (int i = 0; i < kPadCount; ++i) {
+            if (m_runtime[i]) {
+                m_runtime[i]->useEngine = m_engineAvailable;
+            }
+        }
+        return ok;
+    }
+#endif
+    return false;
+}
+
+QString PadBank::audioDevice() const {
+#ifdef GROOVEBOX_WITH_ALSA
+    if (m_engine) {
+        return m_engine->alsaDevice();
+    }
+#endif
+    return QString();
+}
+
 bool PadBank::startRecording(const QString &path, int durationMs, int targetRate) {
     if (!m_engineAvailable || !m_engine) {
         return false;
@@ -2411,6 +2449,115 @@ bool PadBank::startRecording(const QString &path, int durationMs, int targetRate
     }
     const int frames = qMax(1, static_cast<int>((durationMs * m_engineRate) / 1000.0));
     return m_engine->startRecording(path, frames, targetRate);
+}
+
+bool PadBank::previewSample(const QString &path, int *durationMs) {
+    if (durationMs) {
+        *durationMs = 0;
+    }
+    if (!m_engineAvailable || !m_engine) {
+        return false;
+    }
+    if (path.trimmed().isEmpty()) {
+        return false;
+    }
+
+    stopPreview();
+
+#ifdef Q_OS_LINUX
+    const QString ffmpeg = QStandardPaths::findExecutable("ffmpeg");
+    if (ffmpeg.isEmpty()) {
+        return false;
+    }
+    int rate = m_engineRate > 0 ? m_engineRate : 48000;
+    int maxSec = 20;
+    {
+        bool ok = false;
+        const int env = qEnvironmentVariableIntValue("GROOVEBOX_PREVIEW_MAX_SEC", &ok);
+        if (ok && env > 0) {
+            maxSec = qMin(120, env);
+        }
+    }
+
+    m_previewBytes.clear();
+    m_previewPath = path;
+    m_previewSampleRate = rate;
+
+    m_previewProcess = new QProcess(this);
+    m_previewProcess->setProgram(ffmpeg);
+    m_previewProcess->setArguments(
+        {"-v", "error",
+         "-i", path,
+         "-f", "s16le",
+         "-ac", "2",
+         "-ar", QString::number(rate),
+         "-t", QString::number(maxSec),
+         "-"});
+    m_previewProcess->setProcessChannelMode(QProcess::SeparateChannels);
+
+    connect(m_previewProcess, &QProcess::readyReadStandardOutput, this, [this]() {
+        if (!m_previewProcess) {
+            return;
+        }
+        m_previewBytes.append(m_previewProcess->readAllStandardOutput());
+    });
+
+    connect(m_previewProcess,
+            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this,
+            [this, durationMs](int, QProcess::ExitStatus) {
+                if (!m_previewProcess) {
+                    return;
+                }
+                const QByteArray bytes = m_previewBytes;
+                m_previewBytes.clear();
+                m_previewProcess->deleteLater();
+                m_previewProcess = nullptr;
+
+                auto buffer = decodePcm16(bytes, m_previewSampleRate, 2);
+                if (!buffer || !buffer->isValid()) {
+                    return;
+                }
+                m_previewBuffer = buffer;
+                const int frames = buffer->frames();
+                const int ms =
+                    qMax(1, static_cast<int>((frames * 1000.0) / qMax(1, buffer->sampleRate)));
+                if (durationMs) {
+                    *durationMs = ms;
+                }
+                m_engine->trigger(-2, buffer, 0, frames, false, 1.0f, 0.0f, 1.0f, 0);
+                m_previewActive = true;
+                QTimer::singleShot(ms, this, [this]() { m_previewActive = false; });
+            });
+
+    connect(m_previewProcess, &QProcess::errorOccurred, this,
+            [this](QProcess::ProcessError) {
+                if (m_previewProcess) {
+                    m_previewProcess->deleteLater();
+                    m_previewProcess = nullptr;
+                }
+                m_previewBytes.clear();
+            });
+
+    m_previewProcess->start();
+    return true;
+#else
+    Q_UNUSED(path);
+    return false;
+#endif
+}
+
+void PadBank::stopPreview() {
+    if (m_previewProcess) {
+        m_previewProcess->kill();
+        m_previewProcess->deleteLater();
+        m_previewProcess = nullptr;
+    }
+    m_previewBytes.clear();
+    m_previewBuffer.reset();
+    m_previewActive = false;
+    if (m_engineAvailable && m_engine) {
+        m_engine->stopPad(-2);
+    }
 }
 
 static std::shared_ptr<AudioEngine::Buffer> makeMetronomeBuffer(int sampleRate, float freq,

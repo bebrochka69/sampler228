@@ -14,6 +14,8 @@
 #include <QtGlobal>
 #include <QtMath>
 
+#include "PadBank.h"
+
 namespace {
 constexpr int kFastPcmLimit = 6000;
 
@@ -41,7 +43,7 @@ float sampleToFloat(const char *data, QAudioFormat::SampleFormat format) {
 }
 }  // namespace
 
-SampleSession::SampleSession(QObject *parent) : QObject(parent) {
+SampleSession::SampleSession(PadBank *pads, QObject *parent) : QObject(parent), m_pads(pads) {
     connect(&m_decoder, &QAudioDecoder::bufferReady, this, &SampleSession::handleBufferReady);
     connect(&m_decoder, &QAudioDecoder::finished, this, &SampleSession::handleDecodeFinished);
     connect(&m_decoder,
@@ -58,6 +60,21 @@ SampleSession::SampleSession(QObject *parent) : QObject(parent) {
         m_forceExternal = true;
     }
 #endif
+
+    m_previewPoll.setInterval(150);
+    connect(&m_previewPoll, &QTimer::timeout, this, [this]() {
+        if (!m_previewActive) {
+            m_previewPoll.stop();
+            return;
+        }
+        if (m_pads && m_pads->isPreviewActive()) {
+            return;
+        }
+        m_previewActive = false;
+        m_previewDurationMs = 0;
+        emit playbackChanged(false);
+        m_previewPoll.stop();
+    });
 
     ensureAudioOutput();
 }
@@ -99,6 +116,9 @@ void SampleSession::play() {
     if (m_sourcePath.isEmpty()) {
         return;
     }
+    if (playPreviewViaEngine()) {
+        return;
+    }
     if (m_forceExternal) {
         playExternal();
         return;
@@ -123,6 +143,7 @@ void SampleSession::play() {
 }
 
 void SampleSession::stop() {
+    stopPreview();
     if (m_player) {
         m_player->stop();
     }
@@ -130,6 +151,9 @@ void SampleSession::stop() {
 }
 
 bool SampleSession::isPlaying() const {
+    if (m_previewActive) {
+        return true;
+    }
     if (m_externalPlayer) {
         return m_externalPlayer->state() == QProcess::Running;
     }
@@ -137,6 +161,12 @@ bool SampleSession::isPlaying() const {
 }
 
 float SampleSession::playbackProgress() const {
+    if (m_previewActive && m_previewDurationMs > 0) {
+        const qint64 elapsed = m_previewTimer.isValid() ? m_previewTimer.elapsed() : 0;
+        const float ratio =
+            static_cast<float>(static_cast<double>(elapsed) / static_cast<double>(m_previewDurationMs));
+        return qBound(0.0f, ratio, 1.0f);
+    }
     if (m_durationMs <= 0) {
         return -1.0f;
     }
@@ -255,6 +285,36 @@ void SampleSession::handlePlayerState(QMediaPlayer::PlaybackState state) {
         m_playbackPosMs = 0;
     }
     emit playbackChanged(state == QMediaPlayer::PlayingState);
+}
+
+bool SampleSession::playPreviewViaEngine() {
+    if (!m_pads) {
+        return false;
+    }
+    if (!m_pads->previewSample(m_sourcePath, nullptr)) {
+        return false;
+    }
+    m_previewActive = true;
+    m_previewDurationMs = 0;
+    m_previewTimer.restart();
+    emit playbackChanged(true);
+    if (!m_previewPoll.isActive()) {
+        m_previewPoll.start();
+    }
+    return true;
+}
+
+void SampleSession::stopPreview() {
+    if (!m_previewActive) {
+        return;
+    }
+    m_previewActive = false;
+    m_previewDurationMs = 0;
+    m_previewPoll.stop();
+    if (m_pads) {
+        m_pads->stopPreview();
+    }
+    emit playbackChanged(false);
 }
 
 void SampleSession::ensureAudioOutput() {

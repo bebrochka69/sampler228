@@ -7,13 +7,17 @@
 #include <QString>
 #include <QStringList>
 #include <QVector>
+#include <QElapsedTimer>
+#include <QTimer>
 
 class QAudioOutput;
+class PadBank;
 
 class SampleSession : public QObject {
     Q_OBJECT
 public:
-    explicit SampleSession(QObject *parent = nullptr);
+    explicit SampleSession(PadBank *pads = nullptr, QObject *parent = nullptr);
+    void setPreviewPads(PadBank *pads) { m_pads = pads; }
 
     enum class DecodeMode {
         Full,
@@ -55,6 +59,8 @@ private:
     void playExternal();
     void stopExternal();
     bool buildExternalCommand(QString &program, QStringList &args) const;
+    bool playPreviewViaEngine();
+    void stopPreview();
 
     QString m_sourcePath;
     DecodeMode m_decodeMode = DecodeMode::Full;
@@ -64,6 +70,11 @@ private:
     bool m_hasAudioOutput = false;
     bool m_forceExternal = false;
     QProcess *m_externalPlayer = nullptr;
+    PadBank *m_pads = nullptr;
+    bool m_previewActive = false;
+    qint64 m_previewDurationMs = 0;
+    QElapsedTimer m_previewTimer;
+    QTimer m_previewPoll;
 
     QVector<float> m_pcm;
     QVector<float> m_waveform;

@@ -141,10 +141,15 @@ public:
     float busMeter(int bus) const;
     float busGain(int bus) const;
     void setBusGain(int bus, float gain);
+    bool setAudioDevice(const QString &device);
+    QString audioDevice() const;
     int engineSampleRate() const { return m_engineRate; }
     bool startRecording(const QString &path, int durationMs, int targetRate);
     void triggerMetronome(bool accent);
     float normalizeGainForPad(int index) const;
+    bool previewSample(const QString &path, int *durationMs = nullptr);
+    void stopPreview();
+    bool isPreviewActive() const { return m_previewActive; }
 
 signals:
     void padChanged(int index);
@@ -180,4 +185,10 @@ private:
     QTimer *m_synthConnectTimer = nullptr;
     std::shared_ptr<AudioEngine::Buffer> m_metronomeBuffer;
     std::shared_ptr<AudioEngine::Buffer> m_metronomeAccent;
+    QProcess *m_previewProcess = nullptr;
+    QByteArray m_previewBytes;
+    std::shared_ptr<AudioEngine::Buffer> m_previewBuffer;
+    QString m_previewPath;
+    int m_previewSampleRate = 0;
+    bool m_previewActive = false;
 };

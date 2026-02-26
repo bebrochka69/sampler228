@@ -34,7 +34,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     m_toolbar = new TopToolbarWidget(m_padBank, central);
 
     m_stack = new QStackedWidget(central);
-    m_sampleSession = new SampleSession(this);
+    m_sampleSession = new SampleSession(m_padBank, this);
     m_seqPage = new SeqPageWidget(m_padBank, m_stack);
     auto *editPage = new EditPageWidget(m_sampleSession, m_padBank, m_stack);
     m_fxPage = new FxPageWidget(m_padBank, m_stack);
