@@ -76,6 +76,8 @@ public:
     bool isAvailable() const { return m_available; }
     int sampleRate() const { return m_sampleRate; }
     int channels() const { return m_channels; }
+    bool setAlsaDevice(const QString &device);
+    QString alsaDevice() const { return m_activeDevice; }
 
     void trigger(int padId, const std::shared_ptr<Buffer> &buffer, int startFrame, int endFrame,
                  bool loop, float volume, float pan, float rate, int bus);
@@ -238,6 +240,8 @@ private:
     std::vector<float> m_recordFloat;
     std::mutex m_recordMutex;
     void *m_pcmHandle = nullptr;
+    QString m_deviceOverride;
+    QString m_activeDevice;
 
     std::array<std::atomic<float>, 8> m_padAttack{};
     std::array<std::atomic<float>, 8> m_padDecay{};

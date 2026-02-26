@@ -86,7 +86,7 @@ void AudioEngine::start() {
         return;
     }
 
-    auto deviceList = []() {
+    auto deviceList = [this]() {
         auto detectPreferred = []() -> QString {
 #ifdef Q_OS_LINUX
             QFile file("/proc/asound/cards");
@@ -126,6 +126,9 @@ void AudioEngine::start() {
             return QString();
         };
         QStringList list;
+        if (!m_deviceOverride.trimmed().isEmpty()) {
+            list << m_deviceOverride.trimmed();
+        }
         const QString envSingle = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
         const QString envList = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICES");
         if (!envSingle.isEmpty()) {
@@ -157,9 +160,11 @@ void AudioEngine::start() {
 
     snd_pcm_t *pcm = nullptr;
     const QStringList devices = deviceList();
+    QString openedDevice;
     for (const QString &dev : devices) {
         if (snd_pcm_open(&pcm, dev.toLocal8Bit().constData(),
                          SND_PCM_STREAM_PLAYBACK, 0) >= 0) {
+            openedDevice = dev;
             break;
         }
         pcm = nullptr;
@@ -167,6 +172,7 @@ void AudioEngine::start() {
 
     if (!pcm) {
         m_available = false;
+        m_activeDevice.clear();
         return;
     }
 
@@ -199,6 +205,7 @@ void AudioEngine::start() {
     snd_pcm_prepare(pcm);
 
     m_pcmHandle = pcm;
+    m_activeDevice = openedDevice;
     m_available = true;
     m_running = true;
     m_thread = std::thread(&AudioEngine::run, this);
@@ -225,6 +232,31 @@ void AudioEngine::stop() {
 #endif
     m_available = false;
 }
+
+#ifdef GROOVEBOX_WITH_ALSA
+bool AudioEngine::setAlsaDevice(const QString &device) {
+    const QString next = device.trimmed();
+    if (next == m_deviceOverride && m_available) {
+        return true;
+    }
+    const QString prevOverride = m_deviceOverride;
+    m_deviceOverride = next;
+    stop();
+    start();
+    if (!m_available) {
+        m_deviceOverride = prevOverride;
+        stop();
+        start();
+        return m_available;
+    }
+    return true;
+}
+#else
+bool AudioEngine::setAlsaDevice(const QString &device) {
+    Q_UNUSED(device);
+    return false;
+}
+#endif
 
 void AudioEngine::trigger(int padId, const std::shared_ptr<Buffer> &buffer, int startFrame,
                           int endFrame, bool loop, float volume, float pan, float rate, int bus) {
