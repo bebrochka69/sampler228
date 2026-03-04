@@ -74,12 +74,11 @@ protected:
                 const QString type = (i >= 0 && i < m_items.size()) ? m_items[i] : QString("DX7");
                 QString preset;
                 const QString upper = type.trimmed().toUpper();
-                if (upper == "SIMPLE" || upper == "FM" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL") {
-                    const QStringList presets = PadBank::synthPresetsForBank("SIMPLE");
-                    preset = presets.isEmpty() ? QString("INIT") : presets.first();
-                } else {
+                if (upper == "DX7") {
                     const QStringList presets = PadBank::synthPresets();
                     preset = presets.isEmpty() ? QString("PROGRAM 01") : presets.first();
+                } else {
+                    preset = QString("INIT");
                 }
                 m_pads->setSynth(m_activePad, QString("%1:%2").arg(type).arg(preset));
                 emit synthAssigned();

@@ -42,8 +42,22 @@ constexpr float kAdsrMaxSeconds = 2.37842f;
 
 bool isSimpleType(const QString &type) {
     const QString upper = type.trimmed().toUpper();
-    return upper == "SIMPLE" || upper == "VITALYA" || upper == "VITAL" || upper == "SERUM" ||
-           upper == "FM";
+    return upper == "SIMPLE" || upper == "VITALYA" || upper == "VITAL" || upper == "SERUM";
+}
+
+QString canonicalType(const QString &type) {
+    QString upper = type.trimmed().toUpper();
+    upper.remove(' ');
+    upper.remove('_');
+    upper.remove('-');
+    return upper;
+}
+
+bool isCustomEngineType(const QString &type) {
+    const QString t = canonicalType(type);
+    return t == "CLUSTER" || t == "DIGITAL" || t == "DNA" || t == "DRWAVE" ||
+           t == "DSYNTH" || t == "FM" || t == "PULSE" || t == "PHASE" ||
+           t == "RING" || t == "STRING" || t == "VOLTAGE";
 }
 
 QVector<int> visibleParamIndicesForType(const QString &type) {
@@ -128,8 +142,8 @@ QString synthTypeFromId(const QString &id);
 
 QString synthBank(const QString &id) {
     const QString type = synthTypeFromId(id).trimmed().toUpper();
-    if (isSimpleType(type)) {
-        return QStringLiteral("SIMPLE");
+    if (isSimpleType(type) || isCustomEngineType(type)) {
+        return type;
     }
     const QString preset = synthPreset(id);
     const int slash = preset.indexOf('/');
@@ -169,7 +183,7 @@ QString synthTypeFromId(const QString &id) {
 
 bool isFmBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
-    return isSimpleType(upper);
+    return isSimpleType(upper) || isCustomEngineType(upper);
 }
 
 QString classifyPresetType(const QString &name) {
@@ -400,7 +414,7 @@ void SynthPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad));
-    const bool presetsAllowed = !isSimpleType(type);
+    const bool presetsAllowed = (type.trimmed().toUpper() == "DX7");
     if (key == Qt::Key_P) {
         if (presetsAllowed) {
             m_showPresetMenu = !m_showPresetMenu;
@@ -464,7 +478,7 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad));
-    const bool presetsAllowed = !isSimpleType(type);
+    const bool presetsAllowed = (type.trimmed().toUpper() == "DX7");
 
     if (m_busRect.contains(pos) && m_pads) {
         const int nextBus = (m_pads->fxBus(m_activePad) + 1) % 6;
@@ -580,7 +594,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
 
     const QString id = synthIdOrDefault(m_pads, m_activePad);
     const QString synthType = synthTypeFromId(id);
-    const bool presetsAllowed = !isSimpleType(synthType);
+    const bool presetsAllowed = (synthType.trimmed().toUpper() == "DX7");
 
     const float buttonW = Theme::pxF(96.0f);
     const float buttonH = header.height() - Theme::pxF(4.0f);

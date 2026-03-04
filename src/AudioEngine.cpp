@@ -1,4 +1,5 @@
 #include "AudioEngine.h"
+#include "op1_engines.h"
 
 #include <algorithm>
 #include <chrono>
@@ -39,6 +40,68 @@ void computePanGains(float pan, float volume, float &left, float &right) {
     const float r = pan >= 0.0f ? 1.0f : 1.0f + pan;
     left = volume * l;
     right = volume * r;
+}
+
+bool isCustomKind(AudioEngine::SynthKind kind) {
+    return kind != AudioEngine::SynthKind::Dx7 && kind != AudioEngine::SynthKind::Simple;
+}
+
+Op1EngineType op1TypeFromKind(AudioEngine::SynthKind kind) {
+    switch (kind) {
+        case AudioEngine::SynthKind::Cluster:
+            return Op1EngineType::Cluster;
+        case AudioEngine::SynthKind::Digital:
+            return Op1EngineType::Digital;
+        case AudioEngine::SynthKind::DNA:
+            return Op1EngineType::DNA;
+        case AudioEngine::SynthKind::DrWave:
+            return Op1EngineType::DrWave;
+        case AudioEngine::SynthKind::DSynth:
+            return Op1EngineType::DSynth;
+        case AudioEngine::SynthKind::FM:
+            return Op1EngineType::FM;
+        case AudioEngine::SynthKind::Pulse:
+            return Op1EngineType::Pulse;
+        case AudioEngine::SynthKind::Phase:
+            return Op1EngineType::Phase;
+        case AudioEngine::SynthKind::Ring:
+            return Op1EngineType::Ring;
+        case AudioEngine::SynthKind::String:
+            return Op1EngineType::String;
+        case AudioEngine::SynthKind::Voltage:
+            return Op1EngineType::Voltage;
+        default:
+            return Op1EngineType::Digital;
+    }
+}
+
+Op1Params toOp1Params(const AudioEngine::FmParams &fm) {
+    Op1Params p;
+    p.fmAmount = fm.fmAmount;
+    p.ratio = fm.ratio;
+    p.feedback = fm.feedback;
+    p.octave = fm.octave;
+    p.cutoff = fm.cutoff;
+    p.resonance = fm.resonance;
+    p.filterEnv = fm.filterEnv;
+    p.filterType = fm.filterType;
+    p.lfoRate = fm.lfoRate;
+    p.lfoDepth = fm.lfoDepth;
+    p.osc1Wave = fm.osc1Wave;
+    p.osc2Wave = fm.osc2Wave;
+    p.osc1Voices = fm.osc1Voices;
+    p.osc2Voices = fm.osc2Voices;
+    p.osc1Detune = fm.osc1Detune;
+    p.osc2Detune = fm.osc2Detune;
+    p.osc1Gain = fm.osc1Gain;
+    p.osc2Gain = fm.osc2Gain;
+    p.osc1Pan = fm.osc1Pan;
+    p.osc2Pan = fm.osc2Pan;
+    p.attack = fm.attack;
+    p.decay = fm.decay;
+    p.sustain = fm.sustain;
+    p.release = fm.release;
+    return p;
 }
 }  // namespace
 
@@ -509,8 +572,10 @@ void AudioEngine::setSynthEnabled(int padId, bool enabled) {
             if (state.activeNotes[n]) {
                 if (state.kind == SynthKind::Simple) {
                     state.simple.noteOff(static_cast<int>(n));
-                } else {
+                } else if (state.kind == SynthKind::Dx7) {
                     state.core.noteOff(static_cast<int>(n));
+                } else if (state.op1) {
+                    state.op1->noteOff(static_cast<int>(n));
                 }
                 state.activeNotes[n] = false;
             }
@@ -535,6 +600,8 @@ void AudioEngine::setSynthKind(int padId, SynthKind kind) {
     state.kind = kind;
     state.initialized = false;
     state.bankLoaded = false;
+    state.op1.reset();
+    state.op1Kind = SynthKind::Dx7;
     state.env = 0.0f;
     state.envStage = EnvStage::Attack;
     state.releaseRequested = false;
@@ -572,10 +639,16 @@ void AudioEngine::setFmParams(int padId, const FmParams &params) {
     std::lock_guard<std::mutex> lock(m_mutex);
     SynthState &state = m_synthStates[static_cast<size_t>(padId)];
     state.fmParams = params;
+    state.filterCutoff = params.cutoff;
+    state.filterResonance = params.resonance;
+    state.filterType = params.filterType;
+    state.filterEnvAmount = params.filterEnv;
+    state.lfoRate = params.lfoRate;
+    state.lfoDepth = params.lfoDepth;
     SimpleFmCore::Params simpleParams;
-    simpleParams.fmAmount = 0.0f;
-    simpleParams.ratio = 1.0f;
-    simpleParams.feedback = 0.0f;
+    simpleParams.fmAmount = params.fmAmount;
+    simpleParams.ratio = params.ratio;
+    simpleParams.feedback = params.feedback;
     simpleParams.octave = params.octave;
     simpleParams.osc1Wave = params.osc1Wave;
     simpleParams.osc2Wave = params.osc2Wave;
@@ -585,9 +658,12 @@ void AudioEngine::setFmParams(int padId, const FmParams &params) {
     simpleParams.osc2Detune = params.osc2Detune;
     simpleParams.osc1Gain = params.osc1Gain;
     simpleParams.osc2Gain = params.osc2Gain;
-    simpleParams.osc1Pan = 0.0f;
-    simpleParams.osc2Pan = 0.0f;
+    simpleParams.osc1Pan = params.osc1Pan;
+    simpleParams.osc2Pan = params.osc2Pan;
     state.simple.setParams(simpleParams);
+    if (state.op1) {
+        state.op1->setParams(toOp1Params(params));
+    }
 }
 
 void AudioEngine::setSynthVoices(int padId, int voices) {
@@ -629,8 +705,10 @@ void AudioEngine::synthNoteOn(int padId, int midiNote, int velocity) {
     ensureSynthInit(state);
     if (state.kind == SynthKind::Simple) {
         state.simple.noteOn(midiNote, velocity);
-    } else {
+    } else if (state.kind == SynthKind::Dx7) {
         state.core.noteOn(midiNote, velocity);
+    } else if (state.op1) {
+        state.op1->noteOn(midiNote, velocity);
     }
     state.activeNotes[static_cast<size_t>(midiNote)] = true;
     if (!hadActive || state.envStage == EnvStage::Release) {
@@ -657,8 +735,10 @@ void AudioEngine::synthNoteOff(int padId, int midiNote) {
     ensureSynthInit(state);
     if (state.kind == SynthKind::Simple) {
         state.simple.noteOff(midiNote);
-    } else {
+    } else if (state.kind == SynthKind::Dx7) {
         state.core.noteOff(midiNote);
+    } else if (state.op1) {
+        state.op1->noteOff(midiNote);
     }
     state.activeNotes[static_cast<size_t>(midiNote)] = false;
     const bool hasActive =
@@ -685,8 +765,10 @@ void AudioEngine::synthAllNotesOff(int padId) {
         if (state.activeNotes[n]) {
             if (state.kind == SynthKind::Simple) {
                 state.simple.noteOff(static_cast<int>(n));
-            } else {
+            } else if (state.kind == SynthKind::Dx7) {
                 state.core.noteOff(static_cast<int>(n));
+            } else if (state.op1) {
+                state.op1->noteOff(static_cast<int>(n));
             }
             state.activeNotes[n] = false;
         }
@@ -855,6 +937,19 @@ void AudioEngine::ensureSynthInit(SynthState &state) {
         state.simple.setParams(simpleParams);
         state.initialized = true;
         return;
+    }
+
+    if (isCustomKind(state.kind)) {
+        if (!state.op1 || state.op1Kind != state.kind) {
+            state.op1 = createOp1Engine(op1TypeFromKind(state.kind));
+            state.op1Kind = state.kind;
+        }
+        if (state.op1) {
+            state.op1->init(m_sampleRate, state.voices);
+            state.op1->setParams(toOp1Params(state.fmParams));
+            state.initialized = true;
+            return;
+        }
     }
 
     state.core.init(m_sampleRate, state.voices);
@@ -1048,7 +1143,7 @@ void AudioEngine::mix(float *out, int frames) {
             const bool isSimple = (synth.kind == SynthKind::Simple);
             const bool neutralEnv =
                 (attack <= 0.001f && decay <= 0.001f && release <= 0.001f && sustain >= 0.999f);
-            const bool useExternalEnv = !isSimple && !(isDx7 && neutralEnv);
+            const bool useExternalEnv = !(isDx7 && neutralEnv);
 
             const bool hasNotes = std::any_of(synth.activeNotes.begin(),
                                              synth.activeNotes.end(),
@@ -1060,11 +1155,16 @@ void AudioEngine::mix(float *out, int frames) {
             }
             if (synth.kind == SynthKind::Simple) {
                 synth.simple.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
-            } else {
+            } else if (synth.kind == SynthKind::Dx7) {
                 synth.core.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
+            } else if (synth.op1) {
+                synth.op1->render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
+            } else {
+                std::fill(m_synthScratchL.begin(), m_synthScratchL.end(), 0.0f);
+                std::fill(m_synthScratchR.begin(), m_synthScratchR.end(), 0.0f);
             }
 
-            const bool useFilter = false;
+            const bool useFilter = (!isDx7 && synth.filterType != 8);
             const float baseCutoff = synth.filterCutoff;
             const float baseRes = synth.filterResonance;
             const float lfoDepth = synth.lfoDepth;
@@ -1127,14 +1227,21 @@ void AudioEngine::mix(float *out, int frames) {
                 if (useFilter) {
                     float g = staticG;
                     float R = staticR;
+                    float cutoff = baseCutoff;
+                    if (synth.filterEnvAmount > 0.0001f) {
+                        cutoff = std::max(0.02f, std::min(0.98f,
+                                                          cutoff + env * synth.filterEnvAmount));
+                    }
                     if (lfoDepth > 0.0001f) {
                         const float lfo = std::sin(synth.lfoPhase);
                         synth.lfoPhase += lfoInc;
                         if (synth.lfoPhase > 2.0f * static_cast<float>(M_PI)) {
                             synth.lfoPhase -= 2.0f * static_cast<float>(M_PI);
                         }
-                        const float cutoff =
-                            std::max(0.02f, std::min(0.98f, baseCutoff + lfo * lfoDepth * 0.5f));
+                        cutoff =
+                            std::max(0.02f, std::min(0.98f, cutoff + lfo * lfoDepth * 0.5f));
+                    }
+                    if (g == 0.0f || lfoDepth > 0.0001f || synth.filterEnvAmount > 0.0001f) {
                         const float hz = 40.0f * std::pow(2.0f, cutoff * 8.0f);
                         g = std::tan(static_cast<float>(M_PI) * hz / m_sampleRate);
                         const float q = 0.7f + baseRes * 7.0f;

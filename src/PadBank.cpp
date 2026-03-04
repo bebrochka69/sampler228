@@ -51,11 +51,25 @@ constexpr const char *kFxBusLabels[] = {
 
 QString defaultMiniDexedType();
 
+QString canonicalType(const QString &name) {
+    QString upper = name.trimmed().toUpper();
+    upper.remove(' ');
+    upper.remove('_');
+    upper.remove('-');
+    return upper;
+}
+
+bool isCustomEngineType(const QString &type) {
+    const QString t = canonicalType(type);
+    return t == "CLUSTER" || t == "DIGITAL" || t == "DNA" || t == "DRWAVE" ||
+           t == "DSYNTH" || t == "FM" || t == "PULSE" || t == "PHASE" ||
+           t == "RING" || t == "STRING" || t == "VOLTAGE";
+}
+
 QString synthTypeFromName(const QString &name) {
     const QString upper = name.trimmed().toUpper();
     if (upper.startsWith("VITALYA") || upper.startsWith("VITAL") ||
-        upper.startsWith("FM") || upper.startsWith("SERUM") ||
-        upper.startsWith("SIMPLE")) {
+        upper.startsWith("SERUM") || upper.startsWith("SIMPLE")) {
         return "SIMPLE";
     }
     if (upper.startsWith("DX7")) {
@@ -67,6 +81,9 @@ QString synthTypeFromName(const QString &name) {
     if (upper.contains(":")) {
         const int colon = upper.indexOf(':');
         return upper.left(colon).trimmed();
+    }
+    if (isCustomEngineType(upper)) {
+        return upper.trimmed();
     }
     return QStringLiteral("SIMPLE");
 }
@@ -92,7 +109,10 @@ bool isMiniDexedType(const QString &type) {
 
 bool isFmType(const QString &type) {
     const QString t = type.trimmed().toUpper();
-    return t == "SIMPLE" || t == "FM" || t == "SERUM" || t == "VITALYA" || t == "VITAL";
+    if (t == "SIMPLE" || t == "SERUM" || t == "VITALYA" || t == "VITAL") {
+        return true;
+    }
+    return isCustomEngineType(t);
 }
 
 QString defaultMiniDexedType() {
@@ -256,6 +276,190 @@ struct FmPreset {
 static QVector<FmPreset> g_fmPresets;
 static bool g_fmPresetsReady = false;
 
+static PadBank::SynthParams defaultParamsForEngine(const QString &type) {
+    PadBank::SynthParams params;
+    const QString t = canonicalType(type);
+
+    if (t == "CLUSTER") {
+        params.osc1Wave = 4;
+        params.osc2Wave = 0;
+        params.osc1Voices = 4;
+        params.osc1Detune = 0.5f;
+        params.cutoff = 0.7f;
+        params.resonance = 0.3f;
+        params.filterType = 2;
+        params.lfoRate = 0.35f;
+        params.lfoDepth = 0.4f;
+        params.attack = 0.05f;
+        params.decay = 0.4f;
+        params.sustain = 0.6f;
+        params.release = 0.35f;
+        return params;
+    }
+    if (t == "DIGITAL") {
+        params.osc1Wave = 1;
+        params.osc2Wave = 2;
+        params.fmAmount = 0.6f;
+        params.feedback = 0.4f;
+        params.ratio = 2.0f;
+        params.cutoff = 0.85f;
+        params.filterType = 8;
+        params.attack = 0.01f;
+        params.decay = 0.2f;
+        params.sustain = 0.7f;
+        params.release = 0.2f;
+        return params;
+    }
+    if (t == "DNA") {
+        params.osc1Wave = 4;
+        params.osc2Wave = 4;
+        params.osc2Gain = 0.35f;
+        params.fmAmount = 0.7f;
+        params.feedback = 0.35f;
+        params.cutoff = 0.5f;
+        params.resonance = 0.2f;
+        params.filterType = 2;
+        params.lfoRate = 0.2f;
+        params.lfoDepth = 0.3f;
+        params.attack = 0.02f;
+        params.decay = 0.3f;
+        params.sustain = 0.5f;
+        params.release = 0.3f;
+        return params;
+    }
+    if (t == "DRWAVE") {
+        params.osc1Wave = 8;
+        params.osc2Wave = 6;
+        params.osc1Voices = 2;
+        params.osc1Detune = 0.2f;
+        params.fmAmount = 0.55f;
+        params.lfoRate = 0.3f;
+        params.lfoDepth = 0.25f;
+        params.cutoff = 0.7f;
+        params.resonance = 0.15f;
+        params.filterType = 0;
+        params.attack = 0.08f;
+        params.decay = 0.3f;
+        params.sustain = 0.7f;
+        params.release = 0.35f;
+        return params;
+    }
+    if (t == "DSYNTH") {
+        params.osc1Wave = 1;
+        params.osc2Wave = 2;
+        params.osc1Gain = 0.8f;
+        params.osc2Gain = 0.6f;
+        params.osc1Detune = 0.15f;
+        params.osc2Detune = 0.08f;
+        params.cutoff = 0.55f;
+        params.resonance = 0.25f;
+        params.filterType = 0;
+        params.attack = 0.01f;
+        params.decay = 0.25f;
+        params.sustain = 0.75f;
+        params.release = 0.2f;
+        return params;
+    }
+    if (t == "FM") {
+        params.osc1Wave = 0;
+        params.osc2Wave = 0;
+        params.fmAmount = 0.8f;
+        params.feedback = 0.3f;
+        params.ratio = 2.0f;
+        params.cutoff = 0.85f;
+        params.filterType = 8;
+        params.attack = 0.02f;
+        params.decay = 0.35f;
+        params.sustain = 0.4f;
+        params.release = 0.25f;
+        return params;
+    }
+    if (t == "PULSE") {
+        params.osc1Wave = 2;
+        params.fmAmount = 0.5f;
+        params.lfoRate = 0.4f;
+        params.lfoDepth = 0.35f;
+        params.cutoff = 0.9f;
+        params.filterType = 8;
+        params.attack = 0.0f;
+        params.decay = 0.12f;
+        params.sustain = 0.7f;
+        params.release = 0.1f;
+        return params;
+    }
+    if (t == "PHASE") {
+        params.osc1Wave = 0;
+        params.osc2Wave = 0;
+        params.fmAmount = 0.6f;
+        params.ratio = 1.5f;
+        params.cutoff = 0.75f;
+        params.resonance = 0.2f;
+        params.filterType = 0;
+        params.attack = 0.04f;
+        params.decay = 0.25f;
+        params.sustain = 0.6f;
+        params.release = 0.3f;
+        return params;
+    }
+    if (t == "RING") {
+        params.osc1Wave = 0;
+        params.osc2Wave = 1;
+        params.fmAmount = 0.7f;
+        params.ratio = 1.25f;
+        params.cutoff = 0.8f;
+        params.resonance = 0.2f;
+        params.filterType = 2;
+        params.attack = 0.01f;
+        params.decay = 0.2f;
+        params.sustain = 0.5f;
+        params.release = 0.25f;
+        return params;
+    }
+    if (t == "STRING") {
+        params.osc1Wave = 4;
+        params.fmAmount = 0.0f;
+        params.cutoff = 0.65f;
+        params.resonance = 0.3f;
+        params.filterType = 0;
+        params.attack = 0.0f;
+        params.decay = 0.2f;
+        params.sustain = 0.0f;
+        params.release = 0.2f;
+        return params;
+    }
+    if (t == "VOLTAGE") {
+        params.osc1Wave = 1;
+        params.osc1Voices = 5;
+        params.osc1Detune = 0.4f;
+        params.osc1Gain = 0.8f;
+        params.cutoff = 0.6f;
+        params.resonance = 0.2f;
+        params.filterType = 0;
+        params.attack = 0.02f;
+        params.decay = 0.25f;
+        params.sustain = 0.75f;
+        params.release = 0.3f;
+        return params;
+    }
+    return params;
+}
+
+static AudioEngine::SynthKind synthKindForType(const QString &type) {
+    const QString t = canonicalType(type);
+    if (t == "CLUSTER") return AudioEngine::SynthKind::Cluster;
+    if (t == "DIGITAL") return AudioEngine::SynthKind::Digital;
+    if (t == "DNA") return AudioEngine::SynthKind::DNA;
+    if (t == "DRWAVE") return AudioEngine::SynthKind::DrWave;
+    if (t == "DSYNTH") return AudioEngine::SynthKind::DSynth;
+    if (t == "FM") return AudioEngine::SynthKind::FM;
+    if (t == "PULSE") return AudioEngine::SynthKind::Pulse;
+    if (t == "PHASE") return AudioEngine::SynthKind::Phase;
+    if (t == "RING") return AudioEngine::SynthKind::Ring;
+    if (t == "STRING") return AudioEngine::SynthKind::String;
+    if (t == "VOLTAGE") return AudioEngine::SynthKind::Voltage;
+    return AudioEngine::SynthKind::Simple;
+}
+
 static void ensureFmPresets() {
     if (g_fmPresetsReady) {
         return;
@@ -265,109 +469,238 @@ static void ensureFmPresets() {
 
     auto base = PadBank::SynthParams();
 
-    FmPreset init;
-    init.name = "INIT";
-    init.params = base;
-    init.params.fmAmount = 0.0f;
-    init.params.ratio = 1.0f;
-    init.params.feedback = 0.0f;
-    init.params.osc1Wave = 0;
-    init.params.osc2Wave = 0;
-    init.params.osc1Voices = 1;
-    init.params.osc2Voices = 1;
-    init.params.osc1Detune = 0.0f;
-    init.params.osc2Detune = 0.0f;
-    init.params.osc1Gain = 0.8f;
-    init.params.osc2Gain = 0.5f;
-    init.params.osc1Pan = -0.1f;
-    init.params.osc2Pan = 0.1f;
-    init.params.filterType = 0;
-    init.params.cutoff = 0.9f;
-    init.params.resonance = 0.1f;
-    init.params.attack = 0.05f;
-    init.params.decay = 0.2f;
-    init.params.sustain = 0.8f;
-    init.params.release = 0.2f;
-    g_fmPresets.push_back(init);
+    auto addPreset = [&](const QString &name, const PadBank::SynthParams &params) {
+        FmPreset preset;
+        preset.name = name;
+        preset.params = params;
+        g_fmPresets.push_back(preset);
+    };
 
-    FmPreset piano;
-    piano.name = "FM PIANO";
-    piano.params = base;
-    piano.params.fmAmount = 0.55f;
-    piano.params.ratio = 2.0f;
-    piano.params.feedback = 0.25f;
-    piano.params.osc1Wave = 0;
-    piano.params.osc2Wave = 0;
-    piano.params.osc1Gain = 0.8f;
-    piano.params.osc2Gain = 0.6f;
-    piano.params.filterType = 0;
-    piano.params.cutoff = 0.85f;
-    piano.params.resonance = 0.15f;
-    piano.params.attack = 0.02f;
-    piano.params.decay = 0.3f;
-    piano.params.sustain = 0.6f;
-    piano.params.release = 0.25f;
-    g_fmPresets.push_back(piano);
+    PadBank::SynthParams init = base;
+    init.fmAmount = 0.0f;
+    init.ratio = 1.0f;
+    init.feedback = 0.0f;
+    init.osc1Wave = 0;
+    init.osc2Wave = 0;
+    init.osc1Voices = 1;
+    init.osc2Voices = 1;
+    init.osc1Detune = 0.0f;
+    init.osc2Detune = 0.0f;
+    init.osc1Gain = 0.8f;
+    init.osc2Gain = 0.0f;
+    init.osc1Pan = -0.1f;
+    init.osc2Pan = 0.1f;
+    init.filterType = 0;
+    init.cutoff = 0.9f;
+    init.resonance = 0.1f;
+    init.filterEnv = 0.0f;
+    init.attack = 0.02f;
+    init.decay = 0.2f;
+    init.sustain = 0.9f;
+    init.release = 0.2f;
+    addPreset("INIT", init);
 
-    FmPreset bell;
-    bell.name = "FM BELL";
-    bell.params = base;
-    bell.params.fmAmount = 0.8f;
-    bell.params.ratio = 3.0f;
-    bell.params.feedback = 0.4f;
-    bell.params.osc1Wave = 7;
-    bell.params.osc2Wave = 0;
-    bell.params.osc1Gain = 0.75f;
-    bell.params.osc2Gain = 0.6f;
-    bell.params.filterType = 0;
-    bell.params.cutoff = 0.95f;
-    bell.params.resonance = 0.1f;
-    bell.params.attack = 0.01f;
-    bell.params.decay = 0.25f;
-    bell.params.sustain = 0.3f;
-    bell.params.release = 0.35f;
-    g_fmPresets.push_back(bell);
+    PadBank::SynthParams acid = base;
+    acid.osc1Wave = 1;
+    acid.osc2Wave = 2;
+    acid.osc1Gain = 0.85f;
+    acid.osc2Gain = 0.15f;
+    acid.osc1Voices = 1;
+    acid.osc2Voices = 1;
+    acid.cutoff = 0.28f;
+    acid.resonance = 0.75f;
+    acid.filterEnv = 0.55f;
+    acid.filterType = 0;
+    acid.attack = 0.0f;
+    acid.decay = 0.25f;
+    acid.sustain = 0.15f;
+    acid.release = 0.12f;
+    addPreset("ACID BASS", acid);
 
-    FmPreset bass;
-    bass.name = "FM BASS";
-    bass.params = base;
-    bass.params.fmAmount = 0.35f;
-    bass.params.ratio = 1.0f;
-    bass.params.feedback = 0.15f;
-    bass.params.osc1Wave = 1;
-    bass.params.osc2Wave = 2;
-    bass.params.osc1Gain = 0.9f;
-    bass.params.osc2Gain = 0.4f;
-    bass.params.filterType = 0;
-    bass.params.cutoff = 0.45f;
-    bass.params.resonance = 0.25f;
-    bass.params.attack = 0.01f;
-    bass.params.decay = 0.25f;
-    bass.params.sustain = 0.7f;
-    bass.params.release = 0.15f;
-    g_fmPresets.push_back(bass);
+    PadBank::SynthParams sub = base;
+    sub.osc1Wave = 0;
+    sub.osc2Wave = 1;
+    sub.osc1Gain = 0.95f;
+    sub.osc2Gain = 0.15f;
+    sub.cutoff = 0.32f;
+    sub.resonance = 0.1f;
+    sub.filterEnv = 0.08f;
+    sub.filterType = 0;
+    sub.attack = 0.0f;
+    sub.decay = 0.2f;
+    sub.sustain = 0.85f;
+    sub.release = 0.15f;
+    addPreset("SUB BASS", sub);
 
-    FmPreset pad;
-    pad.name = "FM PAD";
-    pad.params = base;
-    pad.params.fmAmount = 0.4f;
-    pad.params.ratio = 1.5f;
-    pad.params.feedback = 0.1f;
-    pad.params.osc1Wave = 6;
-    pad.params.osc2Wave = 0;
-    pad.params.osc1Voices = 2;
-    pad.params.osc2Voices = 1;
-    pad.params.osc1Detune = 0.2f;
-    pad.params.osc1Gain = 0.8f;
-    pad.params.osc2Gain = 0.4f;
-    pad.params.filterType = 0;
-    pad.params.cutoff = 0.6f;
-    pad.params.resonance = 0.2f;
-    pad.params.attack = 0.3f;
-    pad.params.decay = 0.4f;
-    pad.params.sustain = 0.8f;
-    pad.params.release = 0.5f;
-    g_fmPresets.push_back(pad);
+    PadBank::SynthParams pad = base;
+    pad.osc1Wave = 6;
+    pad.osc2Wave = 1;
+    pad.osc1Voices = 4;
+    pad.osc2Voices = 2;
+    pad.osc1Detune = 0.35f;
+    pad.osc2Detune = 0.15f;
+    pad.osc1Gain = 0.7f;
+    pad.osc2Gain = 0.45f;
+    pad.cutoff = 0.55f;
+    pad.resonance = 0.2f;
+    pad.filterEnv = 0.25f;
+    pad.filterType = 0;
+    pad.lfoRate = 0.2f;
+    pad.lfoDepth = 0.12f;
+    pad.attack = 0.55f;
+    pad.decay = 0.35f;
+    pad.sustain = 0.85f;
+    pad.release = 0.75f;
+    addPreset("ANALOG PAD", pad);
+
+    PadBank::SynthParams karplus = base;
+    karplus.osc1Wave = 4;
+    karplus.osc2Gain = 0.0f;
+    karplus.cutoff = 0.6f;
+    karplus.resonance = 0.65f;
+    karplus.filterEnv = 0.4f;
+    karplus.filterType = 2;
+    karplus.attack = 0.0f;
+    karplus.decay = 0.18f;
+    karplus.sustain = 0.0f;
+    karplus.release = 0.12f;
+    addPreset("KARPLUS PLUCK", karplus);
+
+    PadBank::SynthParams subPluck = base;
+    subPluck.osc1Wave = 1;
+    subPluck.osc2Wave = 0;
+    subPluck.osc2Gain = 0.1f;
+    subPluck.cutoff = 0.5f;
+    subPluck.resonance = 0.35f;
+    subPluck.filterEnv = 0.65f;
+    subPluck.filterType = 0;
+    subPluck.attack = 0.0f;
+    subPluck.decay = 0.22f;
+    subPluck.sustain = 0.1f;
+    subPluck.release = 0.1f;
+    addPreset("SUBTRACT PLUCK", subPluck);
+
+    PadBank::SynthParams chip = base;
+    chip.osc1Wave = 2;
+    chip.osc2Wave = 5;
+    chip.osc1Gain = 0.85f;
+    chip.osc2Gain = 0.25f;
+    chip.cutoff = 0.9f;
+    chip.resonance = 0.05f;
+    chip.filterEnv = 0.0f;
+    chip.filterType = 8;
+    chip.attack = 0.0f;
+    chip.decay = 0.12f;
+    chip.sustain = 0.6f;
+    chip.release = 0.05f;
+    addPreset("8-BIT CHIP", chip);
+
+    PadBank::SynthParams lofi = base;
+    lofi.osc1Wave = 5;
+    lofi.osc2Wave = 4;
+    lofi.osc1Gain = 0.75f;
+    lofi.osc2Gain = 0.25f;
+    lofi.cutoff = 0.4f;
+    lofi.resonance = 0.2f;
+    lofi.filterEnv = 0.15f;
+    lofi.filterType = 0;
+    lofi.lfoRate = 0.15f;
+    lofi.lfoDepth = 0.08f;
+    lofi.attack = 0.02f;
+    lofi.decay = 0.25f;
+    lofi.sustain = 0.7f;
+    lofi.release = 0.2f;
+    addPreset("LO-FI", lofi);
+
+    PadBank::SynthParams drone = base;
+    drone.osc1Wave = 1;
+    drone.osc2Wave = 9;
+    drone.osc1Voices = 3;
+    drone.osc2Voices = 2;
+    drone.osc1Detune = 0.2f;
+    drone.osc2Detune = 0.15f;
+    drone.osc1Gain = 0.75f;
+    drone.osc2Gain = 0.35f;
+    drone.cutoff = 0.3f;
+    drone.resonance = 0.6f;
+    drone.filterEnv = 0.25f;
+    drone.filterType = 2;
+    drone.lfoRate = 0.12f;
+    drone.lfoDepth = 0.22f;
+    drone.attack = 0.6f;
+    drone.decay = 0.5f;
+    drone.sustain = 0.9f;
+    drone.release = 0.8f;
+    addPreset("DARK DRONE", drone);
+
+    PadBank::SynthParams fm = base;
+    fm.osc1Wave = 0;
+    fm.osc2Wave = 0;
+    fm.osc1Gain = 0.9f;
+    fm.osc2Gain = 0.0f;
+    fm.fmAmount = 0.8f;
+    fm.ratio = 2.0f;
+    fm.feedback = 0.35f;
+    fm.cutoff = 0.85f;
+    fm.resonance = 0.1f;
+    fm.filterEnv = 0.0f;
+    fm.filterType = 8;
+    fm.attack = 0.02f;
+    fm.decay = 0.35f;
+    fm.sustain = 0.4f;
+    fm.release = 0.25f;
+    addPreset("FM 2-OP", fm);
+
+    PadBank::SynthParams wavetable = base;
+    wavetable.osc1Wave = 8;
+    wavetable.osc2Wave = 1;
+    wavetable.osc1Voices = 2;
+    wavetable.osc2Voices = 1;
+    wavetable.osc1Detune = 0.15f;
+    wavetable.osc1Gain = 0.75f;
+    wavetable.osc2Gain = 0.35f;
+    wavetable.cutoff = 0.65f;
+    wavetable.resonance = 0.2f;
+    wavetable.filterEnv = 0.25f;
+    wavetable.filterType = 0;
+    wavetable.lfoRate = 0.25f;
+    wavetable.lfoDepth = 0.18f;
+    wavetable.attack = 0.1f;
+    wavetable.decay = 0.3f;
+    wavetable.sustain = 0.75f;
+    wavetable.release = 0.4f;
+    addPreset("WAVETABLE", wavetable);
+
+    PadBank::SynthParams phase = base;
+    phase.osc1Wave = 9;
+    phase.osc2Wave = 0;
+    phase.osc1Gain = 0.8f;
+    phase.osc2Gain = 0.2f;
+    phase.fmAmount = 0.35f;
+    phase.ratio = 1.5f;
+    phase.feedback = 0.2f;
+    phase.cutoff = 0.7f;
+    phase.resonance = 0.25f;
+    phase.filterEnv = 0.2f;
+    phase.filterType = 0;
+    phase.attack = 0.05f;
+    phase.decay = 0.25f;
+    phase.sustain = 0.6f;
+    phase.release = 0.3f;
+    addPreset("PHASE DIST", phase);
+
+    PadBank::SynthParams perc = base;
+    perc.osc1Wave = 4;
+    perc.osc2Gain = 0.0f;
+    perc.cutoff = 0.8f;
+    perc.resonance = 0.2f;
+    perc.filterEnv = 0.3f;
+    perc.filterType = 1;
+    perc.attack = 0.0f;
+    perc.decay = 0.12f;
+    perc.sustain = 0.0f;
+    perc.release = 0.06f;
+    addPreset("NOISE PERC", perc);
 }
 
 static const FmPreset *findFmPreset(const QString &name) {
@@ -902,24 +1235,31 @@ void PadBank::setSynth(int index, const QString &name) {
     QString type = synthTypeFromName(synthName);
 
     if (isFmType(type)) {
+        const QString typeLabel = type.trimmed().isEmpty() ? QStringLiteral("SIMPLE")
+                                                           : type.trimmed().toUpper();
+        const bool custom = isCustomEngineType(typeLabel);
         if (!synthName.contains(":")) {
-            synthName = makeSynthName(QStringLiteral("SIMPLE"), QStringLiteral("INIT"));
+            synthName = makeSynthName(typeLabel, QStringLiteral("INIT"));
         }
-        const QString presetToken = synthPresetFromName(synthName);
-        QString presetName = presetToken;
-        const int slash = presetToken.indexOf('/');
-        if (slash >= 0) {
-            presetName = presetToken.mid(slash + 1).trimmed();
-        }
-        const FmPreset *preset = findFmPreset(presetName);
-        if (preset) {
-            m_synthParams[static_cast<size_t>(index)] = preset->params;
+        QString presetName = QStringLiteral("INIT");
+        if (!custom) {
+            const QString presetToken = synthPresetFromName(synthName);
+            presetName = presetToken;
+            const int slash = presetToken.indexOf('/');
+            if (slash >= 0) {
+                presetName = presetToken.mid(slash + 1).trimmed();
+            }
+            const FmPreset *preset = findFmPreset(presetName);
+            if (preset) {
+                m_synthParams[static_cast<size_t>(index)] = preset->params;
+            }
+        } else {
+            m_synthParams[static_cast<size_t>(index)] = defaultParamsForEngine(typeLabel);
         }
 
         m_isSynth[static_cast<size_t>(index)] = true;
-        const QString typeName = type.trimmed().isEmpty() ? QStringLiteral("SIMPLE") : type;
-        m_synthNames[static_cast<size_t>(index)] = makeSynthName(typeName, presetName);
-        m_synthBanks[static_cast<size_t>(index)] = "SIMPLE";
+        m_synthNames[static_cast<size_t>(index)] = makeSynthName(typeLabel, presetName);
+        m_synthBanks[static_cast<size_t>(index)] = custom ? typeLabel : QStringLiteral("SIMPLE");
         m_synthPrograms[static_cast<size_t>(index)] = 0;
         m_paths[static_cast<size_t>(index)].clear();
         m_synthBaseMidi[static_cast<size_t>(index)] = 60;
@@ -937,8 +1277,9 @@ void PadBank::setSynth(int index, const QString &name) {
         }
         if (m_engineAvailable && m_engine) {
             const SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
-            m_engine->setSynthKind(index, AudioEngine::SynthKind::Simple);
-            m_engine->setPadAdsr(index, 0.0f, 0.0f, 1.0f, 0.0f);
+            m_engine->setSynthKind(
+                index, custom ? synthKindForType(typeLabel) : AudioEngine::SynthKind::Simple);
+            m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
             m_engine->setSynthVoices(index, sp.voices);
             m_engine->setFmParams(index, buildFmParams(sp));
             const PadParams &pp = m_params[static_cast<size_t>(index)];
@@ -1206,7 +1547,7 @@ void PadBank::setSynthAdsr(int index, float attack, float decay, float sustain, 
     if (m_engineAvailable && m_engine) {
         const QString type = synthTypeFromName(m_synthNames[static_cast<size_t>(index)]);
         if (isFmType(type)) {
-            m_engine->setPadAdsr(index, 0.0f, 0.0f, 1.0f, 0.0f);
+            m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
             m_engine->setFmParams(index, buildFmParams(sp));
         } else {
             m_engine->setPadAdsr(index, sp.attack, sp.decay, sp.sustain, sp.release);
@@ -1300,12 +1641,13 @@ void PadBank::setSynthOctave(int index, int octave) {
 
 static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     AudioEngine::FmParams fm;
-    fm.fmAmount = 0.0f;
-    fm.ratio = 1.0f;
-    fm.feedback = 0.0f;
+    fm.fmAmount = sp.fmAmount;
+    fm.ratio = sp.ratio;
+    fm.feedback = sp.feedback;
     fm.octave = sp.octave;
     fm.cutoff = sp.cutoff;
     fm.resonance = sp.resonance;
+    fm.filterEnv = sp.filterEnv;
     fm.filterType = sp.filterType;
     fm.lfoRate = sp.lfoRate;
     fm.lfoDepth = sp.lfoDepth;
@@ -1318,7 +1660,7 @@ static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     fm.osc1Gain = sp.osc1Gain;
     fm.osc2Gain = sp.osc2Gain;
     fm.osc1Pan = sp.osc1Pan;
-    fm.osc2Pan = 0.0f;
+    fm.osc2Pan = sp.osc2Pan;
     fm.attack = sp.attack;
     fm.decay = sp.decay;
     fm.sustain = sp.sustain;
@@ -2649,7 +2991,8 @@ QStringList PadBank::synthBanks() {
 
 QStringList PadBank::synthPresetsForBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
-    if (upper == "SIMPLE" || upper == "FM" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL") {
+    if (upper == "SIMPLE" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL" ||
+        isCustomEngineType(upper)) {
         return {"INIT"};
     }
     scanDx7Banks();
@@ -2673,7 +3016,8 @@ QStringList PadBank::serumWaves() {
 }
 
 QStringList PadBank::synthTypes() {
-    return {defaultMiniDexedType(), "SIMPLE"};
+    return {defaultMiniDexedType(), "SIMPLE", "CLUSTER", "DIGITAL", "DNA", "DR WAVE",
+            "DSYNTH", "FM", "PULSE", "PHASE", "RING", "STRING", "VOLTAGE"};
 }
 
 bool PadBank::hasMiniDexed() {

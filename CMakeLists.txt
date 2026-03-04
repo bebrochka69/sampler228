@@ -23,6 +23,7 @@ set(SOURCES
     src/FramebufferCleaner.cpp
     src/AudioEngine.cpp
     src/simple_fm.cpp
+    src/op1_engines.cpp
     src/PadBank.cpp
     src/SampleSession.cpp
     src/ui/TopToolbarWidget.cpp
@@ -50,6 +51,7 @@ set(HEADERS
     src/FramebufferCleaner.h
     src/AudioEngine.h
     src/simple_fm.h
+    src/op1_engines.h
     src/PadBank.h
     src/SampleSession.h
     src/Theme.h

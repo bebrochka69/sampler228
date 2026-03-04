@@ -13,12 +13,25 @@
 #include "dx7_core.h"
 #include "simple_fm.h"
 
+class Op1Engine;
+
 class AudioEngine : public QObject {
     Q_OBJECT
 public:
     enum class SynthKind {
         Dx7,
-        Simple
+        Simple,
+        Cluster,
+        Digital,
+        DNA,
+        DrWave,
+        DSynth,
+        FM,
+        Pulse,
+        Phase,
+        Ring,
+        String,
+        Voltage
     };
 
     struct FmParams {
@@ -28,6 +41,7 @@ public:
         int octave = 0;
         float cutoff = 0.8f;
         float resonance = 0.1f;
+        float filterEnv = 0.0f;
         int filterType = 0;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
@@ -181,6 +195,8 @@ private:
     struct SynthState {
         Dx7Core core;
         SimpleFmCore simple;
+        std::unique_ptr<Op1Engine> op1;
+        SynthKind op1Kind = SynthKind::Dx7;
         SynthKind kind = SynthKind::Dx7;
         bool enabled = false;
         bool initialized = false;
@@ -196,6 +212,7 @@ private:
         float filterCutoff = 0.8f;
         float filterResonance = 0.1f;
         int filterType = 0;
+        float filterEnvAmount = 0.0f;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
         float lfoPhase = 0.0f;
