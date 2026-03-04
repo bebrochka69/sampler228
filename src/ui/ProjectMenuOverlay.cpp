@@ -1,6 +1,7 @@
 #include "ProjectMenuOverlay.h"
 
 #include <QDateTime>
+#include <algorithm>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -13,6 +14,7 @@
 #include <QPainter>
 #include <QProcess>
 #include <QSaveFile>
+#include <QStandardPaths>
 #include <QtGlobal>
 
 #include "PadBank.h"
@@ -75,6 +77,7 @@ QJsonObject synthParamsToJson(const PadBank::SynthParams &s) {
     obj["feedback"] = s.feedback;
     obj["cutoff"] = s.cutoff;
     obj["resonance"] = s.resonance;
+    obj["filterEnv"] = s.filterEnv;
     obj["filterType"] = s.filterType;
     obj["lfoRate"] = s.lfoRate;
     obj["lfoDepth"] = s.lfoDepth;
@@ -111,6 +114,7 @@ PadBank::SynthParams synthParamsFromJson(const QJsonObject &obj) {
     s.feedback = static_cast<float>(obj.value("feedback").toDouble(s.feedback));
     s.cutoff = static_cast<float>(obj.value("cutoff").toDouble(s.cutoff));
     s.resonance = static_cast<float>(obj.value("resonance").toDouble(s.resonance));
+    s.filterEnv = static_cast<float>(obj.value("filterEnv").toDouble(s.filterEnv));
     s.filterType = obj.value("filterType").toInt(s.filterType);
     s.lfoRate = static_cast<float>(obj.value("lfoRate").toDouble(s.lfoRate));
     s.lfoDepth = static_cast<float>(obj.value("lfoDepth").toDouble(s.lfoDepth));
@@ -132,6 +136,18 @@ PadBank::SynthParams synthParamsFromJson(const QJsonObject &obj) {
 }
 }  // namespace
 
+static QString runProcessOutput(const QString &program, const QStringList &args, int timeoutMs,
+                                int *exitCode = nullptr) {
+    QProcess proc;
+    proc.start(program, args);
+    proc.waitForFinished(timeoutMs);
+    const QByteArray out = proc.readAllStandardOutput() + proc.readAllStandardError();
+    if (exitCode) {
+        *exitCode = proc.exitCode();
+    }
+    return QString::fromUtf8(out);
+}
+
 ProjectMenuOverlay::ProjectMenuOverlay(PadBank *pads, SeqPageWidget *seq, FxPageWidget *fx,
                                        QWidget *parent)
     : QWidget(parent), m_pads(pads), m_seq(seq), m_fx(fx) {
@@ -147,6 +163,7 @@ void ProjectMenuOverlay::showMenu() {
     }
     ensureMediaDirs();
     refreshProjects();
+    refreshBluetoothDevices();
     if (m_pads) {
         m_metronome = m_seq ? m_seq->metronomeEnabled() : false;
     }
@@ -224,6 +241,131 @@ void ProjectMenuOverlay::openBluetoothMenu() {
     }
     QProcess::startDetached(QStringLiteral("sh"), {QStringLiteral("-c"), cmd});
 #endif
+}
+
+void ProjectMenuOverlay::refreshBluetoothDevices() {
+#ifdef Q_OS_LINUX
+    m_btDevices.clear();
+    m_btStatus.clear();
+    const QString btctl = QStandardPaths::findExecutable("bluetoothctl");
+    if (btctl.isEmpty()) {
+        m_btStatus = "bluetoothctl not found";
+        return;
+    }
+    runProcessOutput(btctl, {"power", "on"}, 1000);
+    int exitCode = 0;
+    const QString out = runProcessOutput(btctl, {"devices"}, 1500, &exitCode);
+    if (out.trimmed().isEmpty()) {
+        if (exitCode != 0) {
+            m_btStatus = "bluetoothctl error";
+        }
+        return;
+    }
+    const QStringList lines = out.split('\n', Qt::SkipEmptyParts);
+    for (const QString &lineRaw : lines) {
+        const QString line = lineRaw.trimmed();
+        if (!line.startsWith("Device ")) {
+            continue;
+        }
+        const QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+        if (parts.size() < 3) {
+            continue;
+        }
+        BtDevice dev;
+        dev.address = parts[1];
+        dev.name = line.section(' ', 2);
+        const QString info = runProcessOutput(btctl, {"info", dev.address}, 1200);
+        dev.connected = info.contains("Connected: yes", Qt::CaseInsensitive);
+        dev.paired = info.contains("Paired: yes", Qt::CaseInsensitive);
+        m_btDevices.push_back(dev);
+    }
+    std::sort(m_btDevices.begin(), m_btDevices.end(),
+              [](const BtDevice &a, const BtDevice &b) {
+                  if (a.connected != b.connected) {
+                      return a.connected > b.connected;
+                  }
+                  return a.name.toLower() < b.name.toLower();
+              });
+#else
+    m_btDevices.clear();
+    m_btStatus = "Bluetooth only on Linux";
+#endif
+}
+
+QString ProjectMenuOverlay::buildBluetoothAlsaDevice(const QString &mac) const {
+#ifdef Q_OS_LINUX
+    QString env = qEnvironmentVariable("GROOVEBOX_BT_ALSA");
+    if (!env.isEmpty()) {
+        if (env.contains("%MAC%")) {
+            env.replace("%MAC%", mac);
+        }
+        return env;
+    }
+    return QStringLiteral("bluealsa:DEV=%1,PROFILE=a2dp").arg(mac);
+#else
+    Q_UNUSED(mac);
+    return QString();
+#endif
+}
+
+void ProjectMenuOverlay::connectBluetoothDevice(int index) {
+    if (index < 0 || index >= m_btDevices.size()) {
+        return;
+    }
+#ifdef Q_OS_LINUX
+    const BtDevice dev = m_btDevices[index];
+    const QString btctl = QStandardPaths::findExecutable("bluetoothctl");
+    if (btctl.isEmpty()) {
+        m_btStatus = "bluetoothctl not found";
+        return;
+    }
+    if (m_btPrevDevice.isEmpty()) {
+        m_btPrevDevice = qEnvironmentVariable("GROOVEBOX_ALSA_DEVICE");
+    }
+    runProcessOutput(btctl, {"pair", dev.address}, 4000);
+    runProcessOutput(btctl, {"trust", dev.address}, 2000);
+    const QString result = runProcessOutput(btctl, {"connect", dev.address}, 6000);
+    QString status;
+    if (result.contains("Failed", Qt::CaseInsensitive)) {
+        status = "Connect failed";
+    } else {
+        status = "Connected";
+        const QString alsa = buildBluetoothAlsaDevice(dev.address);
+        if (m_pads && !alsa.isEmpty()) {
+            const bool ok = m_pads->setAudioDevice(alsa);
+            if (ok) {
+                m_btAudioDevice = alsa;
+            } else {
+                status = "Connected (audio failed)";
+            }
+        }
+    }
+    refreshBluetoothDevices();
+    m_btStatus = status;
+#endif
+    update();
+}
+
+void ProjectMenuOverlay::disconnectBluetoothDevice(int index) {
+    if (index < 0 || index >= m_btDevices.size()) {
+        return;
+    }
+#ifdef Q_OS_LINUX
+    const BtDevice dev = m_btDevices[index];
+    const QString btctl = QStandardPaths::findExecutable("bluetoothctl");
+    if (!btctl.isEmpty()) {
+        runProcessOutput(btctl, {"disconnect", dev.address}, 3000);
+    }
+    if (m_pads) {
+        if (!m_btPrevDevice.isEmpty()) {
+            m_pads->setAudioDevice(m_btPrevDevice);
+        }
+    }
+    m_btPrevDevice.clear();
+    refreshBluetoothDevices();
+    m_btStatus = "Disconnected";
+#endif
+    update();
 }
 
 void ProjectMenuOverlay::refreshProjects() {
@@ -608,8 +750,85 @@ void ProjectMenuOverlay::paintEvent(QPaintEvent *event) {
     QRectF rateRow = drawRowBase("RENDER QUALITY", rateLabel);
     m_rateRect = rateRow;
 
-    QRectF btRow = drawRowBase("BLUETOOTH", "OPEN");
+    QRectF btRow = drawRowBase("BLUETOOTH", "REFRESH");
     m_bluetoothRect = btRow;
+
+    const float minBtListH = Theme::pxF(110.0f);
+    const float maxBtListH = Theme::pxF(170.0f);
+    const float reserveForMedia = rowH + Theme::pxF(10.0f);
+    const float remaining = m_leftRect.bottom() - y - reserveForMedia;
+    const float btListH = qBound(minBtListH, remaining, maxBtListH);
+    QRectF btBox(rowX, y, rowW, btListH);
+    p.setBrush(Theme::bg2());
+    p.setPen(QPen(Theme::stroke(), 1.0));
+    p.drawRoundedRect(btBox, Theme::px(10), Theme::px(10));
+
+    const float btHeaderH = Theme::pxF(22.0f);
+    p.setPen(Theme::textMuted());
+    p.setFont(Theme::baseFont(8, QFont::DemiBold));
+    p.drawText(btBox.adjusted(Theme::px(10), Theme::px(4), -Theme::px(10), 0),
+               Qt::AlignLeft | Qt::AlignTop, "DEVICES");
+
+    m_btRefreshRect = QRectF(btBox.right() - Theme::pxF(72.0f), btBox.top() + Theme::pxF(4.0f),
+                             Theme::pxF(62.0f), Theme::pxF(18.0f));
+    p.setBrush(Theme::bg3());
+    p.setPen(QPen(Theme::stroke(), 1.0));
+    p.drawRoundedRect(m_btRefreshRect, Theme::px(6), Theme::px(6));
+    p.setPen(Theme::text());
+    p.setFont(Theme::baseFont(8, QFont::DemiBold));
+    p.drawText(m_btRefreshRect, Qt::AlignCenter, "REFRESH");
+
+    m_btDeviceRects.clear();
+    const float rowHbt = Theme::pxF(22.0f);
+    float by = btBox.top() + btHeaderH + Theme::pxF(6.0f);
+    const float maxY = btBox.bottom() - Theme::pxF(26.0f);
+    for (int i = 0; i < m_btDevices.size() && by + rowHbt <= maxY; ++i) {
+        QRectF row(btBox.left() + Theme::px(8), by, btBox.width() - Theme::px(16), rowHbt);
+        m_btDeviceRects.push_back(row);
+        const bool connected = m_btDevices[i].connected;
+        p.setBrush(connected ? Theme::accentAlt() : Theme::bg3());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRoundedRect(row, Theme::px(6), Theme::px(6));
+        p.setPen(connected ? Theme::bg0() : Theme::text());
+        p.setFont(Theme::baseFont(8, QFont::DemiBold));
+        QString label = m_btDevices[i].name;
+        if (label.trimmed().isEmpty()) {
+            label = m_btDevices[i].address;
+        }
+        if (connected) {
+            label = QStringLiteral("CONNECTED  ") + label;
+        }
+        p.drawText(row.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
+                   Qt::AlignLeft | Qt::AlignVCenter, label);
+        by += rowHbt + Theme::pxF(4.0f);
+    }
+    if (m_btDevices.isEmpty()) {
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(8));
+        p.drawText(btBox.adjusted(Theme::px(8), Theme::px(26), -Theme::px(8), 0),
+                   Qt::AlignLeft | Qt::AlignTop, "NO BLUETOOTH DEVICES");
+    }
+
+    m_btDisconnectRect = QRectF(btBox.left() + Theme::pxF(10.0f),
+                                btBox.bottom() - Theme::pxF(22.0f),
+                                Theme::pxF(90.0f), Theme::pxF(18.0f));
+    p.setBrush(Theme::bg3());
+    p.setPen(QPen(Theme::stroke(), 1.0));
+    p.drawRoundedRect(m_btDisconnectRect, Theme::px(6), Theme::px(6));
+    p.setPen(Theme::text());
+    p.setFont(Theme::baseFont(8, QFont::DemiBold));
+    p.drawText(m_btDisconnectRect, Qt::AlignCenter, "DISCONNECT");
+
+    if (!m_btStatus.isEmpty()) {
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(8));
+        p.drawText(btBox.adjusted(Theme::px(110), Theme::px(0), -Theme::px(10), 0),
+                   Qt::AlignBottom | Qt::AlignRight,
+                   QFontMetrics(Theme::baseFont(8)).elidedText(m_btStatus, Qt::ElideRight,
+                                                              static_cast<int>(btBox.width() * 0.6f)));
+    }
+
+    y = btBox.bottom() + Theme::pxF(10.0f);
 
     const QString media = mediaRoot();
     drawRowBase("MEDIA", QFontMetrics(Theme::baseFont(9, QFont::DemiBold))
@@ -753,8 +972,39 @@ void ProjectMenuOverlay::mousePressEvent(QMouseEvent *event) {
         return;
     }
     if (m_bluetoothRect.contains(pos)) {
-        openBluetoothMenu();
+        refreshBluetoothDevices();
+        update();
         return;
+    }
+    if (m_btRefreshRect.contains(pos)) {
+        refreshBluetoothDevices();
+        update();
+        return;
+    }
+    if (m_btDisconnectRect.contains(pos)) {
+        int connectedIndex = -1;
+        for (int i = 0; i < m_btDevices.size(); ++i) {
+            if (m_btDevices[i].connected) {
+                connectedIndex = i;
+                break;
+            }
+        }
+        if (connectedIndex >= 0) {
+            disconnectBluetoothDevice(connectedIndex);
+        }
+        return;
+    }
+    for (int i = 0; i < m_btDeviceRects.size(); ++i) {
+        if (m_btDeviceRects[i].contains(pos)) {
+            if (i < m_btDevices.size()) {
+                if (m_btDevices[i].connected) {
+                    disconnectBluetoothDevice(i);
+                } else {
+                    connectBluetoothDevice(i);
+                }
+            }
+            return;
+        }
     }
 
     for (int i = 0; i < m_projectRowRects.size(); ++i) {

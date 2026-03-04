@@ -26,12 +26,23 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
+    struct BtDevice {
+        QString address;
+        QString name;
+        bool connected = false;
+        bool paired = false;
+    };
+
     void refreshProjects();
     QString mediaRoot() const;
     QString projectDir() const;
     QString renderDir() const;
     void ensureMediaDirs();
     void openBluetoothMenu();
+    void refreshBluetoothDevices();
+    void connectBluetoothDevice(int index);
+    void disconnectBluetoothDevice(int index);
+    QString buildBluetoothAlsaDevice(const QString &mac) const;
 
     void newProject();
     bool saveProject(const QString &name);
@@ -48,6 +59,14 @@ private:
     int m_renderBars = 4;
     int m_renderRate = 44100;
     bool m_metronome = false;
+
+    QVector<BtDevice> m_btDevices;
+    QVector<QRectF> m_btDeviceRects;
+    QRectF m_btRefreshRect;
+    QRectF m_btDisconnectRect;
+    QString m_btStatus;
+    QString m_btPrevDevice;
+    QString m_btAudioDevice;
 
     QRectF m_panelRect;
     QRectF m_leftRect;

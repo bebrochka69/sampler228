@@ -60,6 +60,7 @@ public:
         float feedback = 0.0f;
         float cutoff = 0.8f;
         float resonance = 0.1f;
+        float filterEnv = 0.0f;
         int filterType = 0;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
