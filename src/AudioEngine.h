@@ -12,8 +12,7 @@
 
 #include "dx7_core.h"
 #include "simple_fm.h"
-
-class Op1Engine;
+#include "op1_engines.h"
 
 class AudioEngine : public QObject {
     Q_OBJECT
