@@ -348,16 +348,11 @@ static PadBank::SynthParams defaultParamsForEngine(const QString &type) {
         params.osc1Wave = 1;
         params.osc2Wave = 2;
         params.osc1Gain = 0.8f;
-        params.osc2Gain = 0.6f;
-        params.osc1Detune = 0.15f;
-        params.osc2Detune = 0.08f;
-        params.cutoff = 0.55f;
-        params.resonance = 0.25f;
-        params.filterType = 0;
-        params.attack = 0.01f;
-        params.decay = 0.25f;
-        params.sustain = 0.75f;
-        params.release = 0.2f;
+        params.osc2Gain = 0.5f;
+        params.osc1Detune = 0.2f;
+        params.osc2Detune = 0.0f;
+        params.fmAmount = 0.25f;
+        params.ratio = 1.0f;
         return params;
     }
     if (t == "FM") {
@@ -3043,8 +3038,8 @@ QStringList PadBank::serumWaves() {
 }
 
 QStringList PadBank::synthTypes() {
-    return {defaultMiniDexedType(), "SIMPLE", "CLUSTER", "DIGITAL", "DNA", "DR WAVE",
-            "FM", "PULSE", "PHASE", "RING", "STRING", "SAW", "VOLTAGE"};
+    return {defaultMiniDexedType(), "SIMPLE", "CLUSTER", "DIGITAL", "DNA", "DR WAVE", "DSYNTH",
+            "FM", "PULSE", "PHASE", "STRING", "VOLTAGE"};
 }
 
 bool PadBank::hasMiniDexed() {

@@ -121,6 +121,13 @@ QVector<CustomControl> customControlsForType(const QString &type) {
         add(EditCustom4, CustomTarget::Feedback, "DRIVE");
         return list;
     }
+    if (t == "DSYNTH") {
+        add(EditCustom1, CustomTarget::Osc1Wave, "WAVE");
+        add(EditCustom2, CustomTarget::Ratio, "PITCH");
+        add(EditCustom3, CustomTarget::FmAmount, "X-MOD");
+        add(EditCustom4, CustomTarget::Osc2Gain, "MIX");
+        return list;
+    }
     if (t == "FM") {
         add(EditCustom1, CustomTarget::Osc1Detune, "C RATIO");
         add(EditCustom2, CustomTarget::Ratio, "M RATIO");
@@ -166,7 +173,7 @@ QVector<CustomControl> customControlsForType(const QString &type) {
     if (t == "VOLTAGE") {
         add(EditCustom1, CustomTarget::FmAmount, "MIX");
         add(EditCustom2, CustomTarget::Osc1Detune, "DETUNE");
-        add(EditCustom3, CustomTarget::FilterEnv, "F ENV");
+        add(EditCustom3, CustomTarget::FilterEnv, "SHAPE");
         add(EditCustom4, CustomTarget::Feedback, "DRIVE");
         return list;
     }
