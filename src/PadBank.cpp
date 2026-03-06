@@ -12,6 +12,9 @@
 #include <QProcess>
 #include <QFile>
 #include <QSoundEffect>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QThread>
@@ -132,6 +135,159 @@ struct Dx7Bank {
 static QVector<Dx7Bank> g_dx7Banks;
 static bool g_dx7BanksScanned = false;
 static QStringList internalProgramNames();
+
+struct Op1Patch {
+    QString name;
+    QString label;
+    QString type;
+    QString path;
+    QVector<int> knobs;
+    int octave = 0;
+};
+
+static QVector<Op1Patch> g_op1Patches;
+static bool g_op1PatchesScanned = false;
+
+static quint32 readBe32(const QByteArray &data, int offset) {
+    if (offset + 4 > data.size()) {
+        return 0;
+    }
+    const unsigned char *p = reinterpret_cast<const unsigned char *>(data.constData() + offset);
+    return (static_cast<quint32>(p[0]) << 24) | (static_cast<quint32>(p[1]) << 16) |
+           (static_cast<quint32>(p[2]) << 8) | static_cast<quint32>(p[3]);
+}
+
+static QString normalizeOp1Type(const QString &type) {
+    const QString t = canonicalType(type);
+    if (t == "CLUSTER") return "CLUSTER";
+    if (t == "DIGITAL") return "DIGITAL";
+    if (t == "DNA") return "DNA";
+    if (t == "DRWAVE" || t == "DRWAV") return "DR WAVE";
+    if (t == "DSYNTH") return "DSYNTH";
+    if (t == "FM") return "FM";
+    if (t == "PULSE") return "PULSE";
+    if (t == "PHASE") return "PHASE";
+    if (t == "STRING") return "STRING";
+    if (t == "VOLTAGE") return "VOLTAGE";
+    return QString();
+}
+
+static bool extractOp1Json(const QString &path, QJsonObject &out) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    const QByteArray data = file.readAll();
+    if (data.size() < 12 || data.mid(0, 4) != "FORM") {
+        return false;
+    }
+    int offset = 12;
+    while (offset + 8 <= data.size()) {
+        const QByteArray ckid = data.mid(offset, 4);
+        const quint32 size = readBe32(data, offset + 4);
+        offset += 8;
+        if (size == 0 || offset + static_cast<int>(size) > data.size()) {
+            return false;
+        }
+        if (ckid == "APPL") {
+            const QByteArray chunk = data.mid(offset, static_cast<int>(size));
+            if (chunk.size() >= 4 && chunk.mid(0, 4) == "op-1") {
+                QByteArray json = chunk.mid(4);
+                const int nullPos = json.indexOf('\0');
+                if (nullPos >= 0) {
+                    json = json.left(nullPos);
+                }
+                const QJsonDocument doc = QJsonDocument::fromJson(json);
+                if (doc.isObject()) {
+                    out = doc.object();
+                    return true;
+                }
+            }
+        }
+        offset += static_cast<int>(size);
+        if (size % 2 == 1) {
+            offset += 1;
+        }
+    }
+    return false;
+}
+
+static void scanOp1Patches() {
+    if (g_op1PatchesScanned) {
+        return;
+    }
+    g_op1PatchesScanned = true;
+    g_op1Patches.clear();
+
+    QStringList roots;
+    roots << QDir::currentPath();
+    const QString appDir = QCoreApplication::applicationDirPath();
+    if (!roots.contains(appDir)) {
+        roots << appDir;
+    }
+
+    QStringList searchDirs;
+    for (const QString &root : roots) {
+        QDir dir(root);
+        searchDirs << dir.filePath("op1")
+                   << dir.filePath("assets/op1")
+                   << dir.filePath("assets/op1_patches")
+                   << dir.filePath("data/op1")
+                   << dir.filePath("sysex/op1")
+                   << dir.filePath("sysex");
+    }
+
+    QSet<QString> files;
+    for (const QString &dir : searchDirs) {
+        QDirIterator it(dir, {"*.aif", "*.aiff", "*.AIF", "*.AIFF"}, QDir::Files,
+                        QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            files.insert(QDir::cleanPath(it.next()));
+        }
+    }
+
+    for (const QString &path : files) {
+        QJsonObject obj;
+        if (!extractOp1Json(path, obj)) {
+            continue;
+        }
+        const QString type = normalizeOp1Type(obj.value("type").toString());
+        if (type.isEmpty()) {
+            continue;
+        }
+        Op1Patch patch;
+        patch.type = type;
+        patch.path = path;
+        patch.name = obj.value("name").toString().trimmed();
+        if (patch.name.isEmpty()) {
+            patch.name = QFileInfo(path).completeBaseName();
+        }
+        patch.octave = obj.value("octave").toInt(0);
+        const QJsonArray knobs = obj.value("knobs").toArray();
+        for (const auto &v : knobs) {
+            patch.knobs.push_back(v.toInt(0));
+        }
+        g_op1Patches.push_back(patch);
+    }
+
+    QHash<QString, int> nameCounts;
+    for (const auto &patch : g_op1Patches) {
+        const QString key = QString("%1:%2").arg(canonicalType(patch.type), patch.name).toUpper();
+        nameCounts[key] += 1;
+    }
+    QHash<QString, int> nameUsed;
+    for (auto &patch : g_op1Patches) {
+        const QString key = QString("%1:%2").arg(canonicalType(patch.type), patch.name).toUpper();
+        const int total = nameCounts.value(key, 0);
+        if (total <= 1) {
+            patch.label = patch.name;
+        } else {
+            const int idx = nameUsed.value(key, 0) + 1;
+            nameUsed[key] = idx;
+            patch.label = QString("%1 [%2]").arg(patch.name).arg(idx);
+        }
+    }
+}
 
 QString makeProgramLabel(int index) {
     return QString("PROGRAM %1").arg(index + 1, 2, 10, QChar('0'));
@@ -450,6 +606,115 @@ static PadBank::SynthParams defaultParamsForEngine(const QString &type) {
         return params;
     }
     return params;
+}
+
+static const Op1Patch *findOp1Patch(const QString &type, const QString &name) {
+    scanOp1Patches();
+    const QString t = canonicalType(type);
+    const QString want = name.trimmed();
+    for (const auto &patch : g_op1Patches) {
+        if (canonicalType(patch.type) != t) {
+            continue;
+        }
+        if (QString::compare(patch.label, want, Qt::CaseInsensitive) == 0 ||
+            QString::compare(patch.name, want, Qt::CaseInsensitive) == 0) {
+            return &patch;
+        }
+    }
+    return nullptr;
+}
+
+static float knob01(int value) {
+    const int clamped = qBound(0, value, 32767);
+    return static_cast<float>(clamped) / 32767.0f;
+}
+
+static int knobWave(int value) {
+    const int count = qMax(1, PadBank::serumWaves().size());
+    const float norm = knob01(value);
+    const int idx = qBound(0, static_cast<int>(std::floor(norm * count)), count - 1);
+    return idx;
+}
+
+static float knobRange(int value, float lo, float hi) {
+    return lo + (hi - lo) * knob01(value);
+}
+
+static void applyOp1Knobs(const QString &type, const QVector<int> &knobs,
+                          PadBank::SynthParams &params) {
+    auto k = [&](int index) { return (index >= 0 && index < knobs.size()) ? knobs[index] : 0; };
+    const QString t = canonicalType(type);
+
+    if (t == "CLUSTER") {
+        params.osc1Detune = knob01(k(0));
+        params.osc2Detune = knob01(k(1));
+        params.osc1Wave = knobWave(k(2));
+        params.fmAmount = knob01(k(3));
+        return;
+    }
+    if (t == "DIGITAL") {
+        params.osc1Wave = knobWave(k(0));
+        params.fmAmount = knob01(k(1));
+        params.osc1Detune = knob01(k(2));
+        params.feedback = knob01(k(3));
+        return;
+    }
+    if (t == "DNA") {
+        params.osc1Wave = knobWave(k(0));
+        params.osc2Wave = knobWave(k(1));
+        params.fmAmount = knob01(k(2));
+        params.feedback = knob01(k(3));
+        return;
+    }
+    if (t == "DRWAVE") {
+        params.osc1Wave = knobWave(k(0));
+        params.fmAmount = knob01(k(1));
+        params.osc1Detune = knob01(k(2));
+        params.feedback = knob01(k(3));
+        return;
+    }
+    if (t == "DSYNTH") {
+        params.osc1Wave = knobWave(k(0));
+        params.ratio = knobRange(k(1), 0.5f, 2.0f);
+        params.fmAmount = knob01(k(2));
+        params.osc2Gain = knob01(k(3));
+        return;
+    }
+    if (t == "FM") {
+        params.osc1Detune = knob01(k(0));
+        params.ratio = knobRange(k(1), 0.25f, 8.0f);
+        params.fmAmount = knob01(k(2));
+        params.feedback = knob01(k(3));
+        return;
+    }
+    if (t == "PULSE") {
+        params.fmAmount = knob01(k(0));
+        params.osc1Detune = knob01(k(1));
+        params.osc2Gain = knob01(k(2));
+        params.feedback = knob01(k(3));
+        return;
+    }
+    if (t == "PHASE") {
+        params.fmAmount = knob01(k(0));
+        params.osc1Detune = knob01(k(1));
+        params.ratio = knobRange(k(2), 0.25f, 4.0f);
+        params.feedback = knob01(k(3));
+        return;
+    }
+    if (t == "STRING") {
+        params.ratio = knobRange(k(0), 0.5f, 2.0f);
+        params.fmAmount = knob01(k(1));
+        params.osc2Gain = knob01(k(2));
+        params.feedback = knob01(k(3));
+        return;
+    }
+    if (t == "VOLTAGE") {
+        params.fmAmount = knob01(k(0));
+        params.osc1Detune = knob01(k(1));
+        params.filterEnv = knob01(k(2));
+        params.feedback = knob01(k(3));
+        return;
+    }
 }
 
 static AudioEngine::SynthKind synthKindForType(const QString &type) {
@@ -1251,19 +1516,33 @@ void PadBank::setSynth(int index, const QString &name) {
             synthName = makeSynthName(typeLabel, QStringLiteral("INIT"));
         }
         QString presetName = QStringLiteral("INIT");
-        if (!custom) {
-            const QString presetToken = synthPresetFromName(synthName);
+        const QString presetToken = synthPresetFromName(synthName);
+        if (!presetToken.isEmpty()) {
             presetName = presetToken;
             const int slash = presetToken.indexOf('/');
             if (slash >= 0) {
                 presetName = presetToken.mid(slash + 1).trimmed();
             }
+        }
+        if (!custom) {
             const FmPreset *preset = findFmPreset(presetName);
             if (preset) {
                 m_synthParams[static_cast<size_t>(index)] = preset->params;
             }
         } else {
             m_synthParams[static_cast<size_t>(index)] = defaultParamsForEngine(typeLabel);
+            const Op1Patch *patch = nullptr;
+            if (presetName.compare("INIT", Qt::CaseInsensitive) != 0) {
+                patch = findOp1Patch(typeLabel, presetName);
+            }
+            if (patch) {
+                applyOp1Knobs(typeLabel, patch->knobs, m_synthParams[static_cast<size_t>(index)]);
+                m_synthParams[static_cast<size_t>(index)].octave =
+                    qBound(-2, patch->octave, 2);
+                presetName = patch->label;
+            } else {
+                presetName = QStringLiteral("INIT");
+            }
         }
 
         m_isSynth[static_cast<size_t>(index)] = true;
@@ -3013,9 +3292,20 @@ QStringList PadBank::synthBanks() {
 
 QStringList PadBank::synthPresetsForBank(const QString &bank) {
     const QString upper = bank.trimmed().toUpper();
-    if (upper == "SIMPLE" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL" ||
-        isCustomEngineType(upper)) {
+    if (upper == "SIMPLE" || upper == "SERUM" || upper == "VITALYA" || upper == "VITAL") {
         return {"INIT"};
+    }
+    if (isCustomEngineType(upper)) {
+        scanOp1Patches();
+        QStringList list;
+        list << "INIT";
+        const QString t = canonicalType(upper);
+        for (const auto &patch : g_op1Patches) {
+            if (canonicalType(patch.type) == t) {
+                list << patch.label;
+            }
+        }
+        return list;
     }
     scanDx7Banks();
     if (g_dx7Banks.isEmpty()) {
