@@ -34,7 +34,11 @@ enum EditParamType {
     EditRelease = 16,
     EditLfoRate = 17,
     EditLfoDepth = 18,
-    EditOctave = 19
+    EditOctave = 19,
+    EditCustom1 = 20,
+    EditCustom2 = 21,
+    EditCustom3 = 22,
+    EditCustom4 = 23
 };
 
 constexpr float kTwoPi = 6.28318530717958647692f;
@@ -57,7 +61,116 @@ bool isCustomEngineType(const QString &type) {
     const QString t = canonicalType(type);
     return t == "CLUSTER" || t == "DIGITAL" || t == "DNA" || t == "DRWAVE" ||
            t == "DSYNTH" || t == "FM" || t == "PULSE" || t == "PHASE" ||
-           t == "RING" || t == "STRING" || t == "VOLTAGE";
+           t == "RING" || t == "STRING" || t == "SAW" || t == "VOLTAGE";
+}
+
+enum class CustomTarget {
+    Osc1Wave,
+    Osc2Wave,
+    FmAmount,
+    Ratio,
+    Feedback,
+    Osc1Detune,
+    Osc2Detune,
+    Osc2Gain,
+    FilterEnv
+};
+
+struct CustomControl {
+    int paramType = EditCustom1;
+    CustomTarget target = CustomTarget::FmAmount;
+    QString label;
+};
+
+QVector<CustomControl> customControlsForType(const QString &type) {
+    const QString t = canonicalType(type);
+    QVector<CustomControl> list;
+    auto add = [&](int paramType, CustomTarget target, const QString &label) {
+        CustomControl c;
+        c.paramType = paramType;
+        c.target = target;
+        c.label = label;
+        list << c;
+    };
+
+    if (t == "CLUSTER") {
+        add(EditCustom1, CustomTarget::Osc1Detune, "SPREAD");
+        add(EditCustom2, CustomTarget::Osc2Detune, "DETUNE");
+        add(EditCustom3, CustomTarget::Osc1Wave, "WAVE");
+        add(EditCustom4, CustomTarget::FmAmount, "MOTION");
+        return list;
+    }
+    if (t == "DIGITAL") {
+        add(EditCustom1, CustomTarget::Osc1Wave, "WAVE");
+        add(EditCustom2, CustomTarget::FmAmount, "INDEX");
+        add(EditCustom3, CustomTarget::Osc1Detune, "DETUNE");
+        add(EditCustom4, CustomTarget::Feedback, "DRIVE");
+        return list;
+    }
+    if (t == "DNA") {
+        add(EditCustom1, CustomTarget::Osc1Wave, "GENE A");
+        add(EditCustom2, CustomTarget::Osc2Wave, "GENE B");
+        add(EditCustom3, CustomTarget::FmAmount, "MIX");
+        add(EditCustom4, CustomTarget::Feedback, "MUTATE");
+        return list;
+    }
+    if (t == "DRWAVE") {
+        add(EditCustom1, CustomTarget::Osc1Wave, "WAVE");
+        add(EditCustom2, CustomTarget::FmAmount, "BEND");
+        add(EditCustom3, CustomTarget::Osc1Detune, "DETUNE");
+        add(EditCustom4, CustomTarget::Feedback, "DRIVE");
+        return list;
+    }
+    if (t == "FM") {
+        add(EditCustom1, CustomTarget::Osc1Detune, "C RATIO");
+        add(EditCustom2, CustomTarget::Ratio, "M RATIO");
+        add(EditCustom3, CustomTarget::FmAmount, "INDEX");
+        add(EditCustom4, CustomTarget::Feedback, "FEEDBK");
+        return list;
+    }
+    if (t == "PULSE") {
+        add(EditCustom1, CustomTarget::FmAmount, "WIDTH");
+        add(EditCustom2, CustomTarget::Osc1Detune, "DETUNE");
+        add(EditCustom3, CustomTarget::Osc2Gain, "SUB");
+        add(EditCustom4, CustomTarget::Feedback, "PWM");
+        return list;
+    }
+    if (t == "PHASE") {
+        add(EditCustom1, CustomTarget::FmAmount, "OFFSET");
+        add(EditCustom2, CustomTarget::Osc1Detune, "SPREAD");
+        add(EditCustom3, CustomTarget::Ratio, "AMOUNT");
+        add(EditCustom4, CustomTarget::Feedback, "FEEDBK");
+        return list;
+    }
+    if (t == "RING") {
+        add(EditCustom1, CustomTarget::FmAmount, "BALANCE");
+        add(EditCustom2, CustomTarget::Ratio, "RATIO");
+        add(EditCustom3, CustomTarget::Osc1Detune, "DETUNE");
+        add(EditCustom4, CustomTarget::Feedback, "DRIVE");
+        return list;
+    }
+    if (t == "STRING") {
+        add(EditCustom1, CustomTarget::Ratio, "TENSION");
+        add(EditCustom2, CustomTarget::FmAmount, "DAMP");
+        add(EditCustom3, CustomTarget::Osc2Gain, "NOISE");
+        add(EditCustom4, CustomTarget::Feedback, "BODY");
+        return list;
+    }
+    if (t == "SAW") {
+        add(EditCustom1, CustomTarget::Osc1Detune, "DETUNE");
+        add(EditCustom2, CustomTarget::Osc2Detune, "SPREAD");
+        add(EditCustom3, CustomTarget::Osc2Gain, "SUB");
+        add(EditCustom4, CustomTarget::Feedback, "NOISE");
+        return list;
+    }
+    if (t == "VOLTAGE") {
+        add(EditCustom1, CustomTarget::FmAmount, "MIX");
+        add(EditCustom2, CustomTarget::Osc1Detune, "DETUNE");
+        add(EditCustom3, CustomTarget::FilterEnv, "F ENV");
+        add(EditCustom4, CustomTarget::Feedback, "DRIVE");
+        return list;
+    }
+    return list;
 }
 
 QVector<int> visibleParamIndicesForType(const QString &type) {
@@ -65,6 +178,13 @@ QVector<int> visibleParamIndicesForType(const QString &type) {
     QVector<int> indices;
     if (upper == "DX7") {
         indices << EditAttack << EditDecay << EditSustain << EditRelease;
+        return indices;
+    }
+    if (isCustomEngineType(upper)) {
+        const QVector<CustomControl> controls = customControlsForType(upper);
+        for (const auto &c : controls) {
+            indices << c.paramType;
+        }
         return indices;
     }
     if (isSimpleType(upper)) {
@@ -99,6 +219,9 @@ QString defaultSynthBank() {
         return QStringLiteral("INTERNAL");
     }
     const QString type = defaultSynthType().trimmed().toUpper();
+    if (isCustomEngineType(type)) {
+        return type;
+    }
     if (isSimpleType(type)) {
         return QStringLiteral("SIMPLE");
     }
@@ -274,6 +397,10 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
         {"LFO RATE", EditLfoRate},
         {"LFO DEPTH", EditLfoDepth},
         {"OCT", EditOctave},
+        {"C1", EditCustom1},
+        {"C2", EditCustom2},
+        {"C3", EditCustom3},
+        {"C4", EditCustom4},
     };
 
     if (m_pads) {
@@ -304,7 +431,9 @@ void SynthPageWidget::reloadBanks(bool syncSelection) {
     if (m_pads) {
         banks = PadBank::synthBanks();
     }
-    if (isSimpleType(type)) {
+    if (isCustomEngineType(type)) {
+        banks = {type};
+    } else if (isSimpleType(type)) {
         banks = {QStringLiteral("SIMPLE")};
     } else {
         QStringList filtered;
@@ -746,6 +875,30 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         }
         return QString("0");
     };
+
+    auto customTargetValue = [&](CustomTarget target) {
+        switch (target) {
+            case CustomTarget::Osc1Wave:
+                return waves.value(sp.osc1Wave, "WAVE");
+            case CustomTarget::Osc2Wave:
+                return waves.value(sp.osc2Wave, "WAVE");
+            case CustomTarget::FmAmount:
+                return QString("%1%").arg(qRound(clamp01(sp.fmAmount) * 100.0f));
+            case CustomTarget::Ratio:
+                return QString("x%1").arg(sp.ratio, 0, 'f', 2);
+            case CustomTarget::Feedback:
+                return QString("%1%").arg(qRound(clamp01(sp.feedback) * 100.0f));
+            case CustomTarget::Osc1Detune:
+                return QString("%1%").arg(qRound(clamp01(sp.osc1Detune) * 100.0f));
+            case CustomTarget::Osc2Detune:
+                return QString("%1%").arg(qRound(clamp01(sp.osc2Detune) * 100.0f));
+            case CustomTarget::Osc2Gain:
+                return QString("%1%").arg(qRound(clamp01(sp.osc2Gain) * 100.0f));
+            case CustomTarget::FilterEnv:
+                return QString("%1%").arg(qRound(clamp01(sp.filterEnv) * 100.0f));
+        }
+        return QString("0");
+    };
     if (isDx7) {
         for (auto &param : m_editParams) {
             param.rect = QRectF();
@@ -831,6 +984,47 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 p.drawText(r.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
                            Qt::AlignRight | Qt::AlignVCenter, formatValue(param.type));
             }
+        }
+    } else if (isCustomEngineType(synthTypeUpper)) {
+        for (auto &param : m_editParams) {
+            param.rect = QRectF();
+        }
+        m_filterPresetRects.clear();
+
+        QRectF panelRect = content;
+        drawPanel(panelRect, synthTypeUpper);
+        QRectF paramsRect = panelRect.adjusted(Theme::px(10), Theme::px(28),
+                                               -Theme::px(10), -Theme::px(10));
+
+        const QVector<CustomControl> controls = customControlsForType(synthTypeUpper);
+        const float gap = Theme::pxF(10.0f);
+        const float cellW = (paramsRect.width() - gap) / 2.0f;
+        const float cellH = (paramsRect.height() - gap) / 2.0f;
+        auto cellRect = [&](int col, int row) {
+            return QRectF(paramsRect.left() + col * (cellW + gap),
+                          paramsRect.top() + row * (cellH + gap),
+                          cellW, cellH);
+        };
+
+        for (int i = 0; i < controls.size() && i < 4; ++i) {
+            const int row = i / 2;
+            const int col = i % 2;
+            const QRectF r = cellRect(col, row);
+            const CustomControl &ctrl = controls[i];
+            EditParam &param = m_editParams[ctrl.paramType];
+            param.rect = r;
+            const bool selected = (ctrl.paramType == m_selectedEditParam);
+            p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+            p.setPen(selected ? Theme::bg0() : Theme::text());
+            p.setFont(Theme::baseFont(11, QFont::DemiBold));
+            p.drawText(r.adjusted(Theme::px(10), 0, -Theme::px(10), 0),
+                       Qt::AlignLeft | Qt::AlignVCenter, ctrl.label);
+            p.setPen(selected ? Theme::bg0() : Theme::textMuted());
+            p.drawText(r.adjusted(Theme::px(10), 0, -Theme::px(10), 0),
+                       Qt::AlignRight | Qt::AlignVCenter,
+                       customTargetValue(ctrl.target));
         }
     } else {
         for (auto &param : m_editParams) {
@@ -1301,6 +1495,35 @@ float SynthPageWidget::currentEditValue(const EditParam &param) const {
         return 0.0f;
     }
     const PadBank::SynthParams sp = m_pads->synthParams(m_activePad);
+    const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad)).trimmed().toUpper();
+    if (isCustomEngineType(type) &&
+        (param.type >= EditCustom1 && param.type <= EditCustom4)) {
+        const QVector<CustomControl> controls = customControlsForType(type);
+        for (const auto &ctrl : controls) {
+            if (ctrl.paramType == param.type) {
+                switch (ctrl.target) {
+                    case CustomTarget::Osc1Wave:
+                        return static_cast<float>(sp.osc1Wave);
+                    case CustomTarget::Osc2Wave:
+                        return static_cast<float>(sp.osc2Wave);
+                    case CustomTarget::FmAmount:
+                        return sp.fmAmount;
+                    case CustomTarget::Ratio:
+                        return sp.ratio;
+                    case CustomTarget::Feedback:
+                        return sp.feedback;
+                    case CustomTarget::Osc1Detune:
+                        return sp.osc1Detune;
+                    case CustomTarget::Osc2Detune:
+                        return sp.osc2Detune;
+                    case CustomTarget::Osc2Gain:
+                        return sp.osc2Gain;
+                    case CustomTarget::FilterEnv:
+                        return sp.filterEnv;
+                }
+            }
+        }
+    }
     switch (param.type) {
         case EditOsc1Wave:
             return static_cast<float>(sp.osc1Wave);
@@ -1358,11 +1581,16 @@ void SynthPageWidget::adjustEditParam(int delta) {
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad)).trimmed().toUpper();
     const bool isDx7 = (type == "DX7");
     const bool isSimple = isSimpleType(type);
+    const bool isCustom = isCustomEngineType(type);
     if (isDx7 && !(param.type == EditAttack || param.type == EditDecay ||
                    param.type == EditSustain || param.type == EditRelease)) {
         return;
     }
-    if (isSimple && !(param.type == EditOsc1Wave || param.type == EditOctave ||
+    if (isCustom) {
+        if (!(param.type >= EditCustom1 && param.type <= EditCustom4)) {
+            return;
+        }
+    } else if (isSimple && !(param.type == EditOsc1Wave || param.type == EditOctave ||
                      param.type == EditOsc1Voices || param.type == EditOsc1Detune ||
                      param.type == EditOsc1Gain || param.type == EditOsc2Wave ||
                      param.type == EditOsc2Voices || param.type == EditOsc2Detune ||
@@ -1375,6 +1603,67 @@ void SynthPageWidget::adjustEditParam(int delta) {
     auto step = [delta](float base, float amount) {
         return base + amount * static_cast<float>(delta);
     };
+
+    if (isCustom) {
+        const QVector<CustomControl> controls = customControlsForType(type);
+        CustomTarget target = CustomTarget::FmAmount;
+        bool found = false;
+        for (const auto &ctrl : controls) {
+            if (ctrl.paramType == param.type) {
+                target = ctrl.target;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return;
+        }
+        switch (target) {
+            case CustomTarget::Osc1Wave:
+                sp.osc1Wave = (sp.osc1Wave + delta + waveCount) % qMax(1, waveCount);
+                m_pads->setSynthOsc(pad, 0, sp.osc1Wave, sp.osc1Voices, sp.osc1Detune,
+                                    sp.osc1Gain, sp.osc1Pan);
+                break;
+            case CustomTarget::Osc2Wave:
+                sp.osc2Wave = (sp.osc2Wave + delta + waveCount) % qMax(1, waveCount);
+                m_pads->setSynthOsc(pad, 1, sp.osc2Wave, sp.osc2Voices, sp.osc2Detune,
+                                    sp.osc2Gain, sp.osc2Pan);
+                break;
+            case CustomTarget::FmAmount:
+                sp.fmAmount = clamp01(step(sp.fmAmount, 0.05f));
+                m_pads->setSynthFm(pad, sp.fmAmount, sp.ratio, sp.feedback);
+                break;
+            case CustomTarget::Ratio:
+                sp.ratio = qBound(0.1f, sp.ratio + delta * 0.1f, 8.0f);
+                m_pads->setSynthFm(pad, sp.fmAmount, sp.ratio, sp.feedback);
+                break;
+            case CustomTarget::Feedback:
+                sp.feedback = clamp01(step(sp.feedback, 0.05f));
+                m_pads->setSynthFm(pad, sp.fmAmount, sp.ratio, sp.feedback);
+                break;
+            case CustomTarget::Osc1Detune:
+                sp.osc1Detune = clamp01(step(sp.osc1Detune, 0.05f));
+                m_pads->setSynthOsc(pad, 0, sp.osc1Wave, sp.osc1Voices, sp.osc1Detune,
+                                    sp.osc1Gain, sp.osc1Pan);
+                break;
+            case CustomTarget::Osc2Detune:
+                sp.osc2Detune = clamp01(step(sp.osc2Detune, 0.05f));
+                m_pads->setSynthOsc(pad, 1, sp.osc2Wave, sp.osc2Voices, sp.osc2Detune,
+                                    sp.osc2Gain, sp.osc2Pan);
+                break;
+            case CustomTarget::Osc2Gain:
+                sp.osc2Gain = clamp01(step(sp.osc2Gain, 0.05f));
+                m_pads->setSynthOsc(pad, 1, sp.osc2Wave, sp.osc2Voices, sp.osc2Detune,
+                                    sp.osc2Gain, sp.osc2Pan);
+                break;
+            case CustomTarget::FilterEnv:
+                sp.filterEnv = clamp01(step(sp.filterEnv, 0.05f));
+                m_pads->setSynthFilterEnv(pad, sp.filterEnv);
+                break;
+        }
+        update();
+        return;
+    }
 
     switch (param.type) {
         case EditOsc1Wave:

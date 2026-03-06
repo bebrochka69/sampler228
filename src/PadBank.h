@@ -106,6 +106,7 @@ public:
     void setSynthOctave(int index, int octave);
     void setSynthFm(int index, float fmAmount, float ratio, float feedback);
     void setSynthFilter(int index, float cutoff, float resonance);
+    void setSynthFilterEnv(int index, float amount);
     void setSynthFilterType(int index, int type);
     void setSynthOsc(int index, int osc, int wave, int voices, float detune, float gain,
                      float pan);

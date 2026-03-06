@@ -30,6 +30,7 @@ public:
         Phase,
         Ring,
         String,
+        Saw,
         Voltage
     };
 

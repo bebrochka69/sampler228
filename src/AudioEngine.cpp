@@ -68,6 +68,8 @@ Op1EngineType op1TypeFromKind(AudioEngine::SynthKind kind) {
             return Op1EngineType::Ring;
         case AudioEngine::SynthKind::String:
             return Op1EngineType::String;
+        case AudioEngine::SynthKind::Saw:
+            return Op1EngineType::Saw;
         case AudioEngine::SynthKind::Voltage:
             return Op1EngineType::Voltage;
         default:
@@ -1143,7 +1145,8 @@ void AudioEngine::mix(float *out, int frames) {
             const bool isSimple = (synth.kind == SynthKind::Simple);
             const bool neutralEnv =
                 (attack <= 0.001f && decay <= 0.001f && release <= 0.001f && sustain >= 0.999f);
-            const bool useExternalEnv = !(isDx7 && neutralEnv);
+            const bool useExternalEnv =
+                (isDx7 || isSimple) ? !(isDx7 && neutralEnv) : false;
 
             const bool hasNotes = std::any_of(synth.activeNotes.begin(),
                                              synth.activeNotes.end(),
@@ -1164,7 +1167,7 @@ void AudioEngine::mix(float *out, int frames) {
                 std::fill(m_synthScratchR.begin(), m_synthScratchR.end(), 0.0f);
             }
 
-            const bool useFilter = (!isDx7 && synth.filterType != 8);
+            const bool useFilter = (isSimple && synth.filterType != 8);
             const float baseCutoff = synth.filterCutoff;
             const float baseRes = synth.filterResonance;
             const float lfoDepth = synth.lfoDepth;
@@ -1302,13 +1305,13 @@ void AudioEngine::mix(float *out, int frames) {
                 if (m_channels > 1) {
                     busOut[idx + 1] += right * synth.gainR * env;
                 }
-                if ((isDx7 || isSimple) && !useExternalEnv && !hasNotes) {
+                if (!useExternalEnv && !hasNotes) {
                     const float peakL = std::fabs(left * synth.gainL);
                     const float peakR = std::fabs(right * synth.gainR);
                     tailPeak = std::max(tailPeak, std::max(peakL, peakR));
                 }
             }
-            if ((isDx7 || isSimple) && !useExternalEnv && !hasNotes) {
+            if (!useExternalEnv && !hasNotes) {
                 if (tailPeak < 0.00008f) {
                     synth.releaseRequested = false;
                     synth.env = 0.0f;

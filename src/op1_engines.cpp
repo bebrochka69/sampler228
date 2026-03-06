@@ -174,21 +174,13 @@ public:
             return;
         }
 
-        const float releaseSec = 0.02f + params_.release * 1.6f;
+        const float releaseSec = 0.06f;
         const float releaseStep =
             (releaseSec > 0.0f) ? (1.0f / (releaseSec * static_cast<float>(sampleRate_))) : 1.0f;
-
-        const float lfoHz = 0.1f + params_.lfoRate * 8.0f;
-        const float lfoInc = kTwoPi * lfoHz / static_cast<float>(sampleRate_);
-        float lfoPhase = lfoPhase_;
+        const float lfo = 0.0f;
 
         for (int i = 0; i < frames; ++i) {
             float sum = 0.0f;
-            const float lfo = std::sin(lfoPhase);
-            lfoPhase += lfoInc;
-            if (lfoPhase > kTwoPi) {
-                lfoPhase -= kTwoPi;
-            }
 
             for (auto &voice : voices_) {
                 if (!voice.active) {
@@ -207,7 +199,7 @@ public:
             outL[i] = sum;
             outR[i] = sum;
         }
-        lfoPhase_ = lfoPhase;
+        lfoPhase_ = lfoPhase_;
     }
 
 protected:
@@ -234,12 +226,13 @@ protected:
 class ClusterEngine final : public Op1EngineBase {
 protected:
     void onNoteOn(Op1Voice &voice) override {
-        const float spread = 0.5f + params_.osc1Detune * 12.0f + params_.lfoDepth * 6.0f;
+        const float spread = 0.5f + params_.osc1Detune * 12.0f;
+        const float detune = params_.osc2Detune * 4.0f;
         const float dur = 0.01f + params_.decay * 0.1f;
         for (auto &grain : voice.grains) {
             voice.noise = 1664525u * voice.noise + 1013904223u;
             const float r = (static_cast<int>(voice.noise >> 8) & 0xFFFF) / 32768.0f - 1.0f;
-            const float semis = r * spread;
+            const float semis = r * (spread + detune);
             grain.freq = voice.baseFreq * std::pow(2.0f, semis / 12.0f);
             grain.phase = r * kTwoPi;
             grain.age = 0.0f;
@@ -250,14 +243,16 @@ protected:
 
     float renderVoice(Op1Voice &voice, float lfo) override {
         float sum = 0.0f;
-        const float spread = 0.5f + params_.osc1Detune * 12.0f + params_.lfoDepth * 6.0f;
+        const float spread = 0.5f + params_.osc1Detune * 12.0f;
+        const float detune = params_.osc2Detune * 4.0f;
         const float durBase = 0.01f + params_.decay * 0.1f;
         const float dt = 1.0f / static_cast<float>(sampleRate_);
+        const float motion = params_.fmAmount;
         for (auto &grain : voice.grains) {
             if (grain.age >= grain.dur) {
                 voice.noise = 1664525u * voice.noise + 1013904223u;
                 const float r = (static_cast<int>(voice.noise >> 8) & 0xFFFF) / 32768.0f - 1.0f;
-                const float semis = (r + lfo * 0.25f) * spread;
+                const float semis = r * (spread + detune);
                 grain.freq = voice.baseFreq * std::pow(2.0f, semis / 12.0f);
                 grain.phase = r * kTwoPi;
                 grain.age = 0.0f;
@@ -266,8 +261,11 @@ protected:
             }
             const float phaseNorm = grain.age / std::max(0.0001f, grain.dur);
             const float window = 0.5f - 0.5f * std::cos(kTwoPi * phaseNorm);
-            sum += std::sin(grain.phase) * window * grain.amp;
-            grain.phase += kTwoPi * grain.freq * dt;
+            sum += oscWave(params_.osc1Wave, grain.phase, voice.noise) * window * grain.amp;
+            const float jitter = 1.0f + motion * 0.02f *
+                                              (static_cast<float>((voice.noise >> 3) & 0xFF) /
+                                               255.0f - 0.5f);
+            grain.phase += kTwoPi * grain.freq * dt * jitter;
             grain.age += dt;
         }
         return sum * 0.35f;
@@ -277,15 +275,18 @@ protected:
 class DigitalEngine final : public Op1EngineBase {
 protected:
     float renderVoice(Op1Voice &voice, float lfo) override {
-        const float f1 = voice.baseFreq;
-        const float f2 = voice.baseFreq * params_.ratio;
+        const float detune = params_.osc1Detune * 0.6f;
+        const float f1 = voice.baseFreq * (1.0f - detune * 0.5f);
+        const float f2 = voice.baseFreq * (1.0f + detune * 0.5f);
         voice.phase1 += kTwoPi * f1 / sampleRate_;
         voice.phase2 += kTwoPi * f2 / sampleRate_;
-        const float wave1 = oscWave(params_.osc1Wave, voice.phase1, voice.noise);
-        const float wave2 = oscWave(params_.osc2Wave, voice.phase2, voice.noise);
-        float ring = wave1 * wave2;
-        float mix = wave1 * (1.0f - params_.fmAmount) + ring * params_.fmAmount;
-        const float crush = 4.0f + params_.lfoDepth * 12.0f;
+        const int waveA = params_.osc1Wave;
+        const int waveB = (waveA + 1) % 10;
+        const float index = clamp01(params_.fmAmount);
+        const float wave1 = oscWave(waveA, voice.phase1, voice.noise);
+        const float wave2 = oscWave(waveB, voice.phase2, voice.noise);
+        float mix = wave1 + (wave2 - wave1) * index;
+        const float crush = 4.0f + params_.osc2Detune * 12.0f;
         const float step = 1.0f / crush;
         mix = std::round(mix / step) * step;
         const float drive = 1.0f + params_.feedback * 4.0f;
@@ -298,10 +299,13 @@ protected:
     float renderVoice(Op1Voice &voice, float lfo) override {
         voice.noise = 1664525u * voice.noise + 1013904223u;
         const float n = (static_cast<int>(voice.noise >> 8) & 0xFFFF) / 32768.0f - 1.0f;
-        const float chaos = n * (0.2f + params_.fmAmount * 0.8f);
+        const float chaos = n * (0.2f + params_.feedback * 0.8f);
         const float freq = voice.baseFreq * (1.0f + chaos * 0.4f);
         voice.phase1 += kTwoPi * freq / sampleRate_;
-        const float base = std::sin(voice.phase1 + chaos + lfo * 0.3f);
+        const float geneA = oscWave(params_.osc1Wave, voice.phase1, voice.noise);
+        const float geneB = oscWave(params_.osc2Wave, voice.phase1 + chaos, voice.noise);
+        const float mixAmt = clamp01(params_.fmAmount);
+        const float base = geneA + (geneB - geneA) * mixAmt;
         float mix = base * (1.0f - params_.osc2Gain) + n * params_.osc2Gain;
         mix = std::tanh(mix * (1.0f + params_.feedback * 2.5f));
         return mix * 0.8f;
@@ -311,16 +315,15 @@ protected:
 class DrWaveEngine final : public Op1EngineBase {
 protected:
     float renderVoice(Op1Voice &voice, float lfo) override {
-        const float p = clamp01(params_.fmAmount + lfo * params_.lfoDepth * 0.5f);
-        const float idx = p * 3.0f;
-        const int i0 = static_cast<int>(std::floor(idx));
-        const int i1 = std::min(3, i0 + 1);
-        const float frac = idx - static_cast<float>(i0);
-        const int waves[4] = {0, 1, 2, 3};
-        voice.phase1 += kTwoPi * voice.baseFreq / sampleRate_;
-        const float a = oscWave(waves[i0], voice.phase1, voice.noise);
-        const float b = oscWave(waves[i1], voice.phase1, voice.noise);
-        return a + (b - a) * frac;
+        const float bend = clamp01(params_.fmAmount);
+        const int wave = params_.osc1Wave;
+        const float det = params_.osc1Detune * 0.4f;
+        const float freq = voice.baseFreq * (1.0f + det);
+        voice.phase1 += kTwoPi * freq / sampleRate_;
+        float base = oscWave(wave, voice.phase1, voice.noise);
+        const float shaped = std::tanh(base * (1.0f + bend * 4.0f));
+        const float drive = 1.0f + params_.feedback * 2.0f;
+        return std::tanh(shaped * drive);
     }
 };
 
@@ -342,7 +345,8 @@ protected:
 class FmEngine final : public Op1EngineBase {
 protected:
     float renderVoice(Op1Voice &voice, float lfo) override {
-        const float f1 = voice.baseFreq;
+        const float carrierRatio = 0.5f + params_.osc1Detune * 3.5f;
+        const float f1 = voice.baseFreq * carrierRatio;
         const float f2 = voice.baseFreq * params_.ratio;
         voice.phase2 += kTwoPi * f2 / sampleRate_;
         const float mod = std::sin(voice.phase2 + params_.feedback * voice.last);
@@ -356,10 +360,18 @@ class PulseEngine final : public Op1EngineBase {
 protected:
     float renderVoice(Op1Voice &voice, float lfo) override {
         const float dutyBase = 0.1f + params_.fmAmount * 0.8f;
-        const float duty = clampRange(dutyBase + lfo * params_.lfoDepth * 0.25f, 0.05f, 0.95f);
+        const float pwmRate = 0.5f + params_.feedback * 3.0f;
+        voice.phase3 += kTwoPi * pwmRate / sampleRate_;
+        if (voice.phase3 > kTwoPi) {
+            voice.phase3 -= kTwoPi;
+        }
+        const float pwm = std::sin(voice.phase3) * params_.feedback * 0.25f;
+        const float duty = clampRange(dutyBase + pwm, 0.05f, 0.95f);
         voice.phase1 += kTwoPi * voice.baseFreq / sampleRate_;
         const float t = std::fmod(voice.phase1, kTwoPi) / kTwoPi;
-        return (t < duty) ? 1.0f : -1.0f;
+        float sample = (t < duty) ? 1.0f : -1.0f;
+        const float sub = std::sin(voice.phase1 * 0.5f) * params_.osc2Gain;
+        return sample * (1.0f - params_.osc2Gain) + sub;
     }
 };
 
@@ -369,9 +381,11 @@ protected:
         const float f1 = voice.baseFreq;
         const float f2 = voice.baseFreq * params_.ratio;
         voice.phase2 += kTwoPi * f2 / sampleRate_;
-        const float mod = std::sin(voice.phase2) * params_.fmAmount * 2.0f;
+        const float mod = std::sin(voice.phase2) * params_.ratio * (0.3f + params_.feedback * 1.7f);
         voice.phase1 += kTwoPi * f1 / sampleRate_;
-        return std::sin(voice.phase1 + mod + lfo * 0.1f);
+        const float offset = params_.fmAmount * kTwoPi;
+        const float spread = params_.osc1Detune * 0.5f;
+        return std::sin(voice.phase1 + offset + mod + spread);
     }
 };
 
@@ -383,21 +397,24 @@ protected:
         voice.phase1 += kTwoPi * f1 / sampleRate_;
         voice.phase2 += kTwoPi * f2 / sampleRate_;
         const float a = std::sin(voice.phase1);
-        const float b = std::sin(voice.phase2 + lfo * 0.15f);
+        const float b = std::sin(voice.phase2);
         const float ring = a * b;
-        return a * (1.0f - params_.fmAmount) + ring * params_.fmAmount;
+        const float mix = a * (1.0f - params_.fmAmount) + ring * params_.fmAmount;
+        const float drive = 1.0f + params_.feedback * 3.0f;
+        return std::tanh(mix * drive);
     }
 };
 
 class StringEngine final : public Op1EngineBase {
 protected:
     void onNoteOn(Op1Voice &voice) override {
-        const float freq = std::max(40.0f, voice.baseFreq);
+        const float freq = std::max(40.0f, voice.baseFreq * (0.5f + params_.ratio * 0.5f));
         const int len = static_cast<int>(std::max(16.0f, sampleRate_ / freq));
         voice.delay.assign(static_cast<size_t>(len), 0.0f);
         for (auto &v : voice.delay) {
             voice.noise = 1664525u * voice.noise + 1013904223u;
-            v = (static_cast<int>(voice.noise >> 8) & 0xFFFF) / 32768.0f - 1.0f;
+            v = ((static_cast<int>(voice.noise >> 8) & 0xFFFF) / 32768.0f - 1.0f) *
+                (0.5f + params_.osc2Gain * 0.5f);
         }
         voice.delayIdx = 0;
         voice.delayFilter = 0.0f;
@@ -413,9 +430,9 @@ protected:
         const int idx2 = (idx + 1) % len;
         const float y = voice.delay[idx];
         float next = 0.5f * (y + voice.delay[idx2]);
-        const float damp = 0.98f - params_.resonance * 0.3f;
+        const float damp = 0.92f - params_.fmAmount * 0.4f;
         next *= damp;
-        const float cutoff = 0.1f + params_.cutoff * 0.85f;
+        const float cutoff = 0.2f + params_.feedback * 0.6f;
         voice.delayFilter += (next - voice.delayFilter) * cutoff;
         voice.delay[idx] = voice.delayFilter;
         voice.delayIdx = (idx + 1) % len;
@@ -435,15 +452,43 @@ protected:
         float sum = 0.0f;
         const float baseInc = kTwoPi * voice.baseFreq / sampleRate_;
         const float basePhase = voice.phase1;
+        const float mix = clamp01(params_.fmAmount);
         for (int i = 0; i < voices; ++i) {
             const float spread = (static_cast<float>(i) - (voices - 1) * 0.5f) /
                                  std::max(1.0f, (voices - 1) * 0.5f);
             const float detune = std::pow(2.0f, (spread * det) / 12.0f);
-            const float phase = basePhase * detune + spread * 0.4f + lfo * 0.15f;
-            sum += oscWave(1, phase, voice.noise);
+            const float phase = basePhase * detune + spread * 0.4f;
+            const float saw = oscWave(1, phase, voice.noise);
+            const float sq = oscWave(2, phase, voice.noise);
+            sum += saw * (1.0f - mix) + sq * mix;
         }
         voice.phase1 += baseInc;
-        return (sum / static_cast<float>(voices)) * params_.osc1Gain;
+        const float drive = 1.0f + params_.feedback * 3.0f + params_.filterEnv * 2.0f;
+        return std::tanh((sum / static_cast<float>(voices)) * params_.osc1Gain * drive);
+    }
+};
+
+class SawEngine final : public Op1EngineBase {
+protected:
+    float renderVoice(Op1Voice &voice, float) override {
+        const int voices = std::max(1, std::min(8, params_.osc1Voices));
+        const float det = params_.osc1Detune * 0.8f;
+        const float spread = params_.osc2Detune * 0.6f;
+        float sum = 0.0f;
+        const float base = voice.baseFreq;
+        for (int i = 0; i < voices; ++i) {
+            const float vSpread = (static_cast<float>(i) - (voices - 1) * 0.5f) /
+                                  std::max(1.0f, (voices - 1) * 0.5f);
+            const float freq = base * std::pow(2.0f, (vSpread * det) / 12.0f);
+            voice.phase1 += kTwoPi * freq / sampleRate_;
+            const float phase = voice.phase1 + vSpread * spread * kTwoPi * 0.25f;
+            sum += oscWave(1, phase, voice.noise);
+        }
+        const float sub = std::sin(voice.phase1 * 0.5f) * params_.osc2Gain;
+        voice.noise = 1664525u * voice.noise + 1013904223u;
+        const float noise = ((static_cast<int>(voice.noise >> 8) & 0xFFFF) / 32768.0f - 1.0f) *
+                            params_.feedback * 0.5f;
+        return ((sum / static_cast<float>(voices)) + sub + noise) * 0.6f;
     }
 };
 
@@ -471,6 +516,8 @@ std::unique_ptr<Op1Engine> createOp1Engine(Op1EngineType type) {
             return std::make_unique<RingEngine>();
         case Op1EngineType::String:
             return std::make_unique<StringEngine>();
+        case Op1EngineType::Saw:
+            return std::make_unique<SawEngine>();
         case Op1EngineType::Voltage:
             return std::make_unique<VoltageEngine>();
         default:

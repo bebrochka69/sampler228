@@ -42,6 +42,7 @@ enum class Op1EngineType {
     Phase,
     Ring,
     String,
+    Saw,
     Voltage
 };
 

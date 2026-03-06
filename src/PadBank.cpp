@@ -63,7 +63,7 @@ bool isCustomEngineType(const QString &type) {
     const QString t = canonicalType(type);
     return t == "CLUSTER" || t == "DIGITAL" || t == "DNA" || t == "DRWAVE" ||
            t == "DSYNTH" || t == "FM" || t == "PULSE" || t == "PHASE" ||
-           t == "RING" || t == "STRING" || t == "VOLTAGE";
+           t == "RING" || t == "STRING" || t == "SAW" || t == "VOLTAGE";
 }
 
 QString synthTypeFromName(const QString &name) {
@@ -427,6 +427,19 @@ static PadBank::SynthParams defaultParamsForEngine(const QString &type) {
         params.release = 0.2f;
         return params;
     }
+    if (t == "SAW") {
+        params.osc1Wave = 1;
+        params.osc1Voices = 4;
+        params.osc1Detune = 0.35f;
+        params.osc1Gain = 0.8f;
+        params.osc2Gain = 0.25f;
+        params.feedback = 0.2f;
+        params.attack = 0.01f;
+        params.decay = 0.25f;
+        params.sustain = 0.7f;
+        params.release = 0.2f;
+        return params;
+    }
     if (t == "VOLTAGE") {
         params.osc1Wave = 1;
         params.osc1Voices = 5;
@@ -456,6 +469,7 @@ static AudioEngine::SynthKind synthKindForType(const QString &type) {
     if (t == "PHASE") return AudioEngine::SynthKind::Phase;
     if (t == "RING") return AudioEngine::SynthKind::Ring;
     if (t == "STRING") return AudioEngine::SynthKind::String;
+    if (t == "SAW") return AudioEngine::SynthKind::Saw;
     if (t == "VOLTAGE") return AudioEngine::SynthKind::Voltage;
     return AudioEngine::SynthKind::Simple;
 }
@@ -1691,6 +1705,19 @@ void PadBank::setSynthFilter(int index, float cutoff, float resonance) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.cutoff = qBound(0.0f, cutoff, 1.0f);
     sp.resonance = qBound(0.0f, resonance, 1.0f);
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthFilterEnv(int index, float amount) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.filterEnv = qBound(0.0f, amount, 1.0f);
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));
@@ -3017,7 +3044,7 @@ QStringList PadBank::serumWaves() {
 
 QStringList PadBank::synthTypes() {
     return {defaultMiniDexedType(), "SIMPLE", "CLUSTER", "DIGITAL", "DNA", "DR WAVE",
-            "DSYNTH", "FM", "PULSE", "PHASE", "RING", "STRING", "VOLTAGE"};
+            "FM", "PULSE", "PHASE", "RING", "STRING", "SAW", "VOLTAGE"};
 }
 
 bool PadBank::hasMiniDexed() {
