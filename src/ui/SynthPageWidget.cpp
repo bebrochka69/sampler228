@@ -38,7 +38,11 @@ enum EditParamType {
     EditCustom1 = 20,
     EditCustom2 = 21,
     EditCustom3 = 22,
-    EditCustom4 = 23
+    EditCustom4 = 23,
+    EditFilterEnv = 24,
+    EditLfoShape = 25,
+    EditLfoSync = 26,
+    EditLfoTarget = 27
 };
 
 constexpr float kTwoPi = 6.28318530717958647692f;
@@ -408,6 +412,10 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
         {"C2", EditCustom2},
         {"C3", EditCustom3},
         {"C4", EditCustom4},
+        {"F ENV", EditFilterEnv},
+        {"LFO SHAPE", EditLfoShape},
+        {"LFO SYNC", EditLfoSync},
+        {"LFO TGT", EditLfoTarget},
     };
 
     if (m_pads) {
@@ -426,6 +434,17 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
         });
         connect(m_pads, &PadBank::padParamsChanged, this, [this](int) { update(); });
     }
+
+    m_holdTimer.setSingleShot(true);
+    connect(&m_holdTimer, &QTimer::timeout, this, [this]() {
+        if (!m_holdActive || m_holdParamType < 0) {
+            return;
+        }
+        m_assignMenuOpen = true;
+        m_assignParamType = m_holdParamType;
+        m_holdActive = false;
+        update();
+    });
 }
 
 void SynthPageWidget::reloadBanks(bool syncSelection) {
@@ -550,7 +569,15 @@ void SynthPageWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad));
-    const bool presetsAllowed = (type.trimmed().toUpper() == "DX7");
+    const QString typeUpper = type.trimmed().toUpper();
+    const bool presetsAllowed = (typeUpper == "DX7" || isCustomEngineType(typeUpper));
+    if (key == Qt::Key_L) {
+        m_modMenuOpen = !m_modMenuOpen;
+        m_assignMenuOpen = false;
+        m_showPresetMenu = false;
+        update();
+        return;
+    }
     if (key == Qt::Key_P) {
         if (presetsAllowed) {
             m_showPresetMenu = !m_showPresetMenu;
@@ -558,11 +585,202 @@ void SynthPageWidget::keyPressEvent(QKeyEvent *event) {
         }
         return;
     }
+    if (key == Qt::Key_Escape && m_modMenuOpen) {
+        m_modMenuOpen = false;
+        m_assignMenuOpen = false;
+        update();
+        return;
+    }
     if (key == Qt::Key_Escape && m_showPresetMenu) {
         m_showPresetMenu = false;
         update();
         return;
     }
+    if (m_modMenuOpen && m_modMenuRect.isValid()) {
+        const QRectF menu = m_modMenuRect.adjusted(Theme::px(4), Theme::px(4),
+                                                   -Theme::px(4), -Theme::px(4));
+        p.setBrush(Theme::bg1());
+        p.setPen(QPen(Theme::stroke(), 1.2));
+        p.drawRoundedRect(menu, Theme::px(12), Theme::px(12));
+
+        const float sectionGap = Theme::pxF(10.0f);
+        const float sectionH = (menu.height() - sectionGap * 2.0f) / 3.0f;
+        QRectF lfoRect(menu.left(), menu.top(), menu.width(), sectionH);
+        QRectF filterRect(menu.left(), lfoRect.bottom() + sectionGap, menu.width(), sectionH);
+        QRectF adsrRect(menu.left(), filterRect.bottom() + sectionGap, menu.width(),
+                        menu.bottom() - filterRect.bottom() - sectionGap);
+
+        auto drawMiniParam = [&](const QRectF &cell, int paramType) {
+            EditParam &param = m_editParams[paramType];
+            param.rect = cell;
+            const bool selected = (paramType == m_selectedEditParam);
+            p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(cell, Theme::px(6), Theme::px(6));
+            p.setPen(selected ? Theme::bg0() : Theme::text());
+            p.setFont(Theme::baseFont(8, QFont::DemiBold));
+            p.drawText(cell.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+                       Qt::AlignLeft | Qt::AlignVCenter, param.label);
+            p.setPen(selected ? Theme::bg0() : Theme::textMuted());
+            p.drawText(cell.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+                       Qt::AlignRight | Qt::AlignVCenter, formatValue(param.type));
+        };
+
+        // LFO panel.
+        drawPanel(lfoRect, "LFO");
+        QRectF lfoInner = lfoRect.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
+        QRectF lfoWave = lfoInner;
+        lfoWave.setHeight(lfoInner.height() * 0.45f);
+        auto lfoShapeValue = [](int shape, float t) {
+            t = std::max(0.0f, std::min(1.0f, t));
+            switch (shape) {
+                case 1: // triangle
+                    return 4.0f * std::fabs(t - 0.5f) - 1.0f;
+                case 2: // square
+                    return t < 0.5f ? 1.0f : -1.0f;
+                case 3: // saw
+                    return 2.0f * t - 1.0f;
+                case 4: { // random hold
+                    const float step = (t < 0.33f) ? -0.4f : (t < 0.66f ? 0.7f : -0.1f);
+                    return step;
+                }
+                default:
+                    return std::sin(kTwoPi * t);
+            }
+        };
+        drawWave(lfoWave, Theme::accent(), [&](float t) {
+            return lfoShapeValue(sp.lfoShape, t);
+        });
+        QRectF lfoParams = lfoInner;
+        lfoParams.setTop(lfoWave.bottom() + Theme::pxF(6.0f));
+        const float lfoGap = Theme::pxF(6.0f);
+        const float lfoCellW = (lfoParams.width() - lfoGap) / 2.0f;
+        const float lfoCellH = (lfoParams.height() - lfoGap * 2.0f) / 3.0f;
+        const QVector<int> lfoParamList = {EditLfoShape, EditLfoRate, EditLfoDepth,
+                                           EditLfoSync, EditLfoTarget};
+        int lfoIdx = 0;
+        for (int row = 0; row < 3; ++row) {
+            for (int col = 0; col < 2; ++col) {
+                if (lfoIdx >= lfoParamList.size()) {
+                    break;
+                }
+                const QRectF cell(lfoParams.left() + col * (lfoCellW + lfoGap),
+                                  lfoParams.top() + row * (lfoCellH + lfoGap),
+                                  lfoCellW, lfoCellH);
+                drawMiniParam(cell, lfoParamList[lfoIdx++]);
+            }
+        }
+
+        // Filter panel.
+        drawPanel(filterRect, "FILTER");
+        QRectF filterInner = filterRect.adjusted(Theme::px(8), Theme::px(20),
+                                                 -Theme::px(8), -Theme::px(8));
+        QRectF filterVis = filterInner;
+        filterVis.setHeight(filterInner.height() * 0.45f);
+        {
+            QPainterPath curve;
+            const float left = filterVis.left();
+            const float right = filterVis.right();
+            const float midY = filterVis.center().y();
+            const float topY = filterVis.top();
+            const float bottomY = filterVis.bottom();
+            switch (sp.filterType) {
+                case 0:
+                    curve.moveTo(left, topY);
+                    curve.lineTo(right, bottomY);
+                    break;
+                case 1:
+                    curve.moveTo(left, bottomY);
+                    curve.lineTo(right, topY);
+                    break;
+                case 2:
+                    curve.moveTo(left, bottomY);
+                    curve.lineTo(filterVis.center().x(), topY);
+                    curve.lineTo(right, bottomY);
+                    break;
+                case 3:
+                    curve.moveTo(left, topY);
+                    curve.lineTo(filterVis.center().x(), bottomY);
+                    curve.lineTo(right, topY);
+                    break;
+                default:
+                    curve.moveTo(left, midY);
+                    curve.lineTo(right, midY);
+                    break;
+            }
+            p.setPen(QPen(Theme::accent(), Theme::pxF(1.4f)));
+            p.drawPath(curve);
+        }
+        QRectF filterParams = filterInner;
+        filterParams.setTop(filterVis.bottom() + Theme::pxF(6.0f));
+        const float filterGap = Theme::pxF(6.0f);
+        const float filterW = (filterParams.width() - filterGap) / 2.0f;
+        const float filterH = (filterParams.height() - filterGap) / 2.0f;
+        drawMiniParam(QRectF(filterParams.left(), filterParams.top(), filterW, filterH), EditCutoff);
+        drawMiniParam(QRectF(filterParams.left() + filterW + filterGap, filterParams.top(),
+                             filterW, filterH), EditResonance);
+        drawMiniParam(QRectF(filterParams.left(), filterParams.top() + filterH + filterGap,
+                             filterW, filterH), EditFilterEnv);
+        drawMiniParam(QRectF(filterParams.left() + filterW + filterGap,
+                             filterParams.top() + filterH + filterGap,
+                             filterW, filterH), EditFilterType);
+
+        // ADSR panel.
+        drawPanel(adsrRect, "ADSR");
+        QRectF adsrInner = adsrRect.adjusted(Theme::px(8), Theme::px(20),
+                                             -Theme::px(8), -Theme::px(8));
+        QRectF adsrWave = adsrInner;
+        adsrWave.setHeight(adsrInner.height() * 0.5f);
+        {
+            const float a = 0.1f + clamp01(sp.attack) * 0.45f;
+            const float d = 0.1f + clamp01(sp.decay) * 0.35f;
+            const float r = 0.1f + clamp01(sp.release) * 0.4f;
+            float total = a + d + r + 0.1f;
+            float scale = 1.0f;
+            if (total > 0.95f) {
+                scale = 0.95f / (a + d + r);
+            }
+            const float aa = a * scale;
+            const float dd = d * scale;
+            const float rr = r * scale;
+            float sustainLen = 1.0f - (aa + dd + rr);
+            sustainLen = std::max(0.05f, sustainLen);
+            const float s = clamp01(sp.sustain);
+
+            const float x0 = adsrWave.left();
+            const float x1 = x0 + adsrWave.width() * aa;
+            const float x2 = x1 + adsrWave.width() * dd;
+            const float x3 = x2 + adsrWave.width() * sustainLen;
+            const float x4 = adsrWave.right();
+
+            const float y0 = adsrWave.bottom();
+            const float y1 = adsrWave.top();
+            const float y2 = adsrWave.top() + (1.0f - s) * adsrWave.height();
+
+            QPainterPath env;
+            env.moveTo(x0, y0);
+            env.lineTo(x1, y1);
+            env.lineTo(x2, y2);
+            env.lineTo(x3, y2);
+            env.lineTo(x4, y0);
+            p.setPen(QPen(Theme::accent(), Theme::pxF(1.4f)));
+            p.drawPath(env);
+        }
+        QRectF adsrParams = adsrInner;
+        adsrParams.setTop(adsrWave.bottom() + Theme::pxF(6.0f));
+        const float adsrGap = Theme::pxF(6.0f);
+        const float adsrW = (adsrParams.width() - adsrGap) / 2.0f;
+        const float adsrH = (adsrParams.height() - adsrGap) / 2.0f;
+        drawMiniParam(QRectF(adsrParams.left(), adsrParams.top(), adsrW, adsrH), EditAttack);
+        drawMiniParam(QRectF(adsrParams.left() + adsrW + adsrGap, adsrParams.top(),
+                             adsrW, adsrH), EditDecay);
+        drawMiniParam(QRectF(adsrParams.left(), adsrParams.top() + adsrH + adsrGap,
+                             adsrW, adsrH), EditSustain);
+        drawMiniParam(QRectF(adsrParams.left() + adsrW + adsrGap,
+                             adsrParams.top() + adsrH + adsrGap,
+                             adsrW, adsrH), EditRelease);
+    }
+
     if (m_showPresetMenu) {
         if (key == Qt::Key_Down) {
             m_presetScroll += 1;
@@ -614,7 +832,45 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     setFocus(Qt::MouseFocusReason);
     const QPointF pos = event->position();
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad));
-    const bool presetsAllowed = (type.trimmed().toUpper() == "DX7");
+    const QString typeUpper = type.trimmed().toUpper();
+    const bool presetsAllowed = (typeUpper == "DX7" || isCustomEngineType(typeUpper));
+
+    if (m_assignMenuOpen) {
+        if (!m_assignRect.contains(pos)) {
+            m_assignMenuOpen = false;
+            update();
+            return;
+        }
+        if (!m_pads || m_assignParamType < 0) {
+            m_assignMenuOpen = false;
+            update();
+            return;
+        }
+        const int targetIndex = modTargetForParam(m_assignParamType, typeUpper);
+        if (targetIndex <= 0 || targetIndex >= PadBank::kModTargetCount) {
+            m_assignMenuOpen = false;
+            update();
+            return;
+        }
+        PadBank::SynthParams sp = m_pads->synthParams(m_activePad);
+        float lfoAmt = sp.lfoAssign[static_cast<size_t>(targetIndex)];
+        float envAmt = sp.envAssign[static_cast<size_t>(targetIndex)];
+        const float defaultAmt = 0.6f;
+        if (m_assignLfoRect.contains(pos)) {
+            lfoAmt = (lfoAmt > 0.001f) ? 0.0f : defaultAmt;
+        } else if (m_assignEnvRect.contains(pos)) {
+            envAmt = (envAmt > 0.001f) ? 0.0f : defaultAmt;
+        } else {
+            m_assignMenuOpen = false;
+            update();
+            return;
+        }
+        m_pads->setSynthModAssign(m_activePad, static_cast<PadBank::ModTarget>(targetIndex),
+                                  lfoAmt, envAmt);
+        m_assignMenuOpen = false;
+        update();
+        return;
+    }
 
     if (m_busRect.contains(pos) && m_pads) {
         const int nextBus = (m_pads->fxBus(m_activePad) + 1) % 6;
@@ -651,11 +907,18 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
         for (const PresetRow &row : m_presetRows) {
             if (!row.header && row.rect.contains(pos) && m_pads) {
                 const QString bank = row.bank;
-                const QString type = isFmBank(bank) ? QStringLiteral("SIMPLE") : QStringLiteral("DX7");
+                const QString bankUpper = bank.trimmed().toUpper();
+                QString type = QStringLiteral("DX7");
+                if (isCustomEngineType(bankUpper)) {
+                    type = bankUpper;
+                } else if (isFmBank(bank)) {
+                    type = QStringLiteral("SIMPLE");
+                }
                 const QString presetId = row.presetId;
-                const QString payload =
-                    (type == "SIMPLE" || bank.isEmpty()) ? presetId
-                                                        : QString("%1/%2").arg(bank, presetId);
+                QString payload = presetId;
+                if (type == "DX7" && !bank.isEmpty()) {
+                    payload = QString("%1/%2").arg(bank, presetId);
+                }
                 m_pads->setSynth(m_activePad, QString("%1:%2").arg(type, payload));
                 m_showPresetMenu = false;
                 update();
@@ -671,6 +934,13 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     for (int i = 0; i < m_editParams.size(); ++i) {
         if (m_editParams[i].rect.contains(pos)) {
             m_selectedEditParam = i;
+            const int targetIndex = modTargetForParam(i, typeUpper);
+            if (targetIndex > 0) {
+                m_holdActive = true;
+                m_holdParamType = i;
+                m_holdPos = pos;
+                m_holdTimer.start(520);
+            }
             update();
             return;
         }
@@ -687,10 +957,24 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
 }
 
 void SynthPageWidget::mouseMoveEvent(QMouseEvent *event) {
-    Q_UNUSED(event);
+    if (!m_holdActive) {
+        return;
+    }
+    const QPointF pos = event->position();
+    const float dx = pos.x() - m_holdPos.x();
+    const float dy = pos.y() - m_holdPos.y();
+    const float dist2 = dx * dx + dy * dy;
+    if (dist2 > Theme::pxF(16.0f) * Theme::pxF(16.0f)) {
+        m_holdTimer.stop();
+        m_holdActive = false;
+    }
 }
 
 void SynthPageWidget::mouseReleaseEvent(QMouseEvent *) {
+    if (m_holdActive) {
+        m_holdTimer.stop();
+        m_holdActive = false;
+    }
 }
 
 void SynthPageWidget::wheelEvent(QWheelEvent *event) {
@@ -790,6 +1074,13 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     QRectF content(panel.left() + Theme::px(12), header.bottom() + Theme::px(10),
                    panel.width() - Theme::px(24),
                    panel.bottom() - header.bottom() - Theme::px(16));
+    if (m_modMenuOpen) {
+        const float menuW = content.width() * 0.32f;
+        m_modMenuRect = QRectF(content.left(), content.top(), menuW, content.height());
+        content.setLeft(m_modMenuRect.right() + gap);
+    } else {
+        m_modMenuRect = QRectF();
+    }
 
     auto drawPanel = [&](const QRectF &r, const QString &label) {
         p.setBrush(Theme::bg2());
@@ -826,6 +1117,10 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     const QStringList waves = PadBank::serumWaves();
     const QStringList filterPresets = {"LOW", "HIGH", "BAND", "NOTCH", "PEAK",
                                        "LOW SHELF", "HIGH SHELF", "ALLPASS", "BYPASS", "LOW+MID"};
+    const QStringList lfoShapes = {"SINE", "TRI", "SQUARE", "SAW", "RAND"};
+    const QStringList lfoTargets = {"FILTER", "AMP"};
+    const QStringList lfoSyncLabels = {"1/1", "1/2", "1/4", "1/8",
+                                       "1/16", "1/32", "1/4T", "1/8T"};
 
     auto formatValue = [&](int type) {
         switch (type) {
@@ -857,6 +1152,8 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 return QString("%1%").arg(qRound(clamp01(sp.resonance) * 100.0f));
             case EditFilterType:
                 return filterPresets.value(sp.filterType, "FILTER");
+            case EditFilterEnv:
+                return QString("%1%").arg(qRound(clamp01(sp.filterEnv) * 100.0f));
             case EditAttack: {
                 const float sec = (0.005f + clamp01(sp.attack) * 1.2f);
                 return QString("%1 ms").arg(qRound(sec * 1000.0f));
@@ -877,6 +1174,15 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             }
             case EditLfoDepth:
                 return QString("%1%").arg(qRound(clamp01(sp.lfoDepth) * 100.0f));
+            case EditLfoShape:
+                return lfoShapes.value(sp.lfoShape, "SINE");
+            case EditLfoSync:
+                if (sp.lfoSync <= 0) {
+                    return QStringLiteral("FREE");
+                }
+                return lfoSyncLabels.value(sp.lfoSyncIndex, "1/4");
+            case EditLfoTarget:
+                return lfoTargets.value(sp.lfoTarget, "FILTER");
             default:
                 break;
         }
@@ -1005,33 +1311,84 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
 
         const QVector<CustomControl> controls = customControlsForType(synthTypeUpper);
         const float gap = Theme::pxF(10.0f);
-        const float cellW = (paramsRect.width() - gap) / 2.0f;
-        const float cellH = (paramsRect.height() - gap) / 2.0f;
-        auto cellRect = [&](int col, int row) {
-            return QRectF(paramsRect.left() + col * (cellW + gap),
-                          paramsRect.top() + row * (cellH + gap),
-                          cellW, cellH);
-        };
+        if (synthTypeUpper == "CLUSTER") {
+            const float knobH = paramsRect.height() * 0.28f;
+            QRectF knobRow(paramsRect.left(), paramsRect.top(), paramsRect.width(), knobH);
+            QRectF visualRect(paramsRect.left(), knobRow.bottom() + gap,
+                              paramsRect.width(), paramsRect.bottom() - knobRow.bottom() - gap);
 
-        for (int i = 0; i < controls.size() && i < 4; ++i) {
-            const int row = i / 2;
-            const int col = i % 2;
-            const QRectF r = cellRect(col, row);
-            const CustomControl &ctrl = controls[i];
-            EditParam &param = m_editParams[ctrl.paramType];
-            param.rect = r;
-            const bool selected = (ctrl.paramType == m_selectedEditParam);
-            p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
+            const float knobGap = Theme::pxF(8.0f);
+            const float knobW = (knobRow.width() - knobGap * 3.0f) / 4.0f;
+            for (int i = 0; i < controls.size() && i < 4; ++i) {
+                QRectF r(knobRow.left() + i * (knobW + knobGap), knobRow.top(),
+                         knobW, knobRow.height());
+                const CustomControl &ctrl = controls[i];
+                EditParam &param = m_editParams[ctrl.paramType];
+                param.rect = r;
+                const bool selected = (ctrl.paramType == m_selectedEditParam);
+                p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
+                p.setPen(QPen(Theme::stroke(), 1.0));
+                p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+                p.setPen(selected ? Theme::bg0() : Theme::text());
+                p.setFont(Theme::baseFont(9, QFont::DemiBold));
+                p.drawText(r.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
+                           Qt::AlignLeft | Qt::AlignVCenter, ctrl.label);
+                p.setPen(selected ? Theme::bg0() : Theme::textMuted());
+                p.drawText(r.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
+                           Qt::AlignRight | Qt::AlignVCenter,
+                           customTargetValue(ctrl.target));
+            }
+
+            p.setBrush(Theme::bg3());
             p.setPen(QPen(Theme::stroke(), 1.0));
-            p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
-            p.setPen(selected ? Theme::bg0() : Theme::text());
-            p.setFont(Theme::baseFont(11, QFont::DemiBold));
-            p.drawText(r.adjusted(Theme::px(10), 0, -Theme::px(10), 0),
-                       Qt::AlignLeft | Qt::AlignVCenter, ctrl.label);
-            p.setPen(selected ? Theme::bg0() : Theme::textMuted());
-            p.drawText(r.adjusted(Theme::px(10), 0, -Theme::px(10), 0),
-                       Qt::AlignRight | Qt::AlignVCenter,
-                       customTargetValue(ctrl.target));
+            p.drawRoundedRect(visualRect, Theme::px(10), Theme::px(10));
+            QRectF vis = visualRect.adjusted(Theme::px(10), Theme::px(10),
+                                             -Theme::px(10), -Theme::px(10));
+            const int lines = 6;
+            const float spread = 0.06f + sp.osc1Detune * 0.4f;
+            const float detune = 0.04f + sp.osc2Detune * 0.3f;
+            const float motion = sp.fmAmount * 1.5f;
+            const QColor colors[] = {Theme::accent(), Theme::accentAlt(),
+                                     Theme::warn(), Theme::textMuted(),
+                                     Theme::text(), Theme::danger()};
+            for (int i = 0; i < lines; ++i) {
+                const float center = (lines > 1) ? (static_cast<float>(i) / (lines - 1)) * 2.0f - 1.0f : 0.0f;
+                const float freq = 1.0f + center * spread;
+                const float phase = center * detune + motion;
+                const QColor c = Theme::withAlpha(colors[i % 6], 180);
+                drawWave(vis, c, [freq, phase](float t) {
+                    return std::sin(kTwoPi * t * freq + phase);
+                });
+            }
+        } else {
+            const float cellW = (paramsRect.width() - gap) / 2.0f;
+            const float cellH = (paramsRect.height() - gap) / 2.0f;
+            auto cellRect = [&](int col, int row) {
+                return QRectF(paramsRect.left() + col * (cellW + gap),
+                              paramsRect.top() + row * (cellH + gap),
+                              cellW, cellH);
+            };
+
+            for (int i = 0; i < controls.size() && i < 4; ++i) {
+                const int row = i / 2;
+                const int col = i % 2;
+                const QRectF r = cellRect(col, row);
+                const CustomControl &ctrl = controls[i];
+                EditParam &param = m_editParams[ctrl.paramType];
+                param.rect = r;
+                const bool selected = (ctrl.paramType == m_selectedEditParam);
+                p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
+                p.setPen(QPen(Theme::stroke(), 1.0));
+                p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+                p.setPen(selected ? Theme::bg0() : Theme::text());
+                p.setFont(Theme::baseFont(11, QFont::DemiBold));
+                p.drawText(r.adjusted(Theme::px(10), 0, -Theme::px(10), 0),
+                           Qt::AlignLeft | Qt::AlignVCenter, ctrl.label);
+                p.setPen(selected ? Theme::bg0() : Theme::textMuted());
+                p.drawText(r.adjusted(Theme::px(10), 0, -Theme::px(10), 0),
+                           Qt::AlignRight | Qt::AlignVCenter,
+                           customTargetValue(ctrl.target));
+            }
         }
     } else {
         for (auto &param : m_editParams) {
@@ -1495,6 +1852,48 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     } else {
         m_presetPanelRect = QRectF();
     }
+
+    if (m_assignMenuOpen && m_assignParamType >= 0) {
+        const int targetIndex = modTargetForParam(m_assignParamType, synthTypeUpper);
+        if (targetIndex > 0 && targetIndex < PadBank::kModTargetCount) {
+            const float w = Theme::pxF(180.0f);
+            const float h = Theme::pxF(60.0f);
+            QRectF r(m_holdPos.x() - w * 0.5f, m_holdPos.y() - h * 0.5f, w, h);
+            const float minX = Theme::pxF(8.0f);
+            const float minY = Theme::pxF(8.0f);
+            if (r.left() < minX) r.moveLeft(minX);
+            if (r.top() < minY) r.moveTop(minY);
+            if (r.right() > rect().right() - minX) r.moveRight(rect().right() - minX);
+            if (r.bottom() > rect().bottom() - minY) r.moveBottom(rect().bottom() - minY);
+            m_assignRect = r;
+
+            const float pad = Theme::pxF(6.0f);
+            const float cellW = (r.width() - pad * 3.0f) / 2.0f;
+            const float cellH = r.height() - pad * 2.0f;
+            m_assignLfoRect = QRectF(r.left() + pad, r.top() + pad, cellW, cellH);
+            m_assignEnvRect = QRectF(m_assignLfoRect.right() + pad, r.top() + pad, cellW, cellH);
+
+            const bool lfoOn = sp.lfoAssign[static_cast<size_t>(targetIndex)] > 0.001f;
+            const bool envOn = sp.envAssign[static_cast<size_t>(targetIndex)] > 0.001f;
+
+            p.setBrush(Theme::bg2());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+
+            p.setBrush(lfoOn ? Theme::accentAlt() : Theme::bg3());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(m_assignLfoRect, Theme::px(6), Theme::px(6));
+            p.setPen(lfoOn ? Theme::bg0() : Theme::text());
+            p.setFont(Theme::baseFont(9, QFont::DemiBold));
+            p.drawText(m_assignLfoRect, Qt::AlignCenter, "LFO");
+
+            p.setBrush(envOn ? Theme::accent() : Theme::bg3());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(m_assignEnvRect, Theme::px(6), Theme::px(6));
+            p.setPen(envOn ? Theme::bg0() : Theme::text());
+            p.drawText(m_assignEnvRect, Qt::AlignCenter, "ADSR");
+        }
+    }
 }
 
 float SynthPageWidget::currentEditValue(const EditParam &param) const {
@@ -1560,6 +1959,8 @@ float SynthPageWidget::currentEditValue(const EditParam &param) const {
             return sp.resonance;
         case EditFilterType:
             return static_cast<float>(sp.filterType);
+        case EditFilterEnv:
+            return sp.filterEnv;
         case EditAttack:
             return sp.attack;
         case EditDecay:
@@ -1572,6 +1973,12 @@ float SynthPageWidget::currentEditValue(const EditParam &param) const {
             return sp.lfoRate;
         case EditLfoDepth:
             return sp.lfoDepth;
+        case EditLfoShape:
+            return static_cast<float>(sp.lfoShape);
+        case EditLfoSync:
+            return static_cast<float>(sp.lfoSyncIndex);
+        case EditLfoTarget:
+            return static_cast<float>(sp.lfoTarget);
         default:
             break;
     }
@@ -1589,19 +1996,26 @@ void SynthPageWidget::adjustEditParam(int delta) {
     const bool isDx7 = (type == "DX7");
     const bool isSimple = isSimpleType(type);
     const bool isCustom = isCustomEngineType(type);
+    const bool isModParam = (param.type == EditCutoff || param.type == EditResonance ||
+                             param.type == EditFilterType || param.type == EditFilterEnv ||
+                             param.type == EditAttack || param.type == EditDecay ||
+                             param.type == EditSustain || param.type == EditRelease ||
+                             param.type == EditLfoRate || param.type == EditLfoDepth ||
+                             param.type == EditLfoShape || param.type == EditLfoSync ||
+                             param.type == EditLfoTarget);
     if (isDx7 && !(param.type == EditAttack || param.type == EditDecay ||
                    param.type == EditSustain || param.type == EditRelease)) {
         return;
     }
     if (isCustom) {
-        if (!(param.type >= EditCustom1 && param.type <= EditCustom4)) {
+        if (!(param.type >= EditCustom1 && param.type <= EditCustom4) && !isModParam) {
             return;
         }
     } else if (isSimple && !(param.type == EditOsc1Wave || param.type == EditOctave ||
                      param.type == EditOsc1Voices || param.type == EditOsc1Detune ||
                      param.type == EditOsc1Gain || param.type == EditOsc2Wave ||
                      param.type == EditOsc2Voices || param.type == EditOsc2Detune ||
-                     param.type == EditOsc2Gain)) {
+                     param.type == EditOsc2Gain || isModParam)) {
         return;
     }
     const int waveCount = PadBank::serumWaves().size();
@@ -1739,6 +2153,10 @@ void SynthPageWidget::adjustEditParam(int delta) {
             sp.filterType = (sp.filterType + delta + filterCount) % filterCount;
             m_pads->setSynthFilterType(pad, sp.filterType);
             break;
+        case EditFilterEnv:
+            sp.filterEnv = clamp01(step(sp.filterEnv, 0.05f));
+            m_pads->setSynthFilterEnv(pad, sp.filterEnv);
+            break;
         case EditAttack:
             sp.attack = clamp01(step(sp.attack, isSimple ? 0.01f : 0.02f));
             m_pads->setSynthAdsr(pad, sp.attack, sp.decay, sp.sustain, sp.release);
@@ -1763,8 +2181,66 @@ void SynthPageWidget::adjustEditParam(int delta) {
             sp.lfoDepth = clamp01(step(sp.lfoDepth, 0.02f));
             m_pads->setSynthLfo(pad, sp.lfoRate, sp.lfoDepth);
             break;
+        case EditLfoShape:
+            sp.lfoShape = (sp.lfoShape + delta + 5) % 5;
+            m_pads->setSynthLfoShape(pad, sp.lfoShape);
+            break;
+        case EditLfoSync: {
+            const int syncCount = 8;
+            int slot = sp.lfoSync > 0 ? sp.lfoSyncIndex + 1 : 0;
+            slot = qBound(0, slot + delta, syncCount);
+            if (slot <= 0) {
+                sp.lfoSync = 0;
+                sp.lfoSyncIndex = 0;
+            } else {
+                sp.lfoSync = 1;
+                sp.lfoSyncIndex = slot - 1;
+            }
+            m_pads->setSynthLfoSync(pad, sp.lfoSync, sp.lfoSyncIndex);
+            break;
+        }
+        case EditLfoTarget:
+            sp.lfoTarget = (sp.lfoTarget + delta + 2) % 2;
+            m_pads->setSynthLfoTarget(pad, sp.lfoTarget);
+            break;
         default:
             break;
     }
     update();
+}
+
+int SynthPageWidget::modTargetForParam(int paramType, const QString &synthType) const {
+    Q_UNUSED(synthType);
+    using MT = PadBank::ModTarget;
+    switch (paramType) {
+        case EditOsc1Detune:
+            return static_cast<int>(MT::Osc1Detune);
+        case EditOsc1Gain:
+            return static_cast<int>(MT::Osc1Gain);
+        case EditOsc1Pan:
+            return static_cast<int>(MT::Osc1Pan);
+        case EditOsc2Detune:
+            return static_cast<int>(MT::Osc2Detune);
+        case EditOsc2Gain:
+            return static_cast<int>(MT::Osc2Gain);
+        case EditOsc2Pan:
+            return static_cast<int>(MT::Osc2Pan);
+        case EditCutoff:
+            return static_cast<int>(MT::Cutoff);
+        case EditResonance:
+            return static_cast<int>(MT::Resonance);
+        case EditFilterEnv:
+            return static_cast<int>(MT::FilterEnv);
+        case EditCustom1:
+            return static_cast<int>(MT::Custom1);
+        case EditCustom2:
+            return static_cast<int>(MT::Custom2);
+        case EditCustom3:
+            return static_cast<int>(MT::Custom3);
+        case EditCustom4:
+            return static_cast<int>(MT::Custom4);
+        default:
+            break;
+    }
+    return static_cast<int>(MT::None);
 }

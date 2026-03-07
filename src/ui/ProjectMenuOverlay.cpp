@@ -81,6 +81,10 @@ QJsonObject synthParamsToJson(const PadBank::SynthParams &s) {
     obj["filterType"] = s.filterType;
     obj["lfoRate"] = s.lfoRate;
     obj["lfoDepth"] = s.lfoDepth;
+    obj["lfoShape"] = s.lfoShape;
+    obj["lfoSync"] = s.lfoSync;
+    obj["lfoSyncIndex"] = s.lfoSyncIndex;
+    obj["lfoTarget"] = s.lfoTarget;
     obj["osc1Wave"] = s.osc1Wave;
     obj["osc2Wave"] = s.osc2Wave;
     obj["osc1Voices"] = s.osc1Voices;
@@ -96,6 +100,16 @@ QJsonObject synthParamsToJson(const PadBank::SynthParams &s) {
         macros.append(m);
     }
     obj["macros"] = macros;
+    QJsonArray lfoAssign;
+    for (float v : s.lfoAssign) {
+        lfoAssign.append(v);
+    }
+    obj["lfoAssign"] = lfoAssign;
+    QJsonArray envAssign;
+    for (float v : s.envAssign) {
+        envAssign.append(v);
+    }
+    obj["envAssign"] = envAssign;
     return obj;
 }
 
@@ -118,6 +132,10 @@ PadBank::SynthParams synthParamsFromJson(const QJsonObject &obj) {
     s.filterType = obj.value("filterType").toInt(s.filterType);
     s.lfoRate = static_cast<float>(obj.value("lfoRate").toDouble(s.lfoRate));
     s.lfoDepth = static_cast<float>(obj.value("lfoDepth").toDouble(s.lfoDepth));
+    s.lfoShape = obj.value("lfoShape").toInt(s.lfoShape);
+    s.lfoSync = obj.value("lfoSync").toInt(s.lfoSync);
+    s.lfoSyncIndex = obj.value("lfoSyncIndex").toInt(s.lfoSyncIndex);
+    s.lfoTarget = obj.value("lfoTarget").toInt(s.lfoTarget);
     s.osc1Wave = obj.value("osc1Wave").toInt(s.osc1Wave);
     s.osc2Wave = obj.value("osc2Wave").toInt(s.osc2Wave);
     s.osc1Voices = obj.value("osc1Voices").toInt(s.osc1Voices);
@@ -131,6 +149,16 @@ PadBank::SynthParams synthParamsFromJson(const QJsonObject &obj) {
     const QJsonArray macros = obj.value("macros").toArray();
     for (int i = 0; i < macros.size() && i < 8; ++i) {
         s.macros[static_cast<size_t>(i)] = static_cast<float>(macros[i].toDouble(0.5));
+    }
+    const QJsonArray lfoAssign = obj.value("lfoAssign").toArray();
+    for (int i = 0; i < lfoAssign.size() && i < PadBank::kModTargetCount; ++i) {
+        s.lfoAssign[static_cast<size_t>(i)] =
+            static_cast<float>(lfoAssign[i].toDouble(0.0));
+    }
+    const QJsonArray envAssign = obj.value("envAssign").toArray();
+    for (int i = 0; i < envAssign.size() && i < PadBank::kModTargetCount; ++i) {
+        s.envAssign[static_cast<size_t>(i)] =
+            static_cast<float>(envAssign[i].toDouble(0.0));
     }
     return s;
 }
@@ -599,12 +627,21 @@ bool ProjectMenuOverlay::loadProject(const QString &name) {
             m_pads->setSynthFilter(pad, sp.cutoff, sp.resonance);
             m_pads->setSynthFilterType(pad, sp.filterType);
             m_pads->setSynthLfo(pad, sp.lfoRate, sp.lfoDepth);
+            m_pads->setSynthLfoShape(pad, sp.lfoShape);
+            m_pads->setSynthLfoSync(pad, sp.lfoSync, sp.lfoSyncIndex);
+            m_pads->setSynthLfoTarget(pad, sp.lfoTarget);
             m_pads->setSynthOsc(pad, 0, sp.osc1Wave, sp.osc1Voices, sp.osc1Detune,
                                 sp.osc1Gain, sp.osc1Pan);
             m_pads->setSynthOsc(pad, 1, sp.osc2Wave, sp.osc2Voices, sp.osc2Detune,
                                 sp.osc2Gain, sp.osc2Pan);
             for (int i = 0; i < 8; ++i) {
                 m_pads->setSynthMacro(pad, i, sp.macros[static_cast<size_t>(i)]);
+            }
+            for (int i = 0; i < PadBank::kModTargetCount; ++i) {
+                m_pads->setSynthModAssign(
+                    pad, static_cast<PadBank::ModTarget>(i),
+                    sp.lfoAssign[static_cast<size_t>(i)],
+                    sp.envAssign[static_cast<size_t>(i)]);
             }
         }
 

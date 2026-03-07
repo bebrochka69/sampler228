@@ -142,6 +142,10 @@ struct Op1Patch {
     QString type;
     QString path;
     QVector<int> knobs;
+    QVector<int> adsr;
+    QVector<int> lfoParams;
+    QString lfoType;
+    bool lfoActive = false;
     int octave = 0;
 };
 
@@ -263,6 +267,16 @@ static void scanOp1Patches() {
             patch.name = QFileInfo(path).completeBaseName();
         }
         patch.octave = obj.value("octave").toInt(0);
+        patch.lfoType = obj.value("lfo_type").toString().trimmed();
+        patch.lfoActive = obj.value("lfo_active").toBool(false);
+        const QJsonArray adsr = obj.value("adsr").toArray();
+        for (const auto &v : adsr) {
+            patch.adsr.push_back(v.toInt(0));
+        }
+        const QJsonArray lfoParams = obj.value("lfo_params").toArray();
+        for (const auto &v : lfoParams) {
+            patch.lfoParams.push_back(v.toInt(0));
+        }
         const QJsonArray knobs = obj.value("knobs").toArray();
         for (const auto &v : knobs) {
             patch.knobs.push_back(v.toInt(0));
@@ -714,6 +728,46 @@ static void applyOp1Knobs(const QString &type, const QVector<int> &knobs,
         params.filterEnv = knob01(k(2));
         params.feedback = knob01(k(3));
         return;
+    }
+}
+
+static int lfoShapeFromType(const QString &type) {
+    const QString t = type.trimmed().toLower();
+    if (t.contains("tri")) return 1;
+    if (t.contains("square") || t.contains("sqr")) return 2;
+    if (t.contains("saw")) return 3;
+    if (t.contains("rand") || t.contains("s&h") || t.contains("sample")) return 4;
+    return 0;
+}
+
+static int lfoTargetFromType(const QString &type) {
+    const QString t = type.trimmed().toLower();
+    if (t.contains("tremolo") || t.contains("amp") || t.contains("volume")) {
+        return 1;
+    }
+    return 0;
+}
+
+static void applyOp1Adsr(const QVector<int> &adsr, PadBank::SynthParams &params) {
+    if (adsr.size() < 4) {
+        return;
+    }
+    params.attack = knob01(adsr[0]);
+    params.decay = knob01(adsr[1]);
+    params.sustain = knob01(adsr[2]);
+    params.release = knob01(adsr[3]);
+}
+
+static void applyOp1Lfo(const Op1Patch &patch, PadBank::SynthParams &params) {
+    if (!patch.lfoActive) {
+        params.lfoDepth = 0.0f;
+        return;
+    }
+    params.lfoShape = lfoShapeFromType(patch.lfoType);
+    params.lfoTarget = lfoTargetFromType(patch.lfoType);
+    if (patch.lfoParams.size() >= 2) {
+        params.lfoRate = knob01(patch.lfoParams[0]);
+        params.lfoDepth = knob01(patch.lfoParams[1]);
     }
 }
 
@@ -1537,6 +1591,8 @@ void PadBank::setSynth(int index, const QString &name) {
             }
             if (patch) {
                 applyOp1Knobs(typeLabel, patch->knobs, m_synthParams[static_cast<size_t>(index)]);
+                applyOp1Adsr(patch->adsr, m_synthParams[static_cast<size_t>(index)]);
+                applyOp1Lfo(*patch, m_synthParams[static_cast<size_t>(index)]);
                 m_synthParams[static_cast<size_t>(index)].octave =
                     qBound(-2, patch->octave, 2);
                 presetName = patch->label;
@@ -1939,6 +1995,10 @@ static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     fm.filterType = sp.filterType;
     fm.lfoRate = sp.lfoRate;
     fm.lfoDepth = sp.lfoDepth;
+    fm.lfoShape = sp.lfoShape;
+    fm.lfoSync = sp.lfoSync;
+    fm.lfoSyncIndex = sp.lfoSyncIndex;
+    fm.lfoTarget = sp.lfoTarget;
     fm.osc1Wave = sp.osc1Wave;
     fm.osc2Wave = sp.osc2Wave;
     fm.osc1Voices = sp.osc1Voices;
@@ -1954,6 +2014,8 @@ static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     fm.sustain = sp.sustain;
     fm.release = sp.release;
     fm.macros = sp.macros;
+    fm.lfoAssign = sp.lfoAssign;
+    fm.envAssign = sp.envAssign;
     return fm;
 }
 
@@ -2052,6 +2114,64 @@ void PadBank::setSynthLfo(int index, float rate, float depth) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.lfoRate = qBound(0.0f, rate, 1.0f);
     sp.lfoDepth = qBound(0.0f, depth, 1.0f);
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthLfoShape(int index, int shape) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.lfoShape = qBound(0, shape, 4);
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthLfoSync(int index, int enabled, int syncIndex) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.lfoSync = enabled ? 1 : 0;
+    sp.lfoSyncIndex = qBound(0, syncIndex, 7);
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthLfoTarget(int index, int target) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.lfoTarget = qBound(0, target, 1);
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthModAssign(int index, ModTarget target, float lfoAmount, float envAmount) {
+    if (index < 0 || index >= padCount()) {
+        return;
+    }
+    const int t = static_cast<int>(target);
+    if (t <= 0 || t >= kModTargetCount) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.lfoAssign[static_cast<size_t>(t)] = qBound(0.0f, lfoAmount, 1.0f);
+    sp.envAssign[static_cast<size_t>(t)] = qBound(0.0f, envAmount, 1.0f);
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));

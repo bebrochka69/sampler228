@@ -14,6 +14,28 @@ class QProcess;
 class PadBank : public QObject {
     Q_OBJECT
 public:
+    enum class ModTarget {
+        None = 0,
+        Osc1Detune,
+        Osc1Gain,
+        Osc1Pan,
+        Osc2Detune,
+        Osc2Gain,
+        Osc2Pan,
+        Cutoff,
+        Resonance,
+        FilterEnv,
+        FmAmount,
+        Ratio,
+        Feedback,
+        Custom1,
+        Custom2,
+        Custom3,
+        Custom4,
+        Count
+    };
+    static constexpr int kModTargetCount = static_cast<int>(ModTarget::Count);
+
     explicit PadBank(QObject *parent = nullptr);
     ~PadBank() override;
 
@@ -64,6 +86,10 @@ public:
         int filterType = 0;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
+        int lfoShape = 0;
+        int lfoSync = 0;
+        int lfoSyncIndex = 0;
+        int lfoTarget = 0;
         int osc1Wave = 1;
         int osc2Wave = 1;
         int osc1Voices = 1;
@@ -74,7 +100,9 @@ public:
         float osc2Gain = 0.6f;
         float osc1Pan = -0.1f;
         float osc2Pan = 0.1f;
-        std::array<float, 8> macros{{0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f}};
+        std::array<float, 8> macros{{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}};
+        std::array<float, kModTargetCount> lfoAssign{};
+        std::array<float, kModTargetCount> envAssign{};
     };
 
     struct BusEffect {
@@ -111,6 +139,10 @@ public:
     void setSynthOsc(int index, int osc, int wave, int voices, float detune, float gain,
                      float pan);
     void setSynthLfo(int index, float rate, float depth);
+    void setSynthLfoShape(int index, int shape);
+    void setSynthLfoSync(int index, int enabled, int syncIndex);
+    void setSynthLfoTarget(int index, int target);
+    void setSynthModAssign(int index, ModTarget target, float lfoAmount, float envAmount);
     void setSynthMacro(int index, int macro, float value);
     int fxBus(int index) const;
     void setFxBus(int index, int bus);

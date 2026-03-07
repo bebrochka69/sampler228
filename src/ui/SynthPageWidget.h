@@ -4,6 +4,7 @@
 #include <QStringList>
 #include <QVector>
 #include <QWidget>
+#include <QTimer>
 
 class QPaintEvent;
 class QMouseEvent;
@@ -50,6 +51,7 @@ private:
     void reloadBanks(bool syncSelection);
     void adjustEditParam(int delta);
     float currentEditValue(const EditParam &param) const;
+    int modTargetForParam(int paramType, const QString &synthType) const;
 
     PadBank *m_pads = nullptr;
     int m_activePad = 0;
@@ -63,6 +65,20 @@ private:
     int m_selectedCategory = 0;
     int m_presetScroll = 0;
     bool m_showPresetMenu = false;
+    bool m_modMenuOpen = false;
+    int m_modTab = 0;
+    QRectF m_modMenuRect;
+    QVector<QRectF> m_modTabRects;
+    QVector<QRectF> m_modParamRects;
+    bool m_assignMenuOpen = false;
+    int m_assignParamType = -1;
+    QRectF m_assignRect;
+    QRectF m_assignLfoRect;
+    QRectF m_assignEnvRect;
+    QTimer m_holdTimer;
+    bool m_holdActive = false;
+    int m_holdParamType = -1;
+    QPointF m_holdPos;
     QRectF m_presetButtonRect;
     QRectF m_presetPanelRect;
     QRectF m_busRect;

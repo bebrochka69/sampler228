@@ -105,6 +105,99 @@ Op1Params toOp1Params(const AudioEngine::FmParams &fm) {
     p.release = fm.release;
     return p;
 }
+
+float lfoShapeValue(int shape, float phase, float hold) {
+    switch (shape) {
+        case 1: { // triangle
+            float t = phase / (2.0f * static_cast<float>(M_PI));
+            t = t - std::floor(t);
+            return 4.0f * std::fabs(t - 0.5f) - 1.0f;
+        }
+        case 2: // square
+            return std::sin(phase) >= 0.0f ? 1.0f : -1.0f;
+        case 3: { // saw
+            float t = phase / (2.0f * static_cast<float>(M_PI));
+            t = t - std::floor(t);
+            return 2.0f * t - 1.0f;
+        }
+        case 4: // random hold
+            return hold;
+        default: // sine
+            return std::sin(phase);
+    }
+}
+
+float modClamp(float v, float lo, float hi) {
+    return std::max(lo, std::min(hi, v));
+}
+
+void applyCustomMacroMod(AudioEngine::SynthKind kind, int macro, float mod,
+                         AudioEngine::FmParams &params) {
+    if (macro < 0 || macro > 3) {
+        return;
+    }
+    auto mod01 = [&](float base, float amount = 0.5f) {
+        return modClamp(base + mod * amount, 0.0f, 1.0f);
+    };
+    switch (kind) {
+        case AudioEngine::SynthKind::Cluster:
+            if (macro == 0) params.osc1Detune = mod01(params.osc1Detune, 0.6f);
+            if (macro == 1) params.osc2Detune = mod01(params.osc2Detune, 0.6f);
+            if (macro == 3) params.fmAmount = mod01(params.fmAmount, 0.6f);
+            break;
+        case AudioEngine::SynthKind::Digital:
+            if (macro == 1) params.fmAmount = mod01(params.fmAmount, 0.6f);
+            if (macro == 2) params.osc1Detune = mod01(params.osc1Detune, 0.6f);
+            if (macro == 3) params.feedback = mod01(params.feedback, 0.7f);
+            break;
+        case AudioEngine::SynthKind::DNA:
+            if (macro == 2) params.fmAmount = mod01(params.fmAmount, 0.6f);
+            if (macro == 3) params.feedback = mod01(params.feedback, 0.7f);
+            break;
+        case AudioEngine::SynthKind::DrWave:
+            if (macro == 1) params.fmAmount = mod01(params.fmAmount, 0.6f);
+            if (macro == 2) params.osc1Detune = mod01(params.osc1Detune, 0.6f);
+            if (macro == 3) params.feedback = mod01(params.feedback, 0.7f);
+            break;
+        case AudioEngine::SynthKind::DSynth:
+            if (macro == 1) params.ratio = modClamp(params.ratio + mod * 1.0f, 0.1f, 8.0f);
+            if (macro == 2) params.fmAmount = mod01(params.fmAmount, 0.7f);
+            if (macro == 3) params.osc2Gain = mod01(params.osc2Gain, 0.7f);
+            break;
+        case AudioEngine::SynthKind::FM:
+            if (macro == 0) params.osc1Detune = mod01(params.osc1Detune, 0.6f);
+            if (macro == 1) params.ratio = modClamp(params.ratio + mod * 2.0f, 0.1f, 8.0f);
+            if (macro == 2) params.fmAmount = mod01(params.fmAmount, 0.7f);
+            if (macro == 3) params.feedback = mod01(params.feedback, 0.7f);
+            break;
+        case AudioEngine::SynthKind::Pulse:
+            if (macro == 0) params.fmAmount = mod01(params.fmAmount, 0.6f);
+            if (macro == 1) params.osc1Detune = mod01(params.osc1Detune, 0.6f);
+            if (macro == 2) params.osc2Gain = mod01(params.osc2Gain, 0.7f);
+            if (macro == 3) params.feedback = mod01(params.feedback, 0.7f);
+            break;
+        case AudioEngine::SynthKind::Phase:
+            if (macro == 0) params.fmAmount = mod01(params.fmAmount, 0.6f);
+            if (macro == 1) params.osc1Detune = mod01(params.osc1Detune, 0.6f);
+            if (macro == 2) params.ratio = modClamp(params.ratio + mod * 1.0f, 0.1f, 4.0f);
+            if (macro == 3) params.feedback = mod01(params.feedback, 0.7f);
+            break;
+        case AudioEngine::SynthKind::String:
+            if (macro == 0) params.ratio = modClamp(params.ratio + mod * 0.8f, 0.5f, 2.0f);
+            if (macro == 1) params.fmAmount = mod01(params.fmAmount, 0.6f);
+            if (macro == 2) params.osc2Gain = mod01(params.osc2Gain, 0.7f);
+            if (macro == 3) params.feedback = mod01(params.feedback, 0.7f);
+            break;
+        case AudioEngine::SynthKind::Voltage:
+            if (macro == 0) params.fmAmount = mod01(params.fmAmount, 0.6f);
+            if (macro == 1) params.osc1Detune = mod01(params.osc1Detune, 0.6f);
+            if (macro == 2) params.filterEnv = mod01(params.filterEnv, 0.7f);
+            if (macro == 3) params.feedback = mod01(params.feedback, 0.7f);
+            break;
+        default:
+            break;
+    }
+}
 }  // namespace
 
 AudioEngine::AudioEngine(QObject *parent) : QObject(parent) {
@@ -134,7 +227,9 @@ AudioEngine::AudioEngine(QObject *parent) : QObject(parent) {
         m_padRelease[i].store(0.0f);
     }
     for (auto &state : m_synthStates) {
-        state.fmParams.macros.fill(0.5f);
+        state.fmParams.macros.fill(0.0f);
+        state.fmParams.lfoAssign.fill(0.0f);
+        state.fmParams.envAssign.fill(0.0f);
     }
     for (auto &ph : m_padPlayheads) {
         ph.store(-1.0f);
@@ -647,6 +742,10 @@ void AudioEngine::setFmParams(int padId, const FmParams &params) {
     state.filterEnvAmount = params.filterEnv;
     state.lfoRate = params.lfoRate;
     state.lfoDepth = params.lfoDepth;
+    state.lfoShape = params.lfoShape;
+    state.lfoSync = params.lfoSync;
+    state.lfoSyncIndex = params.lfoSyncIndex;
+    state.lfoTarget = params.lfoTarget;
     SimpleFmCore::Params simpleParams;
     simpleParams.fmAmount = params.fmAmount;
     simpleParams.ratio = params.ratio;
@@ -1145,8 +1244,7 @@ void AudioEngine::mix(float *out, int frames) {
             const bool isSimple = (synth.kind == SynthKind::Simple);
             const bool neutralEnv =
                 (attack <= 0.001f && decay <= 0.001f && release <= 0.001f && sustain >= 0.999f);
-            const bool useExternalEnv =
-                (isDx7 || isSimple) ? !(isDx7 && neutralEnv) : false;
+            const bool useExternalEnv = isDx7 ? !neutralEnv : true;
 
             const bool hasNotes = std::any_of(synth.activeNotes.begin(),
                                              synth.activeNotes.end(),
@@ -1156,6 +1254,66 @@ void AudioEngine::mix(float *out, int frames) {
                 synth.envStage = EnvStage::Attack;
                 continue;
             }
+            if (isCustomKind(synth.kind) && synth.op1) {
+                AudioEngine::FmParams modParams = synth.fmParams;
+                const float previewLfo =
+                    lfoShapeValue(synth.lfoShape, synth.lfoPhase, synth.lfoHold);
+                const float envPreview = synth.env;
+                for (int m = 0; m < 4; ++m) {
+                    const int targetIndex = 13 + m;
+                    const float lfoAmt = modParams.lfoAssign[static_cast<size_t>(targetIndex)];
+                    const float envAmt = modParams.envAssign[static_cast<size_t>(targetIndex)];
+                    if (lfoAmt <= 0.0001f && envAmt <= 0.0001f) {
+                        continue;
+                    }
+                    const float mod = lfoAmt * previewLfo + envAmt * envPreview;
+                    applyCustomMacroMod(synth.kind, m, mod, modParams);
+                }
+
+                auto applyDirect = [&](int target, auto applyFn) {
+                    if (target <= 0 || target >= AudioEngine::kModTargetCount) {
+                        return;
+                    }
+                    const float lfoAmt = modParams.lfoAssign[static_cast<size_t>(target)];
+                    const float envAmt = modParams.envAssign[static_cast<size_t>(target)];
+                    if (lfoAmt <= 0.0001f && envAmt <= 0.0001f) {
+                        return;
+                    }
+                    const float mod = lfoAmt * previewLfo + envAmt * envPreview;
+                    applyFn(mod);
+                };
+
+                applyDirect(1, [&](float mod) { // Osc1Detune
+                    modParams.osc1Detune = modClamp(modParams.osc1Detune + mod * 0.5f, 0.0f, 1.0f);
+                });
+                applyDirect(2, [&](float mod) { // Osc1Gain
+                    modParams.osc1Gain = modClamp(modParams.osc1Gain + mod * 0.5f, 0.0f, 1.0f);
+                });
+                applyDirect(3, [&](float mod) { // Osc1Pan
+                    modParams.osc1Pan = modClamp(modParams.osc1Pan + mod * 0.5f, -1.0f, 1.0f);
+                });
+                applyDirect(4, [&](float mod) { // Osc2Detune
+                    modParams.osc2Detune = modClamp(modParams.osc2Detune + mod * 0.5f, 0.0f, 1.0f);
+                });
+                applyDirect(5, [&](float mod) { // Osc2Gain
+                    modParams.osc2Gain = modClamp(modParams.osc2Gain + mod * 0.5f, 0.0f, 1.0f);
+                });
+                applyDirect(6, [&](float mod) { // Osc2Pan
+                    modParams.osc2Pan = modClamp(modParams.osc2Pan + mod * 0.5f, -1.0f, 1.0f);
+                });
+                applyDirect(10, [&](float mod) { // FmAmount
+                    modParams.fmAmount = modClamp(modParams.fmAmount + mod * 0.6f, 0.0f, 1.0f);
+                });
+                applyDirect(11, [&](float mod) { // Ratio
+                    modParams.ratio = modClamp(modParams.ratio + mod * 2.0f, 0.1f, 8.0f);
+                });
+                applyDirect(12, [&](float mod) { // Feedback
+                    modParams.feedback = modClamp(modParams.feedback + mod * 0.6f, 0.0f, 1.0f);
+                });
+
+                synth.op1->setParams(toOp1Params(modParams));
+            }
+
             if (synth.kind == SynthKind::Simple) {
                 synth.simple.render(m_synthScratchL.data(), m_synthScratchR.data(), frames);
             } else if (synth.kind == SynthKind::Dx7) {
@@ -1167,12 +1325,33 @@ void AudioEngine::mix(float *out, int frames) {
                 std::fill(m_synthScratchR.begin(), m_synthScratchR.end(), 0.0f);
             }
 
-            const bool useFilter = (isSimple && synth.filterType != 8);
-            const float baseCutoff = synth.filterCutoff;
-            const float baseRes = synth.filterResonance;
+            const bool useFilter = (synth.filterType != 8);
+            float baseCutoff = synth.filterCutoff;
+            float baseRes = synth.filterResonance;
+            float baseEnv = synth.filterEnvAmount;
             const float lfoDepth = synth.lfoDepth;
-            const float lfoRateHz = 0.1f + synth.lfoRate * 8.0f;
+            float lfoRateHz = 0.1f + synth.lfoRate * 8.0f;
+            if (synth.lfoSync) {
+                static const float syncBeats[] = {4.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.125f, 0.333f,
+                                                  0.166f};
+                const int idx = std::max(0, std::min(7, synth.lfoSyncIndex));
+                const float beats = syncBeats[idx];
+                const float bpm = std::max(30.0f, std::min(300.0f, m_bpm.load()));
+                const float bps = bpm / 60.0f;
+                if (beats > 0.0f) {
+                    lfoRateHz = bps / beats;
+                }
+            }
             const float lfoInc = 2.0f * static_cast<float>(M_PI) * lfoRateHz / m_sampleRate;
+            bool lfoActive = lfoDepth > 0.0001f;
+            if (!lfoActive) {
+                for (float v : synth.fmParams.lfoAssign) {
+                    if (v > 0.0001f) {
+                        lfoActive = true;
+                        break;
+                    }
+                }
+            }
             float staticG = 0.0f;
             float staticR = 0.0f;
             if (useFilter && lfoDepth <= 0.0001f) {
@@ -1225,24 +1404,67 @@ void AudioEngine::mix(float *out, int frames) {
                     synth.env = 1.0f;
                 }
 
+                if (lfoActive && synth.lfoTarget == 1 && lfoDepth > 0.0001f) {
+                    env = std::max(0.0f, std::min(1.5f, env + lfoValue * lfoDepth));
+                }
+
                 float left = m_synthScratchL[static_cast<size_t>(i)];
                 float right = m_synthScratchR[static_cast<size_t>(i)];
+
+                float lfoValue = 0.0f;
+                if (lfoActive) {
+                    if (synth.lfoShape == 4) {
+                        const float nextPhase = synth.lfoPhase + lfoInc;
+                        if (nextPhase >= 2.0f * static_cast<float>(M_PI)) {
+                            synth.lfoNoise = 1664525u * synth.lfoNoise + 1013904223u;
+                            const float r =
+                                (static_cast<int>(synth.lfoNoise >> 8) & 0xFFFF) / 32768.0f -
+                                1.0f;
+                            synth.lfoHold = r;
+                        }
+                    }
+                    lfoValue =
+                        lfoShapeValue(synth.lfoShape, synth.lfoPhase, synth.lfoHold);
+                    synth.lfoPhase += lfoInc;
+                    if (synth.lfoPhase > 2.0f * static_cast<float>(M_PI)) {
+                        synth.lfoPhase -= 2.0f * static_cast<float>(M_PI);
+                    }
+                }
                 if (useFilter) {
                     float g = staticG;
                     float R = staticR;
                     float cutoff = baseCutoff;
-                    if (synth.filterEnvAmount > 0.0001f) {
-                        cutoff = std::max(0.02f, std::min(0.98f,
-                                                          cutoff + env * synth.filterEnvAmount));
+                    float envAmount = baseEnv;
+                    if (synth.fmParams.envAssign[7] > 0.0001f ||
+                        synth.fmParams.lfoAssign[7] > 0.0001f) {
+                        cutoff += (synth.fmParams.lfoAssign[7] * lfoValue +
+                                   synth.fmParams.envAssign[7] * env) *
+                                  0.5f;
                     }
-                    if (lfoDepth > 0.0001f) {
-                        const float lfo = std::sin(synth.lfoPhase);
-                        synth.lfoPhase += lfoInc;
-                        if (synth.lfoPhase > 2.0f * static_cast<float>(M_PI)) {
-                            synth.lfoPhase -= 2.0f * static_cast<float>(M_PI);
-                        }
-                        cutoff =
-                            std::max(0.02f, std::min(0.98f, cutoff + lfo * lfoDepth * 0.5f));
+                    if (synth.fmParams.envAssign[8] > 0.0001f ||
+                        synth.fmParams.lfoAssign[8] > 0.0001f) {
+                        baseRes += (synth.fmParams.lfoAssign[8] * lfoValue +
+                                    synth.fmParams.envAssign[8] * env) *
+                                   0.5f;
+                    }
+                    if (synth.fmParams.envAssign[9] > 0.0001f ||
+                        synth.fmParams.lfoAssign[9] > 0.0001f) {
+                        baseEnv += (synth.fmParams.lfoAssign[9] * lfoValue +
+                                    synth.fmParams.envAssign[9] * env) *
+                                   0.5f;
+                    }
+                    if (synth.fmParams.envAssign[7] > 0.0001f ||
+                        synth.fmParams.lfoAssign[7] > 0.0001f) {
+                        cutoff = std::max(0.02f, std::min(0.98f, cutoff));
+                    }
+                    baseRes = std::max(0.0f, std::min(1.0f, baseRes));
+                    baseEnv = std::max(0.0f, std::min(1.0f, baseEnv));
+                    if (envAmount > 0.0001f) {
+                        cutoff = std::max(0.02f, std::min(0.98f, cutoff + env * envAmount));
+                    }
+                    if (lfoActive && lfoDepth > 0.0001f) {
+                        cutoff = std::max(0.02f,
+                                          std::min(0.98f, cutoff + lfoValue * lfoDepth * 0.5f));
                     }
                     if (g == 0.0f || lfoDepth > 0.0001f || synth.filterEnvAmount > 0.0001f) {
                         const float hz = 40.0f * std::pow(2.0f, cutoff * 8.0f);

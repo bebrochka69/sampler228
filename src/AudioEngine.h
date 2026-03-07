@@ -17,6 +17,7 @@
 class AudioEngine : public QObject {
     Q_OBJECT
 public:
+    static constexpr int kModTargetCount = 17;
     enum class SynthKind {
         Dx7,
         Simple,
@@ -45,6 +46,10 @@ public:
         int filterType = 0;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
+        int lfoShape = 0;
+        int lfoSync = 0;
+        int lfoSyncIndex = 0;
+        int lfoTarget = 0;
         int osc1Wave = 1;
         int osc2Wave = 1;
         int osc1Voices = 1;
@@ -60,6 +65,8 @@ public:
         float sustain = 0.7f;
         float release = 0.25f;
         std::array<float, 8> macros{};
+        std::array<float, kModTargetCount> lfoAssign{};
+        std::array<float, kModTargetCount> envAssign{};
     };
     struct EffectSettings {
         int type = 0;
@@ -215,6 +222,10 @@ private:
         float filterEnvAmount = 0.0f;
         float lfoRate = 0.2f;
         float lfoDepth = 0.0f;
+        int lfoShape = 0;
+        int lfoSync = 0;
+        int lfoSyncIndex = 0;
+        int lfoTarget = 0;
         float lfoPhase = 0.0f;
         float filterIc1L = 0.0f;
         float filterIc2L = 0.0f;
@@ -223,6 +234,8 @@ private:
         float env = 0.0f;
         EnvStage envStage = EnvStage::Attack;
         bool releaseRequested = false;
+        uint32_t lfoNoise = 0x1234567u;
+        float lfoHold = 0.0f;
     };
 
     void start();
