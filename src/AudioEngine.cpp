@@ -1404,10 +1404,6 @@ void AudioEngine::mix(float *out, int frames) {
                     synth.env = 1.0f;
                 }
 
-                if (lfoActive && synth.lfoTarget == 1 && lfoDepth > 0.0001f) {
-                    env = std::max(0.0f, std::min(1.5f, env + lfoValue * lfoDepth));
-                }
-
                 float left = m_synthScratchL[static_cast<size_t>(i)];
                 float right = m_synthScratchR[static_cast<size_t>(i)];
 
@@ -1429,6 +1425,9 @@ void AudioEngine::mix(float *out, int frames) {
                     if (synth.lfoPhase > 2.0f * static_cast<float>(M_PI)) {
                         synth.lfoPhase -= 2.0f * static_cast<float>(M_PI);
                     }
+                }
+                if (lfoActive && synth.lfoTarget == 1 && lfoDepth > 0.0001f) {
+                    env = std::max(0.0f, std::min(1.5f, env + lfoValue * lfoDepth));
                 }
                 if (useFilter) {
                     float g = staticG;
