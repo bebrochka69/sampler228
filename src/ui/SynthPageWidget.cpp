@@ -2455,20 +2455,20 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         };
 
         if (m_editorMode == EditorMode::Lfo) {
-            QVector<int> slots;
+            QVector<int> moduleSlots;
             for (int i = 0; i < PadBank::kLfoModuleCount; ++i) {
                 if (sp.lfoModules[static_cast<size_t>(i)].enabled) {
-                    slots.push_back(i);
+                    moduleSlots.push_back(i);
                 }
             }
-            bool hasFree = slots.size() < PadBank::kLfoModuleCount;
-            m_lfoScroll = qBound(0, m_lfoScroll, std::max(0, slots.size() - visibleCount));
+            bool hasFree = moduleSlots.size() < PadBank::kLfoModuleCount;
+            m_lfoScroll = qBound(0, m_lfoScroll, std::max(0, moduleSlots.size() - visibleCount));
             drawNav(m_editorLeftRect, "<", m_lfoScroll > 0);
-            drawNav(m_editorRightRect, ">", m_lfoScroll + visibleCount < slots.size());
+            drawNav(m_editorRightRect, ">", m_lfoScroll + visibleCount < moduleSlots.size());
             float x = m_editorLeftRect.right() + gapCard;
             int drawn = 0;
-            for (int i = m_lfoScroll; i < slots.size() && drawn < visibleCount; ++i, ++drawn) {
-                const int slot = slots[i];
+            for (int i = m_lfoScroll; i < moduleSlots.size() && drawn < visibleCount; ++i, ++drawn) {
+                const int slot = moduleSlots[i];
                 const auto &module = sp.lfoModules[static_cast<size_t>(slot)];
                 const QRectF card(x, body.top(), cardW, cardH);
                 x += cardW + gapCard;
@@ -2612,20 +2612,20 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                            Qt::AlignHCenter | Qt::AlignTop, "ADD LFO");
             }
         } else if (m_editorMode == EditorMode::Env) {
-            QVector<int> slots;
+            QVector<int> moduleSlots;
             for (int i = 0; i < PadBank::kEnvModuleCount; ++i) {
                 if (sp.envModules[static_cast<size_t>(i)].enabled) {
-                    slots.push_back(i);
+                    moduleSlots.push_back(i);
                 }
             }
-            bool hasFree = slots.size() < PadBank::kEnvModuleCount;
-            m_envScroll = qBound(0, m_envScroll, std::max(0, slots.size() - visibleCount));
+            bool hasFree = moduleSlots.size() < PadBank::kEnvModuleCount;
+            m_envScroll = qBound(0, m_envScroll, std::max(0, moduleSlots.size() - visibleCount));
             drawNav(m_editorLeftRect, "<", m_envScroll > 0);
-            drawNav(m_editorRightRect, ">", m_envScroll + visibleCount < slots.size());
+            drawNav(m_editorRightRect, ">", m_envScroll + visibleCount < moduleSlots.size());
             float x = m_editorLeftRect.right() + gapCard;
             int drawn = 0;
-            for (int i = m_envScroll; i < slots.size() && drawn < visibleCount; ++i, ++drawn) {
-                const int slot = slots[i];
+            for (int i = m_envScroll; i < moduleSlots.size() && drawn < visibleCount; ++i, ++drawn) {
+                const int slot = moduleSlots[i];
                 const auto &module = sp.envModules[static_cast<size_t>(slot)];
                 const QRectF card(x, body.top(), cardW, cardH);
                 x += cardW + gapCard;
@@ -2710,20 +2710,20 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             }
         } else if (m_editorMode == EditorMode::Filter) {
             const QStringList presets = filterPresetNames();
-            QVector<int> slots;
+            QVector<int> moduleSlots;
             for (int i = 0; i < PadBank::kFilterModuleCount; ++i) {
                 if (sp.filterModules[static_cast<size_t>(i)].enabled) {
-                    slots.push_back(i);
+                    moduleSlots.push_back(i);
                 }
             }
-            bool hasFree = slots.size() < PadBank::kFilterModuleCount;
-            m_filterScroll = qBound(0, m_filterScroll, std::max(0, slots.size() - visibleCount));
+            bool hasFree = moduleSlots.size() < PadBank::kFilterModuleCount;
+            m_filterScroll = qBound(0, m_filterScroll, std::max(0, moduleSlots.size() - visibleCount));
             drawNav(m_editorLeftRect, "<", m_filterScroll > 0);
-            drawNav(m_editorRightRect, ">", m_filterScroll + visibleCount < slots.size());
+            drawNav(m_editorRightRect, ">", m_filterScroll + visibleCount < moduleSlots.size());
             float x = m_editorLeftRect.right() + gapCard;
             int drawn = 0;
-            for (int i = m_filterScroll; i < slots.size() && drawn < visibleCount; ++i, ++drawn) {
-                const int slot = slots[i];
+            for (int i = m_filterScroll; i < moduleSlots.size() && drawn < visibleCount; ++i, ++drawn) {
+                const int slot = moduleSlots[i];
                 const auto &module = sp.filterModules[static_cast<size_t>(slot)];
                 const QRectF card(x, body.top(), cardW, cardH);
                 x += cardW + gapCard;
