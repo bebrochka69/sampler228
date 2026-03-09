@@ -908,6 +908,19 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                    Qt::AlignLeft | Qt::AlignVCenter, label);
     };
 
+    auto drawKnobMarker = [&](const QRectF &cell, const QColor &color) {
+        const float size = Theme::pxF(10.0f);
+        QRectF dot(cell.left() + Theme::pxF(8.0f),
+                   cell.top() + Theme::pxF(8.0f),
+                   size, size);
+        p.setBrush(color);
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawEllipse(dot);
+        p.setPen(QPen(Theme::text(), Theme::pxF(1.2f)));
+        p.drawLine(QPointF(dot.center().x(), dot.center().y()),
+                   QPointF(dot.center().x(), dot.top() - Theme::pxF(3.0f)));
+    };
+
     auto drawWave = [&](const QRectF &r, const QColor &color, auto fn) {
         const int steps = Theme::liteMode() ? 36 : 72;
         QPainterPath path;
@@ -936,6 +949,10 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     const QStringList lfoTargets = {"FILTER", "AMP"};
     const QStringList lfoSyncLabels = {"1/1", "1/2", "1/4", "1/8",
                                        "1/16", "1/32", "1/4T", "1/8T"};
+    const QColor knobColors[4] = {QColor(74, 163, 255),
+                                  QColor(99, 210, 96),
+                                  QColor(236, 236, 236),
+                                  QColor(255, 154, 60)};
 
     auto formatValue = [&](int type) {
         switch (type) {
@@ -1120,7 +1137,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         m_filterPresetRects.clear();
 
         QRectF panelRect = content;
-        drawPanel(panelRect, synthTypeUpper);
+        drawPanel(panelRect, QString("T1 ENGINE - %1").arg(synthTypeUpper));
         QRectF paramsRect = panelRect.adjusted(Theme::px(10), Theme::px(28),
                                                -Theme::px(10), -Theme::px(10));
 
@@ -1144,6 +1161,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
                 p.setPen(QPen(Theme::stroke(), 1.0));
                 p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+                drawKnobMarker(r, knobColors[i % 4]);
                 p.setPen(selected ? Theme::bg0() : Theme::text());
                 p.setFont(Theme::baseFont(9, QFont::DemiBold));
                 p.drawText(r.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
@@ -1195,6 +1213,7 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
                 p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
                 p.setPen(QPen(Theme::stroke(), 1.0));
                 p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+                drawKnobMarker(r, knobColors[i % 4]);
                 p.setPen(selected ? Theme::bg0() : Theme::text());
                 p.setFont(Theme::baseFont(11, QFont::DemiBold));
                 p.drawText(r.adjusted(Theme::px(10), 0, -Theme::px(10), 0),
@@ -1548,6 +1567,191 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             }
         }
         }
+    }
+
+    if (m_modMenuOpen && m_modMenuRect.isValid()) {
+        const QRectF menu = m_modMenuRect.adjusted(Theme::px(4), Theme::px(4),
+                                                   -Theme::px(4), -Theme::px(4));
+        p.setBrush(Theme::bg1());
+        p.setPen(QPen(Theme::stroke(), 1.2));
+        p.drawRoundedRect(menu, Theme::px(12), Theme::px(12));
+
+        const float sectionGap = Theme::pxF(10.0f);
+        const float sectionH = (menu.height() - sectionGap * 2.0f) / 3.0f;
+        QRectF lfoRect(menu.left(), menu.top(), menu.width(), sectionH);
+        QRectF filterRect(menu.left(), lfoRect.bottom() + sectionGap, menu.width(), sectionH);
+        QRectF adsrRect(menu.left(), filterRect.bottom() + sectionGap, menu.width(),
+                        menu.bottom() - filterRect.bottom() - sectionGap);
+
+        auto drawMiniParam = [&](const QRectF &cell, int paramType) {
+            EditParam &param = m_editParams[paramType];
+            param.rect = cell;
+            const bool selected = (paramType == m_selectedEditParam);
+            p.setBrush(selected ? Theme::accentAlt() : Theme::bg3());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(cell, Theme::px(6), Theme::px(6));
+            p.setPen(selected ? Theme::bg0() : Theme::text());
+            p.setFont(Theme::baseFont(8, QFont::DemiBold));
+            p.drawText(cell.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+                       Qt::AlignLeft | Qt::AlignVCenter, param.label);
+            p.setPen(selected ? Theme::bg0() : Theme::textMuted());
+            p.drawText(cell.adjusted(Theme::px(6), 0, -Theme::px(6), 0),
+                       Qt::AlignRight | Qt::AlignVCenter, formatValue(param.type));
+        };
+
+        // LFO panel.
+        drawPanel(lfoRect, "T4 LFO");
+        QRectF lfoInner = lfoRect.adjusted(Theme::px(8), Theme::px(20), -Theme::px(8), -Theme::px(8));
+        QRectF lfoWave = lfoInner;
+        lfoWave.setHeight(lfoInner.height() * 0.45f);
+        auto lfoShapeValue = [](int shape, float t) {
+            t = std::max(0.0f, std::min(1.0f, t));
+            switch (shape) {
+                case 1: // triangle
+                    return 4.0f * std::fabs(t - 0.5f) - 1.0f;
+                case 2: // square
+                    return t < 0.5f ? 1.0f : -1.0f;
+                case 3: // saw
+                    return 2.0f * t - 1.0f;
+                case 4: { // random hold
+                    const float step = (t < 0.33f) ? -0.4f : (t < 0.66f ? 0.7f : -0.1f);
+                    return step;
+                }
+                default:
+                    return std::sin(kTwoPi * t);
+            }
+        };
+        drawWave(lfoWave, Theme::accent(), [&](float t) {
+            return lfoShapeValue(sp.lfoShape, t);
+        });
+        QRectF lfoParams = lfoInner;
+        lfoParams.setTop(lfoWave.bottom() + Theme::pxF(6.0f));
+        const float lfoGap = Theme::pxF(6.0f);
+        const float lfoCellW = (lfoParams.width() - lfoGap) / 2.0f;
+        const float lfoCellH = (lfoParams.height() - lfoGap * 2.0f) / 3.0f;
+        const QVector<int> lfoParamList = {EditLfoShape, EditLfoRate, EditLfoDepth,
+                                           EditLfoSync, EditLfoTarget};
+        int lfoIdx = 0;
+        for (int row = 0; row < 3; ++row) {
+            for (int col = 0; col < 2; ++col) {
+                if (lfoIdx >= lfoParamList.size()) {
+                    break;
+                }
+                const QRectF cell(lfoParams.left() + col * (lfoCellW + lfoGap),
+                                  lfoParams.top() + row * (lfoCellH + lfoGap),
+                                  lfoCellW, lfoCellH);
+                drawMiniParam(cell, lfoParamList[lfoIdx++]);
+            }
+        }
+
+        // Filter panel.
+        drawPanel(filterRect, "T3 FX (FILTER)");
+        QRectF filterInner = filterRect.adjusted(Theme::px(8), Theme::px(20),
+                                                 -Theme::px(8), -Theme::px(8));
+        QRectF filterVis = filterInner;
+        filterVis.setHeight(filterInner.height() * 0.45f);
+        {
+            QPainterPath curve;
+            const float left = filterVis.left();
+            const float right = filterVis.right();
+            const float midY = filterVis.center().y();
+            const float topY = filterVis.top();
+            const float bottomY = filterVis.bottom();
+            switch (sp.filterType) {
+                case 0:
+                    curve.moveTo(left, topY);
+                    curve.lineTo(right, bottomY);
+                    break;
+                case 1:
+                    curve.moveTo(left, bottomY);
+                    curve.lineTo(right, topY);
+                    break;
+                case 2:
+                    curve.moveTo(left, bottomY);
+                    curve.lineTo(filterVis.center().x(), topY);
+                    curve.lineTo(right, bottomY);
+                    break;
+                case 3:
+                    curve.moveTo(left, topY);
+                    curve.lineTo(filterVis.center().x(), bottomY);
+                    curve.lineTo(right, topY);
+                    break;
+                default:
+                    curve.moveTo(left, midY);
+                    curve.lineTo(right, midY);
+                    break;
+            }
+            p.setPen(QPen(Theme::accent(), Theme::pxF(1.4f)));
+            p.drawPath(curve);
+        }
+        QRectF filterParams = filterInner;
+        filterParams.setTop(filterVis.bottom() + Theme::pxF(6.0f));
+        const float filterGap = Theme::pxF(6.0f);
+        const float filterW = (filterParams.width() - filterGap) / 2.0f;
+        const float filterH = (filterParams.height() - filterGap) / 2.0f;
+        drawMiniParam(QRectF(filterParams.left(), filterParams.top(), filterW, filterH), EditCutoff);
+        drawMiniParam(QRectF(filterParams.left() + filterW + filterGap, filterParams.top(),
+                             filterW, filterH), EditResonance);
+        drawMiniParam(QRectF(filterParams.left(), filterParams.top() + filterH + filterGap,
+                             filterW, filterH), EditFilterEnv);
+        drawMiniParam(QRectF(filterParams.left() + filterW + filterGap,
+                             filterParams.top() + filterH + filterGap,
+                             filterW, filterH), EditFilterType);
+
+        // ADSR panel.
+        drawPanel(adsrRect, "T2 ENVELOPE");
+        QRectF adsrInner = adsrRect.adjusted(Theme::px(8), Theme::px(20),
+                                             -Theme::px(8), -Theme::px(8));
+        QRectF adsrWave = adsrInner;
+        adsrWave.setHeight(adsrInner.height() * 0.5f);
+        {
+            const float a = 0.1f + clamp01(sp.attack) * 0.45f;
+            const float d = 0.1f + clamp01(sp.decay) * 0.35f;
+            const float r = 0.1f + clamp01(sp.release) * 0.4f;
+            float total = a + d + r + 0.1f;
+            float scale = 1.0f;
+            if (total > 0.95f) {
+                scale = 0.95f / (a + d + r);
+            }
+            const float aa = a * scale;
+            const float dd = d * scale;
+            const float rr = r * scale;
+            float sustainLen = 1.0f - (aa + dd + rr);
+            sustainLen = std::max(0.05f, sustainLen);
+            const float s = clamp01(sp.sustain);
+
+            const float x0 = adsrWave.left();
+            const float x1 = x0 + adsrWave.width() * aa;
+            const float x2 = x1 + adsrWave.width() * dd;
+            const float x3 = x2 + adsrWave.width() * sustainLen;
+            const float x4 = adsrWave.right();
+
+            const float y0 = adsrWave.bottom();
+            const float y1 = adsrWave.top();
+            const float y2 = adsrWave.top() + (1.0f - s) * adsrWave.height();
+
+            QPainterPath env;
+            env.moveTo(x0, y0);
+            env.lineTo(x1, y1);
+            env.lineTo(x2, y2);
+            env.lineTo(x3, y2);
+            env.lineTo(x4, y0);
+            p.setPen(QPen(Theme::accent(), Theme::pxF(1.4f)));
+            p.drawPath(env);
+        }
+        QRectF adsrParams = adsrInner;
+        adsrParams.setTop(adsrWave.bottom() + Theme::pxF(6.0f));
+        const float adsrGap = Theme::pxF(6.0f);
+        const float adsrW = (adsrParams.width() - adsrGap) / 2.0f;
+        const float adsrH = (adsrParams.height() - adsrGap) / 2.0f;
+        drawMiniParam(QRectF(adsrParams.left(), adsrParams.top(), adsrW, adsrH), EditAttack);
+        drawMiniParam(QRectF(adsrParams.left() + adsrW + adsrGap, adsrParams.top(),
+                             adsrW, adsrH), EditDecay);
+        drawMiniParam(QRectF(adsrParams.left(), adsrParams.top() + adsrH + adsrGap,
+                             adsrW, adsrH), EditSustain);
+        drawMiniParam(QRectF(adsrParams.left() + adsrW + adsrGap,
+                             adsrParams.top() + adsrH + adsrGap,
+                             adsrW, adsrH), EditRelease);
     }
 
     if (m_showPresetMenu) {

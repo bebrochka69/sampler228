@@ -18,17 +18,17 @@
 #include <cmath>
 
 namespace Theme {
-inline QColor bg0() { return QColor(4, 8, 5); }
-inline QColor bg1() { return QColor(8, 14, 9); }
-inline QColor bg2() { return QColor(10, 18, 12); }
-inline QColor bg3() { return QColor(16, 26, 18); }
-inline QColor stroke() { return QColor(46, 120, 72); }
-inline QColor accent() { return QColor(68, 255, 140); }    // neon green
-inline QColor accentAlt() { return QColor(255, 196, 70); } // amber
-inline QColor text() { return QColor(210, 255, 220); }
-inline QColor textMuted() { return QColor(110, 170, 130); }
-inline QColor warn() { return QColor(255, 212, 120); }
-inline QColor danger() { return QColor(255, 96, 80); }
+inline QColor bg0() { return QColor(214, 213, 206); }      // OP-1 light base
+inline QColor bg1() { return QColor(205, 204, 198); }
+inline QColor bg2() { return QColor(196, 195, 188); }
+inline QColor bg3() { return QColor(184, 183, 176); }
+inline QColor stroke() { return QColor(120, 120, 112); }
+inline QColor accent() { return QColor(74, 163, 255); }    // OP-1 blue
+inline QColor accentAlt() { return QColor(255, 154, 60); } // OP-1 orange
+inline QColor text() { return QColor(36, 36, 34); }
+inline QColor textMuted() { return QColor(92, 92, 86); }
+inline QColor warn() { return QColor(99, 210, 96); }       // OP-1 green
+inline QColor danger() { return QColor(220, 90, 80); }
 
 inline float uiScale();
 inline int px(int value);
@@ -129,8 +129,8 @@ inline const QImage &grainImage() {
             QRgb *row = reinterpret_cast<QRgb *>(out.scanLine(y));
             for (int x = 0; x < out.width(); ++x) {
                 const int v = static_cast<int>(rng.generate() % 255);
-                const int g = qBound(0, v + 40, 255);
-                row[x] = qRgba(0, g, 0, 28);
+                const int g = qBound(0, v + 10, 255);
+                row[x] = qRgba(g, g, g, 18);
             }
         }
         return out;
@@ -219,57 +219,12 @@ inline void drawIdleDust(QPainter &p, const QRectF &rect, float opacity) {
 
 inline void paintBackground(QPainter &p, const QRectF &rect) {
     QLinearGradient grad(rect.topLeft(), rect.bottomLeft());
-    grad.setColorAt(0.0, QColor(6, 12, 7));
-    grad.setColorAt(1.0, QColor(2, 6, 3));
+    grad.setColorAt(0.0, QColor(222, 221, 214));
+    grad.setColorAt(1.0, QColor(206, 205, 198));
     p.fillRect(rect, grad);
 
-    const QRectF artRect(rect.left() + px(24),
-                         rect.top() + px(56),
-                         rect.width() * 0.28,
-                         rect.height() * 0.48);
-    const QPixmap &bg = leftBgPixmap();
-    if (!bg.isNull()) {
-        const qreal sx = artRect.width() / bg.width();
-        const qreal sy = artRect.height() / bg.height();
-        const qreal scale = qMin(sx, sy);
-        const QSizeF targetSize(bg.width() * scale, bg.height() * scale);
-        const QRectF target(QPointF(artRect.center().x() - targetSize.width() * 0.5,
-                                    artRect.center().y() - targetSize.height() * 0.5),
-                            targetSize);
-        p.save();
-        p.setOpacity(0.55);
-        p.drawPixmap(target, bg, QRectF(0, 0, bg.width(), bg.height()));
-        p.restore();
-    } else {
-        p.save();
-        p.setBrush(bg2());
-        p.setPen(QPen(withAlpha(accent(), 180), 1.2, Qt::DashLine));
-        p.drawRoundedRect(artRect, px(6), px(6));
-        p.setPen(withAlpha(textMuted(), 200));
-        p.setFont(baseFont(9, QFont::DemiBold));
-        p.drawText(artRect.adjusted(px(8), px(8), -px(8), -px(8)),
-                   Qt::AlignLeft | Qt::AlignTop, "ART SLOT");
-        p.setFont(baseFont(8));
-        p.drawText(artRect.adjusted(px(8), px(24), -px(8), -px(8)),
-                   Qt::AlignLeft | Qt::AlignTop,
-                   "Drop image:\nassets/bg_left.png\nor set GROOVEBOX_BG_LEFT");
-        p.restore();
-    }
-
     if (!liteMode()) {
-        p.setPen(QPen(withAlpha(stroke(), 28), 1.0));
-        const int gridX = px(32);
-        const int gridY = px(24);
-        for (int x = 0; x < rect.width(); x += gridX) {
-            const qreal xx = rect.left() + x;
-            p.drawLine(QPointF(xx, rect.top()), QPointF(xx, rect.bottom()));
-        }
-        for (int y = 0; y < rect.height(); y += gridY) {
-            const qreal yy = rect.top() + y;
-            p.drawLine(QPointF(rect.left(), yy), QPointF(rect.right(), yy));
-        }
-        drawScanlines(p, rect, px(3), 18);
-        drawGrain(p, rect, 0.12f);
+        drawGrain(p, rect, 0.08f);
     }
 }
 }
