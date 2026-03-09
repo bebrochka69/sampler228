@@ -79,6 +79,8 @@ private:
     QVector<FxInsertHit> m_slotHits;
     QVector<FxEffectHit> m_effectHits;
     QVector<QRectF> m_faderHits;
+    QVector<QRectF> m_groupHits;
+    QVector<int> m_visibleEffectIndices;
 
     QTimer m_animTimer;
     QElapsedTimer m_clock;
@@ -94,4 +96,5 @@ private:
     QRectF m_closeRect;
     QRectF m_synthBusRect;
     int m_dragFaderTrack = -1;
+    int m_selectedGroup = 0;
 };

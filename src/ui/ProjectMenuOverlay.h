@@ -79,6 +79,9 @@ private:
     QRectF m_metronomeRect;
     QRectF m_rateRect;
     QRectF m_bluetoothRect;
+    QVector<QRectF> m_settingsTabRects;
+    QVector<QRectF> m_themeRowRects;
+    int m_settingsTab = 0;
 
     QRectF m_newRect;
     QRectF m_saveRect;

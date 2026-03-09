@@ -1888,6 +1888,11 @@ void PadBank::setSynthAdsr(int index, float attack, float decay, float sustain, 
     sp.decay = clamp01(decay);
     sp.sustain = clamp01(sustain);
     sp.release = clamp01(release);
+    sp.envModules[0].enabled = true;
+    sp.envModules[0].attack = sp.attack;
+    sp.envModules[0].decay = sp.decay;
+    sp.envModules[0].sustain = sp.sustain;
+    sp.envModules[0].release = sp.release;
     if (m_engineAvailable && m_engine) {
         const QString type = synthTypeFromName(m_synthNames[static_cast<size_t>(index)]);
         if (isFmType(type)) {
@@ -2016,6 +2021,9 @@ static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     fm.macros = sp.macros;
     fm.lfoAssign = sp.lfoAssign;
     fm.envAssign = sp.envAssign;
+    fm.lfoModules = sp.lfoModules;
+    fm.envModules = sp.envModules;
+    fm.filterModules = sp.filterModules;
     return fm;
 }
 
@@ -2041,6 +2049,17 @@ void PadBank::setSynthFilter(int index, float cutoff, float resonance) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.cutoff = qBound(0.0f, cutoff, 1.0f);
     sp.resonance = qBound(0.0f, resonance, 1.0f);
+    sp.filterModules[0].enabled = true;
+    sp.filterModules[0].preset = sp.filterType;
+    sp.filterModules[0].type = sp.filterType;
+    sp.filterModules[0].resonance = sp.resonance;
+    if (sp.filterType == 1) {
+        sp.filterModules[0].lowCut = sp.cutoff;
+        sp.filterModules[0].highCut = 1.0f;
+    } else {
+        sp.filterModules[0].lowCut = 0.0f;
+        sp.filterModules[0].highCut = 1.0f - sp.cutoff;
+    }
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));
@@ -2067,6 +2086,9 @@ void PadBank::setSynthFilterType(int index, int type) {
     }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.filterType = qBound(0, type, 9);
+    sp.filterModules[0].enabled = (sp.filterType != 8);
+    sp.filterModules[0].preset = sp.filterType;
+    sp.filterModules[0].type = sp.filterType;
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));
@@ -2114,6 +2136,9 @@ void PadBank::setSynthLfo(int index, float rate, float depth) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.lfoRate = qBound(0.0f, rate, 1.0f);
     sp.lfoDepth = qBound(0.0f, depth, 1.0f);
+    sp.lfoModules[0].enabled = (sp.lfoDepth > 0.0001f);
+    sp.lfoModules[0].rate = sp.lfoRate;
+    sp.lfoModules[0].depth = sp.lfoDepth;
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));
@@ -2127,6 +2152,7 @@ void PadBank::setSynthLfoShape(int index, int shape) {
     }
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.lfoShape = qBound(0, shape, 4);
+    sp.lfoModules[0].shape = sp.lfoShape;
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));
@@ -2141,6 +2167,8 @@ void PadBank::setSynthLfoSync(int index, int enabled, int syncIndex) {
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.lfoSync = enabled ? 1 : 0;
     sp.lfoSyncIndex = qBound(0, syncIndex, 7);
+    sp.lfoModules[0].sync = sp.lfoSync;
+    sp.lfoModules[0].syncIndex = sp.lfoSyncIndex;
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));
@@ -2172,6 +2200,119 @@ void PadBank::setSynthModAssign(int index, ModTarget target, float lfoAmount, fl
     SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
     sp.lfoAssign[static_cast<size_t>(t)] = qBound(0.0f, lfoAmount, 1.0f);
     sp.envAssign[static_cast<size_t>(t)] = qBound(0.0f, envAmount, 1.0f);
+    sp.lfoModules[0].assign[static_cast<size_t>(t)] = sp.lfoAssign[static_cast<size_t>(t)];
+    sp.envModules[0].assign[static_cast<size_t>(t)] = sp.envAssign[static_cast<size_t>(t)];
+    if (sp.lfoAssign[static_cast<size_t>(t)] > 0.0001f) {
+        sp.lfoModules[0].enabled = true;
+    }
+    if (sp.envAssign[static_cast<size_t>(t)] > 0.0001f) {
+        sp.envModules[0].enabled = true;
+    }
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthLfoModule(int index, int slot, const SynthParams::LfoModule &module) {
+    if (index < 0 || index >= padCount() || slot < 0 || slot >= kLfoModuleCount) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.lfoModules[static_cast<size_t>(slot)] = module;
+    int primary = 0;
+    for (int i = 0; i < kLfoModuleCount; ++i) {
+        if (sp.lfoModules[static_cast<size_t>(i)].enabled) {
+            primary = i;
+            break;
+        }
+    }
+    const auto &primaryModule = sp.lfoModules[static_cast<size_t>(primary)];
+    if (primaryModule.enabled) {
+        sp.lfoRate = qBound(0.0f, primaryModule.rate, 1.0f);
+        sp.lfoDepth = qBound(0.0f, primaryModule.depth, 1.0f);
+        sp.lfoShape = qBound(0, primaryModule.shape, 4);
+        sp.lfoSync = primaryModule.sync ? 1 : 0;
+        sp.lfoSyncIndex = qBound(0, primaryModule.syncIndex, 7);
+        sp.lfoAssign = primaryModule.assign;
+    } else {
+        sp.lfoRate = 0.2f;
+        sp.lfoDepth = 0.0f;
+        sp.lfoShape = 0;
+        sp.lfoSync = 0;
+        sp.lfoSyncIndex = 0;
+        sp.lfoAssign.fill(0.0f);
+    }
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthEnvModule(int index, int slot, const SynthParams::EnvModule &module) {
+    if (index < 0 || index >= padCount() || slot < 0 || slot >= kEnvModuleCount) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.envModules[static_cast<size_t>(slot)] = module;
+    int primary = 0;
+    for (int i = 0; i < kEnvModuleCount; ++i) {
+        if (sp.envModules[static_cast<size_t>(i)].enabled) {
+            primary = i;
+            break;
+        }
+    }
+    const auto &primaryModule = sp.envModules[static_cast<size_t>(primary)];
+    if (primaryModule.enabled) {
+        sp.attack = qBound(0.0f, primaryModule.attack, 1.0f);
+        sp.decay = qBound(0.0f, primaryModule.decay, 1.0f);
+        sp.sustain = qBound(0.0f, primaryModule.sustain, 1.0f);
+        sp.release = qBound(0.0f, primaryModule.release, 1.0f);
+        sp.envAssign = primaryModule.assign;
+    } else {
+        sp.attack = 0.0f;
+        sp.decay = 0.0f;
+        sp.sustain = 1.0f;
+        sp.release = 0.0f;
+        sp.envAssign.fill(0.0f);
+    }
+    if (isSynth(index) && m_engineAvailable && m_engine &&
+        isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
+        m_engine->setFmParams(index, buildFmParams(sp));
+    }
+    emit padParamsChanged(index);
+}
+
+void PadBank::setSynthFilterModule(int index, int slot,
+                                   const SynthParams::FilterModule &module) {
+    if (index < 0 || index >= padCount() || slot < 0 || slot >= kFilterModuleCount) {
+        return;
+    }
+    SynthParams &sp = m_synthParams[static_cast<size_t>(index)];
+    sp.filterModules[static_cast<size_t>(slot)] = module;
+    int primary = 0;
+    for (int i = 0; i < kFilterModuleCount; ++i) {
+        if (sp.filterModules[static_cast<size_t>(i)].enabled) {
+            primary = i;
+            break;
+        }
+    }
+    const auto &primaryModule = sp.filterModules[static_cast<size_t>(primary)];
+    if (primaryModule.enabled) {
+        sp.filterType = qBound(0, primaryModule.type, 12);
+        sp.resonance = qBound(0.0f, primaryModule.resonance, 1.0f);
+        if (sp.filterType == 1) {
+            sp.cutoff = qBound(0.0f, primaryModule.lowCut, 1.0f);
+        } else {
+            sp.cutoff = qBound(0.0f, 1.0f - primaryModule.highCut, 1.0f);
+        }
+    } else {
+        sp.filterType = 8;
+        sp.cutoff = 1.0f;
+        sp.resonance = 0.0f;
+    }
     if (isSynth(index) && m_engineAvailable && m_engine &&
         isFmType(synthTypeFromName(m_synthNames[static_cast<size_t>(index)]))) {
         m_engine->setFmParams(index, buildFmParams(sp));

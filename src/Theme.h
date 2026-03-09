@@ -18,17 +18,158 @@
 #include <cmath>
 
 namespace Theme {
-inline QColor bg0() { return QColor(214, 213, 206); }      // OP-1 light base
-inline QColor bg1() { return QColor(205, 204, 198); }
-inline QColor bg2() { return QColor(196, 195, 188); }
-inline QColor bg3() { return QColor(184, 183, 176); }
-inline QColor stroke() { return QColor(120, 120, 112); }
-inline QColor accent() { return QColor(74, 163, 255); }    // OP-1 blue
-inline QColor accentAlt() { return QColor(255, 154, 60); } // OP-1 orange
-inline QColor text() { return QColor(36, 36, 34); }
-inline QColor textMuted() { return QColor(92, 92, 86); }
-inline QColor warn() { return QColor(99, 210, 96); }       // OP-1 green
-inline QColor danger() { return QColor(220, 90, 80); }
+enum class Mode {
+    Op1Light = 0,
+    Terminal = 1,
+    DeepCyan = 2,
+};
+
+inline int &themeIndexRef() {
+    static int idx = 0;
+    return idx;
+}
+
+inline int themeCount() { return 3; }
+
+inline int currentThemeIndex() { return qBound(0, themeIndexRef(), themeCount() - 1); }
+
+inline void setCurrentThemeIndex(int index) {
+    themeIndexRef() = qBound(0, index, themeCount() - 1);
+}
+
+inline QString themeName(int index) {
+    switch (qBound(0, index, themeCount() - 1)) {
+        case 1:
+            return QStringLiteral("TERMINAL");
+        case 2:
+            return QStringLiteral("DEEP CYAN");
+        default:
+            return QStringLiteral("OP-1 LIGHT");
+    }
+}
+
+inline Mode currentMode() { return static_cast<Mode>(currentThemeIndex()); }
+
+inline QColor bg0() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(12, 18, 12);
+        case Mode::DeepCyan:
+            return QColor(10, 18, 24);
+        default:
+            return QColor(214, 213, 206);
+    }
+}
+
+inline QColor bg1() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(22, 30, 20);
+        case Mode::DeepCyan:
+            return QColor(18, 34, 42);
+        default:
+            return QColor(205, 204, 198);
+    }
+}
+
+inline QColor bg2() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(30, 42, 28);
+        case Mode::DeepCyan:
+            return QColor(24, 48, 60);
+        default:
+            return QColor(196, 195, 188);
+    }
+}
+
+inline QColor bg3() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(44, 60, 38);
+        case Mode::DeepCyan:
+            return QColor(34, 66, 78);
+        default:
+            return QColor(184, 183, 176);
+    }
+}
+
+inline QColor stroke() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(72, 110, 68);
+        case Mode::DeepCyan:
+            return QColor(70, 118, 134);
+        default:
+            return QColor(120, 120, 112);
+    }
+}
+
+inline QColor accent() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(93, 255, 118);
+        case Mode::DeepCyan:
+            return QColor(90, 214, 255);
+        default:
+            return QColor(74, 163, 255);
+    }
+}
+
+inline QColor accentAlt() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(210, 255, 115);
+        case Mode::DeepCyan:
+            return QColor(255, 161, 78);
+        default:
+            return QColor(255, 154, 60);
+    }
+}
+
+inline QColor text() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(212, 248, 210);
+        case Mode::DeepCyan:
+            return QColor(216, 243, 250);
+        default:
+            return QColor(36, 36, 34);
+    }
+}
+
+inline QColor textMuted() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(126, 186, 122);
+        case Mode::DeepCyan:
+            return QColor(118, 174, 188);
+        default:
+            return QColor(92, 92, 86);
+    }
+}
+
+inline QColor warn() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(140, 255, 110);
+        case Mode::DeepCyan:
+            return QColor(122, 255, 186);
+        default:
+            return QColor(99, 210, 96);
+    }
+}
+
+inline QColor danger() {
+    switch (currentMode()) {
+        case Mode::Terminal:
+            return QColor(255, 104, 96);
+        case Mode::DeepCyan:
+            return QColor(255, 120, 106);
+        default:
+            return QColor(220, 90, 80);
+    }
+}
 
 inline float uiScale();
 inline int px(int value);
@@ -219,12 +360,27 @@ inline void drawIdleDust(QPainter &p, const QRectF &rect, float opacity) {
 
 inline void paintBackground(QPainter &p, const QRectF &rect) {
     QLinearGradient grad(rect.topLeft(), rect.bottomLeft());
-    grad.setColorAt(0.0, QColor(222, 221, 214));
-    grad.setColorAt(1.0, QColor(206, 205, 198));
+    switch (currentMode()) {
+        case Mode::Terminal:
+            grad.setColorAt(0.0, QColor(18, 26, 16));
+            grad.setColorAt(1.0, QColor(10, 18, 10));
+            break;
+        case Mode::DeepCyan:
+            grad.setColorAt(0.0, QColor(16, 28, 36));
+            grad.setColorAt(1.0, QColor(8, 16, 22));
+            break;
+        default:
+            grad.setColorAt(0.0, QColor(222, 221, 214));
+            grad.setColorAt(1.0, QColor(206, 205, 198));
+            break;
+    }
     p.fillRect(rect, grad);
 
     if (!liteMode()) {
         drawGrain(p, rect, 0.08f);
+        if (currentMode() != Mode::Op1Light) {
+            drawScanlines(p, rect, px(4), currentMode() == Mode::Terminal ? 24 : 18);
+        }
     }
 }
 }

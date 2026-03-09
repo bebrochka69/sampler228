@@ -127,6 +127,44 @@ float lfoShapeValue(int shape, float phase, float hold) {
     }
 }
 
+float lfoRateFromSyncIndex(int syncIndex, float bpm) {
+    static const float syncBeats[] = {4.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.125f, 0.333f, 0.166f};
+    const int idx = std::max(0, std::min(7, syncIndex));
+    const float beats = syncBeats[idx];
+    const float bps = bpm / 60.0f;
+    return (beats > 0.0f) ? (bps / beats) : 0.0f;
+}
+
+float lfoModuleValue(const AudioEngine::FmParams::LfoModule &module, float phase, float hold) {
+    if (module.kind == 1) {
+        const int steps = std::max(1, std::min(AudioEngine::kLfoPatternSteps, module.steps));
+        float t = phase / (2.0f * static_cast<float>(M_PI));
+        t = t - std::floor(t);
+        const int index = std::max(0, std::min(steps - 1, static_cast<int>(std::floor(t * steps))));
+        return std::max(-1.0f,
+                        std::min(1.0f, module.pattern[static_cast<size_t>(index)] * 2.0f - 1.0f));
+    }
+
+    const float sine = std::sin(phase);
+    const float triangle = lfoShapeValue(1, phase, hold);
+    const float square = lfoShapeValue(2, phase, hold);
+    const float saw = lfoShapeValue(3, phase, hold);
+    const float morph = safeParam(module.morph);
+    if (module.shape <= 0) {
+        return sine * (1.0f - morph) + square * morph;
+    }
+    if (module.shape == 1) {
+        return triangle * (1.0f - morph) + saw * morph;
+    }
+    if (module.shape == 2) {
+        return square;
+    }
+    if (module.shape == 3) {
+        return saw;
+    }
+    return hold;
+}
+
 float modClamp(float v, float lo, float hi) {
     return std::max(lo, std::min(hi, v));
 }
@@ -230,6 +268,12 @@ AudioEngine::AudioEngine(QObject *parent) : QObject(parent) {
         state.fmParams.macros.fill(0.0f);
         state.fmParams.lfoAssign.fill(0.0f);
         state.fmParams.envAssign.fill(0.0f);
+        for (int i = 0; i < kLfoModuleCount; ++i) {
+            state.lfoNoiseModules[static_cast<size_t>(i)] = 0x1234567u + i * 977u;
+        }
+        for (auto &stage : state.envStages) {
+            stage = EnvStage::Attack;
+        }
     }
     for (auto &ph : m_padPlayheads) {
         ph.store(-1.0f);
@@ -707,6 +751,14 @@ void AudioEngine::setSynthKind(int padId, SynthKind kind) {
     state.filterIc2L = 0.0f;
     state.filterIc1R = 0.0f;
     state.filterIc2R = 0.0f;
+    state.filterIc1LModules.fill(0.0f);
+    state.filterIc2LModules.fill(0.0f);
+    state.filterIc1RModules.fill(0.0f);
+    state.filterIc2RModules.fill(0.0f);
+    state.lfoPhaseModules.fill(0.0f);
+    state.lfoHoldModules.fill(0.0f);
+    state.envValues.fill(0.0f);
+    state.envReleaseRequested.fill(false);
     for (bool &note : state.activeNotes) {
         note = false;
     }
@@ -746,6 +798,27 @@ void AudioEngine::setFmParams(int padId, const FmParams &params) {
     state.lfoSync = params.lfoSync;
     state.lfoSyncIndex = params.lfoSyncIndex;
     state.lfoTarget = params.lfoTarget;
+    for (int i = 0; i < kLfoModuleCount; ++i) {
+        if (!params.lfoModules[static_cast<size_t>(i)].enabled) {
+            state.lfoPhaseModules[static_cast<size_t>(i)] = 0.0f;
+            state.lfoHoldModules[static_cast<size_t>(i)] = 0.0f;
+        }
+    }
+    for (int i = 0; i < kEnvModuleCount; ++i) {
+        if (!params.envModules[static_cast<size_t>(i)].enabled) {
+            state.envValues[static_cast<size_t>(i)] = 0.0f;
+            state.envStages[static_cast<size_t>(i)] = EnvStage::Attack;
+            state.envReleaseRequested[static_cast<size_t>(i)] = false;
+        }
+    }
+    for (int i = 0; i < kFilterModuleCount; ++i) {
+        if (!params.filterModules[static_cast<size_t>(i)].enabled) {
+            state.filterIc1LModules[static_cast<size_t>(i)] = 0.0f;
+            state.filterIc2LModules[static_cast<size_t>(i)] = 0.0f;
+            state.filterIc1RModules[static_cast<size_t>(i)] = 0.0f;
+            state.filterIc2RModules[static_cast<size_t>(i)] = 0.0f;
+        }
+    }
     SimpleFmCore::Params simpleParams;
     simpleParams.fmAmount = params.fmAmount;
     simpleParams.ratio = params.ratio;
@@ -815,6 +888,14 @@ void AudioEngine::synthNoteOn(int padId, int midiNote, int velocity) {
     if (!hadActive || state.envStage == EnvStage::Release) {
         state.envStage = EnvStage::Attack;
         state.releaseRequested = false;
+        for (int i = 0; i < kEnvModuleCount; ++i) {
+            if (!state.fmParams.envModules[static_cast<size_t>(i)].enabled) {
+                continue;
+            }
+            state.envStages[static_cast<size_t>(i)] = EnvStage::Attack;
+            state.envReleaseRequested[static_cast<size_t>(i)] = false;
+            state.envValues[static_cast<size_t>(i)] = 0.0f;
+        }
     }
 }
 
@@ -846,6 +927,9 @@ void AudioEngine::synthNoteOff(int padId, int midiNote) {
         std::any_of(state.activeNotes.begin(), state.activeNotes.end(), [](bool v) { return v; });
     if (!hasActive) {
         state.releaseRequested = true;
+        for (int i = 0; i < kEnvModuleCount; ++i) {
+            state.envReleaseRequested[static_cast<size_t>(i)] = true;
+        }
     }
 }
 
@@ -875,6 +959,9 @@ void AudioEngine::synthAllNotesOff(int padId) {
         }
     }
     state.releaseRequested = true;
+    for (int i = 0; i < kEnvModuleCount; ++i) {
+        state.envReleaseRequested[static_cast<size_t>(i)] = true;
+    }
 }
 
 bool AudioEngine::loadSynthSysex(int padId, const QString &path) {
@@ -1104,9 +1191,9 @@ void AudioEngine::mix(float *out, int frames) {
         const float sustain = m_padSustain[static_cast<size_t>(padIndex)].load();
         const float release = m_padRelease[static_cast<size_t>(padIndex)].load();
 
-        const float attackSec = 0.005f + attack * 1.2f;
-        const float decaySec = 0.01f + decay * 1.2f;
-        const float releaseSec = 0.02f + release * 1.6f;
+        const float attackSec = attack * 1.2f;
+        const float decaySec = decay * 1.2f;
+        const float releaseSec = release * 1.6f;
         const float attackStep = attackSec > 0.0f ? 1.0f / (attackSec * m_sampleRate) : 1.0f;
         const float decayStep =
             decaySec > 0.0f ? (1.0f - sustain) / (decaySec * m_sampleRate) : 1.0f;
@@ -1230,9 +1317,9 @@ void AudioEngine::mix(float *out, int frames) {
             const float sustain = m_padSustain[static_cast<size_t>(padIndex)].load();
             const float release = m_padRelease[static_cast<size_t>(padIndex)].load();
 
-            const float attackSec = 0.005f + attack * 1.2f;
-            const float decaySec = 0.01f + decay * 1.2f;
-            const float releaseSec = 0.02f + release * 1.6f;
+            const float attackSec = attack * 1.2f;
+            const float decaySec = decay * 1.2f;
+            const float releaseSec = release * 1.6f;
             const float attackStep =
                 attackSec > 0.0f ? 1.0f / (attackSec * m_sampleRate) : 1.0f;
             const float decayStep =
@@ -1254,19 +1341,54 @@ void AudioEngine::mix(float *out, int frames) {
                 synth.envStage = EnvStage::Attack;
                 continue;
             }
+            std::array<float, kModTargetCount> blockMods{};
+            const float bpmNow = std::max(30.0f, std::min(300.0f, m_bpm.load()));
+            for (int m = 0; m < kLfoModuleCount; ++m) {
+                const auto &module = synth.fmParams.lfoModules[static_cast<size_t>(m)];
+                if (!module.enabled || module.depth <= 0.0001f) {
+                    continue;
+                }
+                const float rateHz =
+                    module.sync ? lfoRateFromSyncIndex(module.syncIndex, bpmNow)
+                                : (0.05f + safeParam(module.rate) * 10.0f);
+                const float value = lfoModuleValue(module,
+                                                   synth.lfoPhaseModules[static_cast<size_t>(m)],
+                                                   synth.lfoHoldModules[static_cast<size_t>(m)]) *
+                                    safeParam(module.depth);
+                for (int t = 1; t < kModTargetCount; ++t) {
+                    blockMods[static_cast<size_t>(t)] +=
+                        value * module.assign[static_cast<size_t>(t)];
+                }
+                float nextPhase = synth.lfoPhaseModules[static_cast<size_t>(m)] +
+                                  (2.0f * static_cast<float>(M_PI) * rateHz / m_sampleRate) *
+                                      std::min(frames, 64);
+                if (module.kind == 1) {
+                    nextPhase = std::fmod(nextPhase, 2.0f * static_cast<float>(M_PI));
+                }
+                while (nextPhase >= 2.0f * static_cast<float>(M_PI)) {
+                    nextPhase -= 2.0f * static_cast<float>(M_PI);
+                }
+                synth.lfoPhaseModules[static_cast<size_t>(m)] = nextPhase;
+            }
+            for (int m = 0; m < kEnvModuleCount; ++m) {
+                const auto &module = synth.fmParams.envModules[static_cast<size_t>(m)];
+                if (!module.enabled) {
+                    continue;
+                }
+                const float value = synth.envValues[static_cast<size_t>(m)];
+                for (int t = 1; t < kModTargetCount; ++t) {
+                    blockMods[static_cast<size_t>(t)] +=
+                        value * module.assign[static_cast<size_t>(t)];
+                }
+            }
             if (isCustomKind(synth.kind) && synth.op1) {
                 AudioEngine::FmParams modParams = synth.fmParams;
-                const float previewLfo =
-                    lfoShapeValue(synth.lfoShape, synth.lfoPhase, synth.lfoHold);
-                const float envPreview = synth.env;
                 for (int m = 0; m < 4; ++m) {
                     const int targetIndex = 13 + m;
-                    const float lfoAmt = modParams.lfoAssign[static_cast<size_t>(targetIndex)];
-                    const float envAmt = modParams.envAssign[static_cast<size_t>(targetIndex)];
-                    if (lfoAmt <= 0.0001f && envAmt <= 0.0001f) {
+                    const float mod = blockMods[static_cast<size_t>(targetIndex)];
+                    if (std::fabs(mod) <= 0.0001f) {
                         continue;
                     }
-                    const float mod = lfoAmt * previewLfo + envAmt * envPreview;
                     applyCustomMacroMod(synth.kind, m, mod, modParams);
                 }
 
@@ -1274,12 +1396,10 @@ void AudioEngine::mix(float *out, int frames) {
                     if (target <= 0 || target >= AudioEngine::kModTargetCount) {
                         return;
                     }
-                    const float lfoAmt = modParams.lfoAssign[static_cast<size_t>(target)];
-                    const float envAmt = modParams.envAssign[static_cast<size_t>(target)];
-                    if (lfoAmt <= 0.0001f && envAmt <= 0.0001f) {
+                    const float mod = blockMods[static_cast<size_t>(target)];
+                    if (std::fabs(mod) <= 0.0001f) {
                         return;
                     }
-                    const float mod = lfoAmt * previewLfo + envAmt * envPreview;
                     applyFn(mod);
                 };
 
@@ -1404,6 +1524,91 @@ void AudioEngine::mix(float *out, int frames) {
                     synth.env = 1.0f;
                 }
 
+                std::array<float, kModTargetCount> moduleMods{};
+                for (int m = 0; m < kEnvModuleCount; ++m) {
+                    const auto &module = synth.fmParams.envModules[static_cast<size_t>(m)];
+                    if (!module.enabled) {
+                        continue;
+                    }
+                    if (synth.envReleaseRequested[static_cast<size_t>(m)] && !hasNotes &&
+                        synth.envStages[static_cast<size_t>(m)] != EnvStage::Release) {
+                        synth.envStages[static_cast<size_t>(m)] = EnvStage::Release;
+                    }
+                    float value = synth.envValues[static_cast<size_t>(m)];
+                    const float aSec = safeParam(module.attack) * 1.2f;
+                    const float dSec = safeParam(module.decay) * 1.2f;
+                    const float rSec = safeParam(module.release) * 1.6f;
+                    const float sus = safeParam(module.sustain);
+                    const float aStep = aSec > 0.0f ? 1.0f / (aSec * m_sampleRate) : 1.0f;
+                    const float dStep =
+                        dSec > 0.0f ? (1.0f - sus) / (dSec * m_sampleRate) : 1.0f;
+                    const float rStep = rSec > 0.0f ? 1.0f / (rSec * m_sampleRate) : 1.0f;
+                    switch (synth.envStages[static_cast<size_t>(m)]) {
+                        case EnvStage::Attack:
+                            value += aStep;
+                            if (value >= 1.0f || aSec <= 0.0f) {
+                                value = 1.0f;
+                                synth.envStages[static_cast<size_t>(m)] = EnvStage::Decay;
+                            }
+                            break;
+                        case EnvStage::Decay:
+                            value -= dStep;
+                            if (value <= sus || dSec <= 0.0f) {
+                                value = sus;
+                                synth.envStages[static_cast<size_t>(m)] = EnvStage::Sustain;
+                            }
+                            break;
+                        case EnvStage::Sustain:
+                            value = sus;
+                            break;
+                        case EnvStage::Release:
+                            value -= rStep * std::max(0.1f, value);
+                            if (value <= 0.0005f || rSec <= 0.0f) {
+                                value = 0.0f;
+                                synth.envReleaseRequested[static_cast<size_t>(m)] = false;
+                            }
+                            break;
+                    }
+                    synth.envValues[static_cast<size_t>(m)] = value;
+                    for (int t = 1; t < kModTargetCount; ++t) {
+                        moduleMods[static_cast<size_t>(t)] +=
+                            value * module.assign[static_cast<size_t>(t)];
+                    }
+                }
+
+                for (int m = 0; m < kLfoModuleCount; ++m) {
+                    const auto &module = synth.fmParams.lfoModules[static_cast<size_t>(m)];
+                    if (!module.enabled || module.depth <= 0.0001f) {
+                        continue;
+                    }
+                    const float rateHz =
+                        module.sync ? lfoRateFromSyncIndex(module.syncIndex, bpmNow)
+                                    : (0.05f + safeParam(module.rate) * 10.0f);
+                    const float phase = synth.lfoPhaseModules[static_cast<size_t>(m)];
+                    const float value =
+                        lfoModuleValue(module, phase, synth.lfoHoldModules[static_cast<size_t>(m)]) *
+                        safeParam(module.depth);
+                    for (int t = 1; t < kModTargetCount; ++t) {
+                        moduleMods[static_cast<size_t>(t)] +=
+                            value * module.assign[static_cast<size_t>(t)];
+                    }
+                    float nextPhase =
+                        phase + 2.0f * static_cast<float>(M_PI) * rateHz / m_sampleRate;
+                    if (nextPhase >= 2.0f * static_cast<float>(M_PI)) {
+                        nextPhase -= 2.0f * static_cast<float>(M_PI);
+                        synth.lfoNoiseModules[static_cast<size_t>(m)] =
+                            1664525u * synth.lfoNoiseModules[static_cast<size_t>(m)] +
+                            1013904223u;
+                        const float r =
+                            (static_cast<int>(synth.lfoNoiseModules[static_cast<size_t>(m)] >> 8) &
+                             0xFFFF) /
+                                32768.0f -
+                            1.0f;
+                        synth.lfoHoldModules[static_cast<size_t>(m)] = r;
+                    }
+                    synth.lfoPhaseModules[static_cast<size_t>(m)] = nextPhase;
+                }
+
                 float left = m_synthScratchL[static_cast<size_t>(i)];
                 float right = m_synthScratchR[static_cast<size_t>(i)];
 
@@ -1452,6 +1657,9 @@ void AudioEngine::mix(float *out, int frames) {
                                     synth.fmParams.envAssign[9] * env) *
                                    0.5f;
                     }
+                    cutoff += moduleMods[7] * 0.5f;
+                    baseRes += moduleMods[8] * 0.5f;
+                    baseEnv += moduleMods[9] * 0.5f;
                     if (synth.fmParams.envAssign[7] > 0.0001f ||
                         synth.fmParams.lfoAssign[7] > 0.0001f) {
                         cutoff = std::max(0.02f, std::min(0.98f, cutoff));

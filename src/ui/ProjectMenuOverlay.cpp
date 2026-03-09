@@ -110,6 +110,65 @@ QJsonObject synthParamsToJson(const PadBank::SynthParams &s) {
         envAssign.append(v);
     }
     obj["envAssign"] = envAssign;
+
+    QJsonArray lfoModules;
+    for (const auto &module : s.lfoModules) {
+        QJsonObject m;
+        m["enabled"] = module.enabled;
+        m["kind"] = module.kind;
+        m["shape"] = module.shape;
+        m["morph"] = module.morph;
+        m["rate"] = module.rate;
+        m["depth"] = module.depth;
+        m["sync"] = module.sync;
+        m["syncIndex"] = module.syncIndex;
+        m["steps"] = module.steps;
+        QJsonArray pattern;
+        for (float v : module.pattern) {
+            pattern.append(v);
+        }
+        m["pattern"] = pattern;
+        QJsonArray assign;
+        for (float v : module.assign) {
+            assign.append(v);
+        }
+        m["assign"] = assign;
+        lfoModules.append(m);
+    }
+    obj["lfoModules"] = lfoModules;
+
+    QJsonArray envModules;
+    for (const auto &module : s.envModules) {
+        QJsonObject m;
+        m["enabled"] = module.enabled;
+        m["attack"] = module.attack;
+        m["decay"] = module.decay;
+        m["sustain"] = module.sustain;
+        m["release"] = module.release;
+        QJsonArray assign;
+        for (float v : module.assign) {
+            assign.append(v);
+        }
+        m["assign"] = assign;
+        envModules.append(m);
+    }
+    obj["envModules"] = envModules;
+
+    QJsonArray filterModules;
+    for (const auto &module : s.filterModules) {
+        QJsonObject m;
+        m["enabled"] = module.enabled;
+        m["preset"] = module.preset;
+        m["type"] = module.type;
+        m["lowCut"] = module.lowCut;
+        m["highCut"] = module.highCut;
+        m["resonance"] = module.resonance;
+        m["slope"] = module.slope;
+        m["drive"] = module.drive;
+        m["mix"] = module.mix;
+        filterModules.append(m);
+    }
+    obj["filterModules"] = filterModules;
     return obj;
 }
 
@@ -159,6 +218,93 @@ PadBank::SynthParams synthParamsFromJson(const QJsonObject &obj) {
     for (int i = 0; i < envAssign.size() && i < PadBank::kModTargetCount; ++i) {
         s.envAssign[static_cast<size_t>(i)] =
             static_cast<float>(envAssign[i].toDouble(0.0));
+    }
+
+    const QJsonArray lfoModules = obj.value("lfoModules").toArray();
+    for (int i = 0; i < lfoModules.size() && i < PadBank::kLfoModuleCount; ++i) {
+        const QJsonObject m = lfoModules[i].toObject();
+        auto &module = s.lfoModules[static_cast<size_t>(i)];
+        module.enabled = m.value("enabled").toBool(module.enabled);
+        module.kind = m.value("kind").toInt(module.kind);
+        module.shape = m.value("shape").toInt(module.shape);
+        module.morph = static_cast<float>(m.value("morph").toDouble(module.morph));
+        module.rate = static_cast<float>(m.value("rate").toDouble(module.rate));
+        module.depth = static_cast<float>(m.value("depth").toDouble(module.depth));
+        module.sync = m.value("sync").toInt(module.sync);
+        module.syncIndex = m.value("syncIndex").toInt(module.syncIndex);
+        module.steps = m.value("steps").toInt(module.steps);
+        const QJsonArray pattern = m.value("pattern").toArray();
+        for (int k = 0; k < pattern.size() && k < PadBank::kLfoPatternSteps; ++k) {
+            module.pattern[static_cast<size_t>(k)] =
+                static_cast<float>(pattern[k].toDouble(0.0));
+        }
+        const QJsonArray assign = m.value("assign").toArray();
+        for (int k = 0; k < assign.size() && k < PadBank::kModTargetCount; ++k) {
+            module.assign[static_cast<size_t>(k)] =
+                static_cast<float>(assign[k].toDouble(0.0));
+        }
+    }
+
+    const QJsonArray envModules = obj.value("envModules").toArray();
+    for (int i = 0; i < envModules.size() && i < PadBank::kEnvModuleCount; ++i) {
+        const QJsonObject m = envModules[i].toObject();
+        auto &module = s.envModules[static_cast<size_t>(i)];
+        module.enabled = m.value("enabled").toBool(module.enabled);
+        module.attack = static_cast<float>(m.value("attack").toDouble(module.attack));
+        module.decay = static_cast<float>(m.value("decay").toDouble(module.decay));
+        module.sustain = static_cast<float>(m.value("sustain").toDouble(module.sustain));
+        module.release = static_cast<float>(m.value("release").toDouble(module.release));
+        const QJsonArray assign = m.value("assign").toArray();
+        for (int k = 0; k < assign.size() && k < PadBank::kModTargetCount; ++k) {
+            module.assign[static_cast<size_t>(k)] =
+                static_cast<float>(assign[k].toDouble(0.0));
+        }
+    }
+
+    const QJsonArray filterModules = obj.value("filterModules").toArray();
+    for (int i = 0; i < filterModules.size() && i < PadBank::kFilterModuleCount; ++i) {
+        const QJsonObject m = filterModules[i].toObject();
+        auto &module = s.filterModules[static_cast<size_t>(i)];
+        module.enabled = m.value("enabled").toBool(module.enabled);
+        module.preset = m.value("preset").toInt(module.preset);
+        module.type = m.value("type").toInt(module.type);
+        module.lowCut = static_cast<float>(m.value("lowCut").toDouble(module.lowCut));
+        module.highCut = static_cast<float>(m.value("highCut").toDouble(module.highCut));
+        module.resonance = static_cast<float>(m.value("resonance").toDouble(module.resonance));
+        module.slope = static_cast<float>(m.value("slope").toDouble(module.slope));
+        module.drive = static_cast<float>(m.value("drive").toDouble(module.drive));
+        module.mix = static_cast<float>(m.value("mix").toDouble(module.mix));
+    }
+
+    if (lfoModules.isEmpty()) {
+        auto &module = s.lfoModules[0];
+        module.enabled = s.lfoDepth > 0.0001f;
+        module.kind = 0;
+        module.shape = s.lfoShape;
+        module.rate = s.lfoRate;
+        module.depth = s.lfoDepth;
+        module.sync = s.lfoSync;
+        module.syncIndex = s.lfoSyncIndex;
+        module.assign = s.lfoAssign;
+    }
+    if (envModules.isEmpty()) {
+        auto &module = s.envModules[0];
+        module.enabled = true;
+        module.attack = s.attack;
+        module.decay = s.decay;
+        module.sustain = s.sustain;
+        module.release = s.release;
+        module.assign = s.envAssign;
+    }
+    if (filterModules.isEmpty()) {
+        auto &module = s.filterModules[0];
+        module.enabled = (s.filterType != 8 || s.cutoff < 0.999f || s.resonance > 0.0001f);
+        module.preset = s.filterType;
+        module.type = s.filterType;
+        module.lowCut = (s.filterType == 1) ? s.cutoff : 0.0f;
+        module.highCut = (s.filterType == 0) ? (1.0f - s.cutoff) : 1.0f;
+        module.resonance = s.resonance;
+        module.mix = 1.0f;
     }
     return s;
 }
@@ -484,6 +630,7 @@ bool ProjectMenuOverlay::saveProject(const QString &name) {
     root["metronome"] = m_seq->metronomeEnabled();
     root["renderBars"] = m_renderBars;
     root["renderRate"] = m_renderRate;
+    root["theme"] = Theme::currentThemeIndex();
 
     QJsonArray busGains;
     for (int bus = 0; bus < 6; ++bus) {
@@ -582,6 +729,7 @@ bool ProjectMenuOverlay::loadProject(const QString &name) {
     m_seq->setMetronomeEnabled(m_metronome);
     m_renderBars = root.value("renderBars").toInt(m_renderBars);
     m_renderRate = root.value("renderRate").toInt(m_renderRate);
+    Theme::setCurrentThemeIndex(root.value("theme").toInt(Theme::currentThemeIndex()));
 
     const QJsonArray busGains = root.value("busGain").toArray();
     for (int bus = 0; bus < busGains.size() && bus < 6; ++bus) {
@@ -740,8 +888,29 @@ void ProjectMenuOverlay::paintEvent(QPaintEvent *event) {
     p.drawLine(m_closeRect.topLeft(), m_closeRect.bottomRight());
     p.drawLine(m_closeRect.topRight(), m_closeRect.bottomLeft());
 
+    const float settingsPad = Theme::pxF(12.0f);
+    const QRectF settingsTabsRect(m_leftRect.left() + settingsPad, m_leftRect.top() + Theme::pxF(34.0f),
+                                  m_leftRect.width() - settingsPad * 2.0f, Theme::pxF(28.0f));
+    const QStringList settingsTabs = {"GENERAL", "BLUETOOTH", "THEME"};
+    const float settingsTabGap = Theme::pxF(6.0f);
+    const float settingsTabW =
+        (settingsTabsRect.width() - settingsTabGap * (settingsTabs.size() - 1)) / settingsTabs.size();
+    m_settingsTabRects.clear();
+    for (int i = 0; i < settingsTabs.size(); ++i) {
+        QRectF tabRect(settingsTabsRect.left() + i * (settingsTabW + settingsTabGap),
+                       settingsTabsRect.top(), settingsTabW, settingsTabsRect.height());
+        m_settingsTabRects.push_back(tabRect);
+        const bool active = (i == m_settingsTab);
+        p.setBrush(active ? Theme::accentAlt() : Theme::bg3());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRoundedRect(tabRect, Theme::px(8), Theme::px(8));
+        p.setPen(active ? Theme::bg0() : Theme::text());
+        p.setFont(Theme::baseFont(8, QFont::DemiBold));
+        p.drawText(tabRect, Qt::AlignCenter, settingsTabs[i]);
+    }
+
     // Settings panel content.
-    float y = m_leftRect.top() + Theme::pxF(36.0f);
+    float y = settingsTabsRect.bottom() + Theme::pxF(12.0f);
     const float rowH = Theme::pxF(46.0f);
     const float rowW = m_leftRect.width() - Theme::pxF(24.0f);
     const float rowX = m_leftRect.left() + Theme::pxF(12.0f);
@@ -762,114 +931,147 @@ void ProjectMenuOverlay::paintEvent(QPaintEvent *event) {
         return row;
     };
 
-    const int bpm = m_pads ? m_pads->bpm() : 120;
-    QRectF bpmRow = drawRowBase("BPM", QString::number(bpm));
-    const float btnW = Theme::pxF(30.0f);
-    m_bpmMinusRect =
-        QRectF(bpmRow.right() - Theme::pxF(92.0f), bpmRow.top() + Theme::pxF(8.0f),
-               btnW, bpmRow.height() - Theme::pxF(16.0f));
-    m_bpmPlusRect =
-        QRectF(bpmRow.right() - Theme::pxF(50.0f), bpmRow.top() + Theme::pxF(8.0f),
-               btnW, bpmRow.height() - Theme::pxF(16.0f));
-    p.setBrush(Theme::bg3());
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    p.drawRoundedRect(m_bpmMinusRect, Theme::px(6), Theme::px(6));
-    p.drawRoundedRect(m_bpmPlusRect, Theme::px(6), Theme::px(6));
-    p.setPen(Theme::accent());
-    p.drawText(m_bpmMinusRect, Qt::AlignCenter, "-");
-    p.drawText(m_bpmPlusRect, Qt::AlignCenter, "+");
-
-    QString metroLabel = m_metronome ? "ON" : "OFF";
-    QRectF metroRow = drawRowBase("METRONOME", metroLabel);
-    m_metronomeRect = metroRow;
-
-    QString rateLabel = (m_renderRate == 48000) ? "48 kHz" : "44.1 kHz";
-    QRectF rateRow = drawRowBase("RENDER QUALITY", rateLabel);
-    m_rateRect = rateRow;
-
-    QRectF btRow = drawRowBase("BLUETOOTH", "REFRESH");
-    m_bluetoothRect = btRow;
-
-    const float minBtListH = Theme::pxF(110.0f);
-    const float maxBtListH = Theme::pxF(170.0f);
-    const float reserveForMedia = rowH + Theme::pxF(10.0f);
-    const float remaining = m_leftRect.bottom() - y - reserveForMedia;
-    const float btListH = qBound(minBtListH, remaining, maxBtListH);
-    QRectF btBox(rowX, y, rowW, btListH);
-    p.setBrush(Theme::bg2());
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    p.drawRoundedRect(btBox, Theme::px(10), Theme::px(10));
-
-    const float btHeaderH = Theme::pxF(22.0f);
-    p.setPen(Theme::textMuted());
-    p.setFont(Theme::baseFont(8, QFont::DemiBold));
-    p.drawText(btBox.adjusted(Theme::px(10), Theme::px(4), -Theme::px(10), 0),
-               Qt::AlignLeft | Qt::AlignTop, "DEVICES");
-
-    m_btRefreshRect = QRectF(btBox.right() - Theme::pxF(72.0f), btBox.top() + Theme::pxF(4.0f),
-                             Theme::pxF(62.0f), Theme::pxF(18.0f));
-    p.setBrush(Theme::bg3());
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    p.drawRoundedRect(m_btRefreshRect, Theme::px(6), Theme::px(6));
-    p.setPen(Theme::text());
-    p.setFont(Theme::baseFont(8, QFont::DemiBold));
-    p.drawText(m_btRefreshRect, Qt::AlignCenter, "REFRESH");
-
+    m_bpmMinusRect = QRectF();
+    m_bpmPlusRect = QRectF();
+    m_metronomeRect = QRectF();
+    m_rateRect = QRectF();
+    m_bluetoothRect = QRectF();
+    m_btRefreshRect = QRectF();
+    m_btDisconnectRect = QRectF();
     m_btDeviceRects.clear();
-    const float rowHbt = Theme::pxF(22.0f);
-    float by = btBox.top() + btHeaderH + Theme::pxF(6.0f);
-    const float maxY = btBox.bottom() - Theme::pxF(26.0f);
-    for (int i = 0; i < m_btDevices.size() && by + rowHbt <= maxY; ++i) {
-        QRectF row(btBox.left() + Theme::px(8), by, btBox.width() - Theme::px(16), rowHbt);
-        m_btDeviceRects.push_back(row);
-        const bool connected = m_btDevices[i].connected;
-        p.setBrush(connected ? Theme::accentAlt() : Theme::bg3());
+    m_themeRowRects.clear();
+
+    if (m_settingsTab == 0) {
+        const int bpm = m_pads ? m_pads->bpm() : 120;
+        QRectF bpmRow = drawRowBase("BPM", QString::number(bpm));
+        const float btnW = Theme::pxF(30.0f);
+        m_bpmMinusRect =
+            QRectF(bpmRow.right() - Theme::pxF(92.0f), bpmRow.top() + Theme::pxF(8.0f),
+                   btnW, bpmRow.height() - Theme::pxF(16.0f));
+        m_bpmPlusRect =
+            QRectF(bpmRow.right() - Theme::pxF(50.0f), bpmRow.top() + Theme::pxF(8.0f),
+                   btnW, bpmRow.height() - Theme::pxF(16.0f));
+        p.setBrush(Theme::bg3());
         p.setPen(QPen(Theme::stroke(), 1.0));
-        p.drawRoundedRect(row, Theme::px(6), Theme::px(6));
-        p.setPen(connected ? Theme::bg0() : Theme::text());
+        p.drawRoundedRect(m_bpmMinusRect, Theme::px(6), Theme::px(6));
+        p.drawRoundedRect(m_bpmPlusRect, Theme::px(6), Theme::px(6));
+        p.setPen(Theme::accent());
+        p.drawText(m_bpmMinusRect, Qt::AlignCenter, "-");
+        p.drawText(m_bpmPlusRect, Qt::AlignCenter, "+");
+
+        QString metroLabel = m_metronome ? "ON" : "OFF";
+        m_metronomeRect = drawRowBase("METRONOME", metroLabel);
+
+        QString rateLabel = (m_renderRate == 48000) ? "48 kHz" : "44.1 kHz";
+        m_rateRect = drawRowBase("RENDER QUALITY", rateLabel);
+
+        const QString media = mediaRoot();
+        drawRowBase("MEDIA", QFontMetrics(Theme::baseFont(9, QFont::DemiBold))
+                                 .elidedText(media, Qt::ElideLeft, rowW - Theme::px(24)));
+    } else if (m_settingsTab == 1) {
+        m_bluetoothRect = drawRowBase("BLUETOOTH", "REFRESH");
+
+        const float minBtListH = Theme::pxF(150.0f);
+        const float maxBtListH = Theme::pxF(260.0f);
+        const float remaining = m_leftRect.bottom() - y - Theme::pxF(12.0f);
+        const float btListH = qBound(minBtListH, remaining, maxBtListH);
+        QRectF btBox(rowX, y, rowW, btListH);
+        p.setBrush(Theme::bg2());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRoundedRect(btBox, Theme::px(10), Theme::px(10));
+
+        const float btHeaderH = Theme::pxF(22.0f);
+        p.setPen(Theme::textMuted());
         p.setFont(Theme::baseFont(8, QFont::DemiBold));
-        QString label = m_btDevices[i].name;
-        if (label.trimmed().isEmpty()) {
-            label = m_btDevices[i].address;
+        p.drawText(btBox.adjusted(Theme::px(10), Theme::px(4), -Theme::px(10), 0),
+                   Qt::AlignLeft | Qt::AlignTop, "DEVICES");
+
+        m_btRefreshRect = QRectF(btBox.right() - Theme::pxF(72.0f), btBox.top() + Theme::pxF(4.0f),
+                                 Theme::pxF(62.0f), Theme::pxF(18.0f));
+        p.setBrush(Theme::bg3());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRoundedRect(m_btRefreshRect, Theme::px(6), Theme::px(6));
+        p.setPen(Theme::text());
+        p.setFont(Theme::baseFont(8, QFont::DemiBold));
+        p.drawText(m_btRefreshRect, Qt::AlignCenter, "REFRESH");
+
+        const float rowHbt = Theme::pxF(22.0f);
+        float by = btBox.top() + btHeaderH + Theme::pxF(6.0f);
+        const float maxY = btBox.bottom() - Theme::pxF(26.0f);
+        for (int i = 0; i < m_btDevices.size() && by + rowHbt <= maxY; ++i) {
+            QRectF row(btBox.left() + Theme::px(8), by, btBox.width() - Theme::px(16), rowHbt);
+            m_btDeviceRects.push_back(row);
+            const bool connected = m_btDevices[i].connected;
+            p.setBrush(connected ? Theme::accentAlt() : Theme::bg3());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(row, Theme::px(6), Theme::px(6));
+            p.setPen(connected ? Theme::bg0() : Theme::text());
+            p.setFont(Theme::baseFont(8, QFont::DemiBold));
+            QString label = m_btDevices[i].name;
+            if (label.trimmed().isEmpty()) {
+                label = m_btDevices[i].address;
+            }
+            if (connected) {
+                label = QStringLiteral("CONNECTED  ") + label;
+            }
+            p.drawText(row.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
+                       Qt::AlignLeft | Qt::AlignVCenter, label);
+            by += rowHbt + Theme::pxF(4.0f);
         }
-        if (connected) {
-            label = QStringLiteral("CONNECTED  ") + label;
+        if (m_btDevices.isEmpty()) {
+            p.setPen(Theme::textMuted());
+            p.setFont(Theme::baseFont(8));
+            p.drawText(btBox.adjusted(Theme::px(8), Theme::px(26), -Theme::px(8), 0),
+                       Qt::AlignLeft | Qt::AlignTop, "NO BLUETOOTH DEVICES");
         }
-        p.drawText(row.adjusted(Theme::px(8), 0, -Theme::px(8), 0),
-                   Qt::AlignLeft | Qt::AlignVCenter, label);
-        by += rowHbt + Theme::pxF(4.0f);
+
+        m_btDisconnectRect = QRectF(btBox.left() + Theme::pxF(10.0f),
+                                    btBox.bottom() - Theme::pxF(22.0f),
+                                    Theme::pxF(90.0f), Theme::pxF(18.0f));
+        p.setBrush(Theme::bg3());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRoundedRect(m_btDisconnectRect, Theme::px(6), Theme::px(6));
+        p.setPen(Theme::text());
+        p.setFont(Theme::baseFont(8, QFont::DemiBold));
+        p.drawText(m_btDisconnectRect, Qt::AlignCenter, "DISCONNECT");
+
+        if (!m_btStatus.isEmpty()) {
+            p.setPen(Theme::textMuted());
+            p.setFont(Theme::baseFont(8));
+            p.drawText(btBox.adjusted(Theme::px(110), Theme::px(0), -Theme::px(10), 0),
+                       Qt::AlignBottom | Qt::AlignRight,
+                       QFontMetrics(Theme::baseFont(8)).elidedText(
+                           m_btStatus, Qt::ElideRight,
+                           static_cast<int>(btBox.width() * 0.6f)));
+        }
+    } else {
+        QRectF themeHeader = drawRowBase("THEME", Theme::themeName(Theme::currentThemeIndex()));
+        Q_UNUSED(themeHeader);
+        const QStringList themes = {Theme::themeName(0), Theme::themeName(1), Theme::themeName(2)};
+        const float themeGap = Theme::pxF(8.0f);
+        const float themeH = Theme::pxF(56.0f);
+        for (int i = 0; i < themes.size(); ++i) {
+            QRectF row(rowX, y, rowW, themeH);
+            m_themeRowRects.push_back(row);
+            const bool active = (i == Theme::currentThemeIndex());
+            p.setBrush(active ? Theme::accentAlt() : Theme::bg2());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(row, Theme::px(10), Theme::px(10));
+            p.setPen(active ? Theme::bg0() : Theme::text());
+            p.setFont(Theme::condensedFont(10, QFont::Bold));
+            p.drawText(row.adjusted(Theme::px(12), Theme::px(8), -Theme::px(12), 0),
+                       Qt::AlignLeft | Qt::AlignTop, themes[i]);
+            p.setPen(active ? Theme::bg0() : Theme::textMuted());
+            p.setFont(Theme::baseFont(8));
+            const QString desc =
+                (i == 0) ? "Clean light instrument UI"
+                : (i == 1) ? "Green terminal / CRT contrast"
+                           : "Cold cyan studio interface";
+            p.drawText(row.adjusted(Theme::px(12), Theme::px(24), -Theme::px(12), -Theme::px(8)),
+                       Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, desc);
+            y += themeH + themeGap;
+        }
     }
-    if (m_btDevices.isEmpty()) {
-        p.setPen(Theme::textMuted());
-        p.setFont(Theme::baseFont(8));
-        p.drawText(btBox.adjusted(Theme::px(8), Theme::px(26), -Theme::px(8), 0),
-                   Qt::AlignLeft | Qt::AlignTop, "NO BLUETOOTH DEVICES");
-    }
-
-    m_btDisconnectRect = QRectF(btBox.left() + Theme::pxF(10.0f),
-                                btBox.bottom() - Theme::pxF(22.0f),
-                                Theme::pxF(90.0f), Theme::pxF(18.0f));
-    p.setBrush(Theme::bg3());
-    p.setPen(QPen(Theme::stroke(), 1.0));
-    p.drawRoundedRect(m_btDisconnectRect, Theme::px(6), Theme::px(6));
-    p.setPen(Theme::text());
-    p.setFont(Theme::baseFont(8, QFont::DemiBold));
-    p.drawText(m_btDisconnectRect, Qt::AlignCenter, "DISCONNECT");
-
-    if (!m_btStatus.isEmpty()) {
-        p.setPen(Theme::textMuted());
-        p.setFont(Theme::baseFont(8));
-        p.drawText(btBox.adjusted(Theme::px(110), Theme::px(0), -Theme::px(10), 0),
-                   Qt::AlignBottom | Qt::AlignRight,
-                   QFontMetrics(Theme::baseFont(8)).elidedText(m_btStatus, Qt::ElideRight,
-                                                              static_cast<int>(btBox.width() * 0.6f)));
-    }
-
-    y = btBox.bottom() + Theme::pxF(10.0f);
-
-    const QString media = mediaRoot();
-    drawRowBase("MEDIA", QFontMetrics(Theme::baseFont(9, QFont::DemiBold))
-                             .elidedText(media, Qt::ElideLeft, rowW - Theme::px(24)));
 
     // Project list + buttons.
     m_projectRowRects.clear();
@@ -985,6 +1187,24 @@ void ProjectMenuOverlay::mousePressEvent(QMouseEvent *event) {
         setVisible(false);
         emit closed();
         return;
+    }
+
+    for (int i = 0; i < m_settingsTabRects.size(); ++i) {
+        if (m_settingsTabRects[i].contains(pos)) {
+            m_settingsTab = i;
+            update();
+            return;
+        }
+    }
+
+    if (m_settingsTab == 2) {
+        for (int i = 0; i < m_themeRowRects.size(); ++i) {
+            if (m_themeRowRects[i].contains(pos)) {
+                Theme::setCurrentThemeIndex(i);
+                update();
+                return;
+            }
+        }
     }
 
     if (m_bpmMinusRect.contains(pos) && m_pads) {

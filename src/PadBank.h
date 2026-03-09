@@ -14,6 +14,11 @@ class QProcess;
 class PadBank : public QObject {
     Q_OBJECT
 public:
+    static constexpr int kLfoModuleCount = 4;
+    static constexpr int kEnvModuleCount = 4;
+    static constexpr int kFilterModuleCount = 4;
+    static constexpr int kLfoPatternSteps = 32;
+
     enum class ModTarget {
         None = 0,
         Osc1Detune,
@@ -69,6 +74,41 @@ public:
     };
 
     struct SynthParams {
+        struct LfoModule {
+            bool enabled = false;
+            int kind = 0;  // 0=smooth, 1=trance
+            int shape = 0;
+            float morph = 0.0f;
+            float rate = 0.2f;
+            float depth = 0.5f;
+            int sync = 1;
+            int syncIndex = 3;
+            int steps = 16;
+            std::array<float, kLfoPatternSteps> pattern{};
+            std::array<float, kModTargetCount> assign{};
+        };
+
+        struct EnvModule {
+            bool enabled = false;
+            float attack = 0.0f;
+            float decay = 0.25f;
+            float sustain = 1.0f;
+            float release = 0.25f;
+            std::array<float, kModTargetCount> assign{};
+        };
+
+        struct FilterModule {
+            bool enabled = false;
+            int preset = 0;
+            int type = 0;
+            float lowCut = 0.0f;
+            float highCut = 1.0f;
+            float resonance = 0.0f;
+            float slope = 0.0f;
+            float drive = 0.0f;
+            float mix = 1.0f;
+        };
+
         float attack = 0.15f;
         float decay = 0.25f;
         float sustain = 0.7f;
@@ -103,6 +143,9 @@ public:
         std::array<float, 8> macros{{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}};
         std::array<float, kModTargetCount> lfoAssign{};
         std::array<float, kModTargetCount> envAssign{};
+        std::array<LfoModule, kLfoModuleCount> lfoModules{};
+        std::array<EnvModule, kEnvModuleCount> envModules{};
+        std::array<FilterModule, kFilterModuleCount> filterModules{};
     };
 
     struct BusEffect {
@@ -143,6 +186,9 @@ public:
     void setSynthLfoSync(int index, int enabled, int syncIndex);
     void setSynthLfoTarget(int index, int target);
     void setSynthModAssign(int index, ModTarget target, float lfoAmount, float envAmount);
+    void setSynthLfoModule(int index, int slot, const SynthParams::LfoModule &module);
+    void setSynthEnvModule(int index, int slot, const SynthParams::EnvModule &module);
+    void setSynthFilterModule(int index, int slot, const SynthParams::FilterModule &module);
     void setSynthMacro(int index, int macro, float value);
     int fxBus(int index) const;
     void setFxBus(int index, int bus);

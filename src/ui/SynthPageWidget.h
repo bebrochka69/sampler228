@@ -27,6 +27,19 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
 
 private:
+    enum class EditorMode {
+        None,
+        Lfo,
+        Env,
+        Filter
+    };
+
+    enum class BindSource {
+        None,
+        Lfo,
+        Env
+    };
+
     struct PresetRow {
         QString label;
         QString presetId;
@@ -46,6 +59,13 @@ private:
         QString label;
         int type = 0;
         QRectF rect;
+    };
+
+    struct EditorHit {
+        QRectF rect;
+        QString id;
+        int slot = -1;
+        int value = 0;
     };
 
     void reloadBanks(bool syncSelection);
@@ -79,6 +99,21 @@ private:
     bool m_holdActive = false;
     int m_holdParamType = -1;
     QPointF m_holdPos;
+    EditorMode m_editorMode = EditorMode::None;
+    QVector<EditorHit> m_editorHits;
+    QRectF m_editorContentRect;
+    QRectF m_editorLeftRect;
+    QRectF m_editorRightRect;
+    QRectF m_editorAddRect;
+    int m_lfoScroll = 0;
+    int m_envScroll = 0;
+    int m_filterScroll = 0;
+    int m_activeLfoSlot = 0;
+    int m_activeEnvSlot = 0;
+    int m_activeFilterSlot = 0;
+    BindSource m_bindSource = BindSource::None;
+    EditorMode m_bindReturnMode = EditorMode::None;
+    int m_bindSlot = -1;
     QRectF m_presetButtonRect;
     QRectF m_presetPanelRect;
     QRectF m_busRect;

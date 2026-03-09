@@ -1,6 +1,7 @@
 #include "SynthPageWidget.h"
 
 #include <QKeyEvent>
+#include <QDateTime>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -375,6 +376,105 @@ QString classifyPresetType(const QString &name) {
     }
     return "OTHER";
 }
+
+QString modTargetLabel(int targetIndex) {
+    switch (targetIndex) {
+        case 1:
+            return "OSC1 DETUNE";
+        case 2:
+            return "OSC1 VOL";
+        case 3:
+            return "OSC1 PAN";
+        case 4:
+            return "OSC2 DETUNE";
+        case 5:
+            return "OSC2 VOL";
+        case 6:
+            return "OSC2 PAN";
+        case 7:
+            return "CUTOFF";
+        case 8:
+            return "RESO";
+        case 9:
+            return "F ENV";
+        case 10:
+            return "FM";
+        case 11:
+            return "RATIO";
+        case 12:
+            return "FEEDBACK";
+        case 13:
+            return "C1";
+        case 14:
+            return "C2";
+        case 15:
+            return "C3";
+        case 16:
+            return "C4";
+        default:
+            return "TARGET";
+    }
+}
+
+QStringList filterPresetNames() {
+    return {"DUAL CUT", "LOW CUT", "HIGH CUT", "BAND", "NOTCH", "PEAK",
+            "LOW+MID", "AIR"};
+}
+
+void applyFilterPreset(PadBank::SynthParams::FilterModule &module) {
+    switch (module.preset) {
+        case 0: // dual cut
+            module.type = 4;
+            if (module.highCut <= module.lowCut) {
+                module.lowCut = 0.15f;
+                module.highCut = 0.85f;
+            }
+            break;
+        case 1: // low cut
+            module.type = 1;
+            module.lowCut = std::max(module.lowCut, 0.15f);
+            module.highCut = 1.0f;
+            break;
+        case 2: // high cut
+            module.type = 0;
+            module.lowCut = 0.0f;
+            module.highCut = std::min(module.highCut, 0.75f);
+            break;
+        case 3: // band
+            module.type = 2;
+            module.lowCut = 0.25f;
+            module.highCut = 0.75f;
+            break;
+        case 4: // notch
+            module.type = 3;
+            module.lowCut = 0.35f;
+            module.highCut = 0.65f;
+            break;
+        case 5: // peak
+            module.type = 7;
+            module.lowCut = 0.4f;
+            module.highCut = 0.6f;
+            break;
+        case 6: // low+mid
+            module.type = 10;
+            module.lowCut = 0.0f;
+            module.highCut = 0.7f;
+            break;
+        case 7: // air
+            module.type = 6;
+            module.lowCut = 0.0f;
+            module.highCut = 1.0f;
+            break;
+        default:
+            break;
+    }
+    module.lowCut = clamp01(module.lowCut);
+    module.highCut = clamp01(std::max(module.lowCut, module.highCut));
+    module.mix = clamp01(module.mix);
+    module.resonance = clamp01(module.resonance);
+    module.slope = clamp01(module.slope);
+    module.drive = clamp01(module.drive);
+}
 }  // namespace
 
 SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
@@ -434,17 +534,6 @@ SynthPageWidget::SynthPageWidget(PadBank *pads, QWidget *parent)
         });
         connect(m_pads, &PadBank::padParamsChanged, this, [this](int) { update(); });
     }
-
-    m_holdTimer.setSingleShot(true);
-    connect(&m_holdTimer, &QTimer::timeout, this, [this]() {
-        if (!m_holdActive || m_holdParamType < 0) {
-            return;
-        }
-        m_assignMenuOpen = true;
-        m_assignParamType = m_holdParamType;
-        m_holdActive = false;
-        update();
-    });
 }
 
 void SynthPageWidget::reloadBanks(bool syncSelection) {
@@ -571,29 +660,81 @@ void SynthPageWidget::keyPressEvent(QKeyEvent *event) {
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad));
     const QString typeUpper = type.trimmed().toUpper();
     const bool presetsAllowed = (typeUpper == "DX7" || isCustomEngineType(typeUpper));
-    if (key == Qt::Key_L) {
-        m_modMenuOpen = !m_modMenuOpen;
-        m_assignMenuOpen = false;
+    auto closeBind = [&]() {
+        m_bindSource = BindSource::None;
+        m_bindSlot = -1;
+        m_bindReturnMode = EditorMode::None;
+    };
+    auto toggleEditor = [&](EditorMode mode) {
+        if (m_editorMode == mode) {
+            m_editorMode = EditorMode::None;
+        } else {
+            m_editorMode = mode;
+        }
         m_showPresetMenu = false;
+        closeBind();
         update();
+    };
+
+    if (key == Qt::Key_L) {
+        toggleEditor(EditorMode::Lfo);
+        return;
+    }
+    if (key == Qt::Key_A) {
+        toggleEditor(EditorMode::Env);
+        return;
+    }
+    if (key == Qt::Key_F) {
+        toggleEditor(EditorMode::Filter);
         return;
     }
     if (key == Qt::Key_P) {
         if (presetsAllowed) {
+            m_editorMode = EditorMode::None;
+            closeBind();
             m_showPresetMenu = !m_showPresetMenu;
             update();
         }
         return;
     }
-    if (key == Qt::Key_Escape && m_modMenuOpen) {
-        m_modMenuOpen = false;
-        m_assignMenuOpen = false;
-        update();
-        return;
+    if (key == Qt::Key_Escape) {
+        if (m_editorMode != EditorMode::None) {
+            m_editorMode = EditorMode::None;
+            update();
+            return;
+        }
+        if (m_bindSource != BindSource::None) {
+            closeBind();
+            update();
+            return;
+        }
     }
     if (key == Qt::Key_Escape && m_showPresetMenu) {
         m_showPresetMenu = false;
         update();
+        return;
+    }
+    if (m_editorMode != EditorMode::None) {
+        int *scroll = nullptr;
+        if (m_editorMode == EditorMode::Lfo) {
+            scroll = &m_lfoScroll;
+        } else if (m_editorMode == EditorMode::Env) {
+            scroll = &m_envScroll;
+        } else if (m_editorMode == EditorMode::Filter) {
+            scroll = &m_filterScroll;
+        }
+        if (scroll) {
+            if (key == Qt::Key_Left) {
+                *scroll = std::max(0, *scroll - 1);
+                update();
+                return;
+            }
+            if (key == Qt::Key_Right) {
+                *scroll += 1;
+                update();
+                return;
+            }
+        }
         return;
     }
     if (m_showPresetMenu) {
@@ -649,6 +790,277 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     const QString type = synthTypeFromId(synthIdOrDefault(m_pads, m_activePad));
     const QString typeUpper = type.trimmed().toUpper();
     const bool presetsAllowed = (typeUpper == "DX7" || isCustomEngineType(typeUpper));
+
+    auto deltaFromClick = [&](const QRectF &r) {
+        return pos.x() < r.center().x() ? -1 : 1;
+    };
+
+    if (m_editorMode != EditorMode::None) {
+        if (!m_editorContentRect.contains(pos)) {
+            m_editorMode = EditorMode::None;
+            update();
+            return;
+        }
+        if (m_editorLeftRect.contains(pos)) {
+            if (m_editorMode == EditorMode::Lfo) {
+                m_lfoScroll = std::max(0, m_lfoScroll - 1);
+            } else if (m_editorMode == EditorMode::Env) {
+                m_envScroll = std::max(0, m_envScroll - 1);
+            } else if (m_editorMode == EditorMode::Filter) {
+                m_filterScroll = std::max(0, m_filterScroll - 1);
+            }
+            update();
+            return;
+        }
+        if (m_editorRightRect.contains(pos)) {
+            if (m_editorMode == EditorMode::Lfo) {
+                ++m_lfoScroll;
+            } else if (m_editorMode == EditorMode::Env) {
+                ++m_envScroll;
+            } else if (m_editorMode == EditorMode::Filter) {
+                ++m_filterScroll;
+            }
+            update();
+            return;
+        }
+        if (m_editorAddRect.contains(pos) && m_pads) {
+            PadBank::SynthParams sp = m_pads->synthParams(m_activePad);
+            if (m_editorMode == EditorMode::Lfo) {
+                for (int i = 0; i < PadBank::kLfoModuleCount; ++i) {
+                    auto module = sp.lfoModules[static_cast<size_t>(i)];
+                    if (!module.enabled) {
+                        module.enabled = true;
+                        module.kind = 0;
+                        module.shape = 0;
+                        module.morph = 0.0f;
+                        module.rate = 0.2f;
+                        module.depth = 0.5f;
+                        module.sync = 1;
+                        module.syncIndex = 3;
+                        module.steps = 16;
+                        module.pattern.fill(0.5f);
+                        m_pads->setSynthLfoModule(m_activePad, i, module);
+                        m_activeLfoSlot = i;
+                        break;
+                    }
+                }
+            } else if (m_editorMode == EditorMode::Env) {
+                for (int i = 0; i < PadBank::kEnvModuleCount; ++i) {
+                    auto module = sp.envModules[static_cast<size_t>(i)];
+                    if (!module.enabled) {
+                        module.enabled = true;
+                        module.attack = 0.0f;
+                        module.decay = 0.2f;
+                        module.sustain = 1.0f;
+                        module.release = 0.2f;
+                        m_pads->setSynthEnvModule(m_activePad, i, module);
+                        m_activeEnvSlot = i;
+                        break;
+                    }
+                }
+            } else if (m_editorMode == EditorMode::Filter) {
+                for (int i = 0; i < PadBank::kFilterModuleCount; ++i) {
+                    auto module = sp.filterModules[static_cast<size_t>(i)];
+                    if (!module.enabled) {
+                        module.enabled = true;
+                        module.preset = 0;
+                        module.type = 4;
+                        module.lowCut = 0.0f;
+                        module.highCut = 1.0f;
+                        module.resonance = 0.0f;
+                        module.slope = 0.0f;
+                        module.drive = 0.0f;
+                        module.mix = 1.0f;
+                        m_pads->setSynthFilterModule(m_activePad, i, module);
+                        m_activeFilterSlot = i;
+                        break;
+                    }
+                }
+            }
+            update();
+            return;
+        }
+        for (int hitIndex = m_editorHits.size() - 1; hitIndex >= 0; --hitIndex) {
+            const EditorHit &hit = m_editorHits[hitIndex];
+            if (!hit.rect.contains(pos) || !m_pads) {
+                continue;
+            }
+            PadBank::SynthParams sp = m_pads->synthParams(m_activePad);
+            if (hit.id == "lfo-select") {
+                m_activeLfoSlot = hit.slot;
+                update();
+                return;
+            }
+            if (hit.id == "env-select") {
+                m_activeEnvSlot = hit.slot;
+                update();
+                return;
+            }
+            if (hit.id == "filter-select") {
+                m_activeFilterSlot = hit.slot;
+                update();
+                return;
+            }
+            if (hit.id == "lfo-remove") {
+                auto module = sp.lfoModules[static_cast<size_t>(hit.slot)];
+                module = {};
+                m_pads->setSynthLfoModule(m_activePad, hit.slot, module);
+                m_activeLfoSlot = std::max(0, std::min(m_activeLfoSlot, PadBank::kLfoModuleCount - 1));
+                update();
+                return;
+            }
+            if (hit.id == "env-remove") {
+                auto module = sp.envModules[static_cast<size_t>(hit.slot)];
+                module = {};
+                m_pads->setSynthEnvModule(m_activePad, hit.slot, module);
+                update();
+                return;
+            }
+            if (hit.id == "filter-remove") {
+                auto module = sp.filterModules[static_cast<size_t>(hit.slot)];
+                module = {};
+                m_pads->setSynthFilterModule(m_activePad, hit.slot, module);
+                update();
+                return;
+            }
+            if (hit.id == "lfo-bind") {
+                m_bindSource = BindSource::Lfo;
+                m_bindSlot = hit.slot;
+                m_bindReturnMode = m_editorMode;
+                m_editorMode = EditorMode::None;
+                update();
+                return;
+            }
+            if (hit.id == "env-bind") {
+                m_bindSource = BindSource::Env;
+                m_bindSlot = hit.slot;
+                m_bindReturnMode = m_editorMode;
+                m_editorMode = EditorMode::None;
+                update();
+                return;
+            }
+            if (hit.id.startsWith("lfo-")) {
+                auto module = sp.lfoModules[static_cast<size_t>(hit.slot)];
+                const int delta = deltaFromClick(hit.rect);
+                if (hit.id == "lfo-kind") {
+                    module.kind = hit.value;
+                    if (module.kind == 1 && module.steps <= 0) {
+                        module.steps = 16;
+                    }
+                } else if (hit.id == "lfo-shape") {
+                    module.morph = qBound(0.0f, module.morph + delta * 0.1f, 1.0f);
+                } else if (hit.id == "lfo-rate") {
+                    module.rate = qBound(0.0f, module.rate + delta * 0.05f, 1.0f);
+                } else if (hit.id == "lfo-depth") {
+                    module.depth = qBound(0.0f, module.depth + delta * 0.05f, 1.0f);
+                } else if (hit.id == "lfo-sync") {
+                    module.sync = module.sync ? 0 : 1;
+                } else if (hit.id == "lfo-steps") {
+                    static const int stepOptions[] = {4, 8, 12, 16, 24, 32};
+                    int current = 3;
+                    for (int i = 0; i < 6; ++i) {
+                        if (module.steps == stepOptions[i]) {
+                            current = i;
+                            break;
+                        }
+                    }
+                    current = qBound(0, current + delta, 5);
+                    module.steps = stepOptions[current];
+                } else if (hit.id == "lfo-step") {
+                    const int step = qBound(0, hit.value, PadBank::kLfoPatternSteps - 1);
+                    module.pattern[static_cast<size_t>(step)] =
+                        module.pattern[static_cast<size_t>(step)] > 0.5f ? 0.15f : 0.85f;
+                }
+                m_pads->setSynthLfoModule(m_activePad, hit.slot, module);
+                update();
+                return;
+            }
+            if (hit.id.startsWith("env-")) {
+                auto module = sp.envModules[static_cast<size_t>(hit.slot)];
+                const int delta = deltaFromClick(hit.rect);
+                auto stepParam = [&](float &value, float amount) {
+                    value = qBound(0.0f, value + delta * amount, 1.0f);
+                };
+                if (hit.id == "env-attack") {
+                    stepParam(module.attack, 0.04f);
+                } else if (hit.id == "env-decay") {
+                    stepParam(module.decay, 0.04f);
+                } else if (hit.id == "env-sustain") {
+                    stepParam(module.sustain, 0.04f);
+                } else if (hit.id == "env-release") {
+                    stepParam(module.release, 0.04f);
+                }
+                module.enabled = true;
+                m_pads->setSynthEnvModule(m_activePad, hit.slot, module);
+                update();
+                return;
+            }
+            if (hit.id.startsWith("filter-")) {
+                auto module = sp.filterModules[static_cast<size_t>(hit.slot)];
+                const int delta = deltaFromClick(hit.rect);
+                auto stepParam = [&](float &value, float amount) {
+                    value = qBound(0.0f, value + delta * amount, 1.0f);
+                };
+                if (hit.id == "filter-preset") {
+                    const int count = filterPresetNames().size();
+                    module.preset = (module.preset + delta + count) % count;
+                    applyFilterPreset(module);
+                } else if (hit.id == "filter-low") {
+                    stepParam(module.lowCut, 0.04f);
+                    module.lowCut = std::min(module.lowCut, module.highCut);
+                } else if (hit.id == "filter-high") {
+                    stepParam(module.highCut, 0.04f);
+                    module.highCut = std::max(module.highCut, module.lowCut);
+                } else if (hit.id == "filter-reso") {
+                    stepParam(module.resonance, 0.05f);
+                } else if (hit.id == "filter-slope") {
+                    stepParam(module.slope, 0.05f);
+                } else if (hit.id == "filter-drive") {
+                    stepParam(module.drive, 0.05f);
+                } else if (hit.id == "filter-mix") {
+                    stepParam(module.mix, 0.05f);
+                }
+                module.enabled = true;
+                m_pads->setSynthFilterModule(m_activePad, hit.slot, module);
+                update();
+                return;
+            }
+        }
+        return;
+    }
+
+    if (m_bindSource != BindSource::None) {
+        for (int i = 0; i < m_editParams.size(); ++i) {
+            if (!m_editParams[i].rect.contains(pos) || !m_pads) {
+                continue;
+            }
+            const int targetIndex = modTargetForParam(i, typeUpper);
+            if (targetIndex <= 0 || targetIndex >= PadBank::kModTargetCount) {
+                continue;
+            }
+            PadBank::SynthParams sp = m_pads->synthParams(m_activePad);
+            if (m_bindSource == BindSource::Lfo && m_bindSlot >= 0 &&
+                m_bindSlot < PadBank::kLfoModuleCount) {
+                auto module = sp.lfoModules[static_cast<size_t>(m_bindSlot)];
+                module.enabled = true;
+                module.assign[static_cast<size_t>(targetIndex)] = 0.65f;
+                m_pads->setSynthLfoModule(m_activePad, m_bindSlot, module);
+            } else if (m_bindSource == BindSource::Env && m_bindSlot >= 0 &&
+                       m_bindSlot < PadBank::kEnvModuleCount) {
+                auto module = sp.envModules[static_cast<size_t>(m_bindSlot)];
+                module.enabled = true;
+                module.assign[static_cast<size_t>(targetIndex)] = 1.0f;
+                m_pads->setSynthEnvModule(m_activePad, m_bindSlot, module);
+            }
+            m_editorMode = m_bindReturnMode;
+            m_bindSource = BindSource::None;
+            m_bindSlot = -1;
+            m_bindReturnMode = EditorMode::None;
+            update();
+            return;
+        }
+        return;
+    }
 
     if (m_assignMenuOpen) {
         if (!m_assignRect.contains(pos)) {
@@ -749,13 +1161,6 @@ void SynthPageWidget::mousePressEvent(QMouseEvent *event) {
     for (int i = 0; i < m_editParams.size(); ++i) {
         if (m_editParams[i].rect.contains(pos)) {
             m_selectedEditParam = i;
-            const int targetIndex = modTargetForParam(i, typeUpper);
-            if (targetIndex > 0) {
-                m_holdActive = true;
-                m_holdParamType = i;
-                m_holdPos = pos;
-                m_holdTimer.start(520);
-            }
             update();
             return;
         }
@@ -793,6 +1198,26 @@ void SynthPageWidget::mouseReleaseEvent(QMouseEvent *) {
 }
 
 void SynthPageWidget::wheelEvent(QWheelEvent *event) {
+    if (m_editorMode != EditorMode::None) {
+        const int delta = event->angleDelta().y();
+        int *scroll = nullptr;
+        if (m_editorMode == EditorMode::Lfo) {
+            scroll = &m_lfoScroll;
+        } else if (m_editorMode == EditorMode::Env) {
+            scroll = &m_envScroll;
+        } else if (m_editorMode == EditorMode::Filter) {
+            scroll = &m_filterScroll;
+        }
+        if (scroll) {
+            if (delta < 0) {
+                ++(*scroll);
+            } else if (delta > 0) {
+                *scroll = std::max(0, *scroll - 1);
+            }
+            update();
+            return;
+        }
+    }
     if (!m_showPresetMenu) {
         QWidget::wheelEvent(event);
         return;
@@ -817,6 +1242,11 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
     Theme::paintBackground(p, rect());
     Theme::applyRenderHints(p);
     reloadBanks(false);
+    m_editorHits.clear();
+    m_editorContentRect = QRectF();
+    m_editorLeftRect = QRectF();
+    m_editorRightRect = QRectF();
+    m_editorAddRect = QRectF();
 
     const int margin = Theme::px(18);
     const QRectF panel = rect().adjusted(margin, margin, -margin, -margin);
@@ -1912,6 +2342,460 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
             p.setPen(envOn ? Theme::bg0() : Theme::text());
             p.drawText(m_assignEnvRect, Qt::AlignCenter, "ADSR");
         }
+    }
+
+    if (m_bindSource != BindSource::None && m_editorMode == EditorMode::None) {
+        const QRectF banner(panel.left() + Theme::pxF(16.0f), panel.top() + Theme::pxF(46.0f),
+                            panel.width() - Theme::pxF(32.0f), Theme::pxF(34.0f));
+        p.setBrush(Theme::accentAlt());
+        p.setPen(QPen(Theme::stroke(), 1.0));
+        p.drawRoundedRect(banner, Theme::px(8), Theme::px(8));
+        p.setPen(Theme::bg0());
+        p.setFont(Theme::baseFont(10, QFont::DemiBold));
+        const QString source =
+            (m_bindSource == BindSource::Lfo)
+                ? QString("LFO %1").arg(m_bindSlot + 1)
+                : QString("ADSR %1").arg(m_bindSlot + 1);
+        p.drawText(banner, Qt::AlignCenter,
+                   QString("BIND %1: click target parameter").arg(source));
+    }
+
+    if (m_editorMode != EditorMode::None) {
+        const QRectF overlay = panel.adjusted(Theme::px(10), Theme::px(42),
+                                              -Theme::px(10), -Theme::px(10));
+        m_editorContentRect = overlay;
+        p.save();
+        p.setBrush(Theme::withAlpha(Theme::bg0(), 200));
+        p.setPen(Qt::NoPen);
+        p.drawRoundedRect(overlay, Theme::px(14), Theme::px(14));
+
+        p.setBrush(Theme::bg1());
+        p.setPen(QPen(Theme::stroke(), 1.2));
+        p.drawRoundedRect(overlay, Theme::px(14), Theme::px(14));
+
+        const QRectF head(overlay.left() + Theme::pxF(14.0f), overlay.top() + Theme::pxF(10.0f),
+                          overlay.width() - Theme::pxF(28.0f), Theme::pxF(28.0f));
+        QString title = "LFO";
+        if (m_editorMode == EditorMode::Env) {
+            title = "ADSR";
+        } else if (m_editorMode == EditorMode::Filter) {
+            title = "FILTER";
+        }
+        p.setPen(Theme::text());
+        p.setFont(Theme::condensedFont(14, QFont::Bold));
+        p.drawText(head, Qt::AlignLeft | Qt::AlignVCenter, title);
+        p.setPen(Theme::textMuted());
+        p.setFont(Theme::baseFont(9, QFont::DemiBold));
+        p.drawText(head, Qt::AlignRight | Qt::AlignVCenter, "ESC close");
+
+        QRectF body = overlay.adjusted(Theme::px(14), Theme::px(44), -Theme::px(14), -Theme::px(14));
+        const float navW = Theme::pxF(28.0f);
+        const float gapCard = Theme::pxF(12.0f);
+        const float cardW = std::min(body.width() - navW * 2.0f - gapCard * 2.0f, Theme::pxF(340.0f));
+        const float cardH = body.height();
+        const int visibleCount = std::max(1, static_cast<int>((body.width() - navW * 2.0f + gapCard) /
+                                                              (cardW + gapCard)));
+
+        m_editorLeftRect = QRectF(body.left(), body.center().y() - Theme::pxF(24.0f),
+                                  navW, Theme::pxF(48.0f));
+        m_editorRightRect = QRectF(body.right() - navW, body.center().y() - Theme::pxF(24.0f),
+                                   navW, Theme::pxF(48.0f));
+        auto drawNav = [&](const QRectF &r, const QString &txt, bool active) {
+            p.setBrush(active ? Theme::bg3() : Theme::withAlpha(Theme::bg2(), 120));
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+            p.setPen(active ? Theme::text() : Theme::textMuted());
+            p.setFont(Theme::condensedFont(13, QFont::Bold));
+            p.drawText(r, Qt::AlignCenter, txt);
+        };
+
+        auto pushEditorHit = [&](const QRectF &r, const QString &id, int slot, int value = 0) {
+            EditorHit hit;
+            hit.rect = r;
+            hit.id = id;
+            hit.slot = slot;
+            hit.value = value;
+            m_editorHits.push_back(hit);
+        };
+
+        auto drawBox = [&](const QRectF &r, const QString &label, const QString &value,
+                           const QString &id, int slot, bool active = false, int hitValue = 0) {
+            p.setBrush(active ? Theme::accentAlt() : Theme::bg2());
+            p.setPen(QPen(Theme::stroke(), 1.0));
+            p.drawRoundedRect(r, Theme::px(8), Theme::px(8));
+            p.setPen(active ? Theme::bg0() : Theme::textMuted());
+            p.setFont(Theme::baseFont(8, QFont::DemiBold));
+            p.drawText(QRectF(r.left() + Theme::pxF(8.0f), r.top() + Theme::pxF(4.0f),
+                              r.width() - Theme::pxF(16.0f), Theme::pxF(12.0f)),
+                       Qt::AlignLeft | Qt::AlignVCenter, label);
+            p.setPen(active ? Theme::bg0() : Theme::text());
+            p.setFont(Theme::baseFont(10, QFont::DemiBold));
+            p.drawText(QRectF(r.left() + Theme::pxF(8.0f), r.center().y() - Theme::pxF(10.0f),
+                              r.width() - Theme::pxF(16.0f), Theme::pxF(20.0f)),
+                       Qt::AlignCenter, value);
+            p.setPen(active ? Theme::bg0() : Theme::textMuted());
+            p.setFont(Theme::baseFont(7, QFont::DemiBold));
+            p.drawText(QRectF(r.left() + Theme::pxF(6.0f), r.bottom() - Theme::pxF(14.0f),
+                              r.width() - Theme::pxF(12.0f), Theme::pxF(10.0f)),
+                       Qt::AlignCenter, "- / +");
+            pushEditorHit(r, id, slot, hitValue);
+        };
+
+        auto drawAssignments = [&](const QRectF &r, const std::array<float, PadBank::kModTargetCount> &assign) {
+            QStringList labels;
+            for (int i = 1; i < PadBank::kModTargetCount; ++i) {
+                if (assign[static_cast<size_t>(i)] > 0.001f) {
+                    labels << modTargetLabel(i);
+                }
+            }
+            p.setPen(Theme::textMuted());
+            p.setFont(Theme::baseFont(7, QFont::DemiBold));
+            p.drawText(r, Qt::AlignLeft | Qt::AlignTop,
+                       labels.isEmpty() ? "NO TARGETS" : labels.join("  "));
+        };
+
+        if (m_editorMode == EditorMode::Lfo) {
+            QVector<int> slots;
+            for (int i = 0; i < PadBank::kLfoModuleCount; ++i) {
+                if (sp.lfoModules[static_cast<size_t>(i)].enabled) {
+                    slots.push_back(i);
+                }
+            }
+            bool hasFree = slots.size() < PadBank::kLfoModuleCount;
+            m_lfoScroll = qBound(0, m_lfoScroll, std::max(0, slots.size() - visibleCount));
+            drawNav(m_editorLeftRect, "<", m_lfoScroll > 0);
+            drawNav(m_editorRightRect, ">", m_lfoScroll + visibleCount < slots.size());
+            float x = m_editorLeftRect.right() + gapCard;
+            int drawn = 0;
+            for (int i = m_lfoScroll; i < slots.size() && drawn < visibleCount; ++i, ++drawn) {
+                const int slot = slots[i];
+                const auto &module = sp.lfoModules[static_cast<size_t>(slot)];
+                const QRectF card(x, body.top(), cardW, cardH);
+                x += cardW + gapCard;
+                const bool activeCard = (slot == m_activeLfoSlot);
+                p.setBrush(activeCard ? Theme::withAlpha(Theme::accentAlt(), 52) : Theme::bg2());
+                p.setPen(QPen(activeCard ? Theme::accentAlt() : Theme::stroke(), activeCard ? 1.6 : 1.0));
+                p.drawRoundedRect(card, Theme::px(12), Theme::px(12));
+                pushEditorHit(card, "lfo-select", slot);
+
+                QRectF titleRect(card.left() + Theme::pxF(12.0f), card.top() + Theme::pxF(10.0f),
+                                 card.width() - Theme::pxF(24.0f), Theme::pxF(20.0f));
+                p.setPen(Theme::text());
+                p.setFont(Theme::condensedFont(12, QFont::Bold));
+                p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+                           QString("LFO %1").arg(slot + 1));
+
+                QRectF bindRect(card.right() - Theme::pxF(74.0f), card.top() + Theme::pxF(8.0f),
+                                Theme::pxF(42.0f), Theme::pxF(20.0f));
+                p.setBrush(Theme::bg3());
+                p.setPen(QPen(Theme::stroke(), 1.0));
+                p.drawRoundedRect(bindRect, Theme::px(6), Theme::px(6));
+                p.setPen(Theme::text());
+                p.setFont(Theme::baseFont(8, QFont::DemiBold));
+                p.drawText(bindRect, Qt::AlignCenter, "BIND");
+                pushEditorHit(bindRect, "lfo-bind", slot);
+
+                QRectF closeRect(card.right() - Theme::pxF(24.0f), card.top() + Theme::pxF(8.0f),
+                                 Theme::pxF(16.0f), Theme::pxF(20.0f));
+                p.setPen(Theme::textMuted());
+                p.drawText(closeRect, Qt::AlignCenter, "x");
+                pushEditorHit(closeRect, "lfo-remove", slot);
+
+                QRectF kindA(card.left() + Theme::pxF(12.0f), card.top() + Theme::pxF(38.0f),
+                             Theme::pxF(76.0f), Theme::pxF(22.0f));
+                QRectF kindB(kindA.right() + Theme::pxF(8.0f), kindA.top(),
+                             Theme::pxF(76.0f), kindA.height());
+                p.setBrush(module.kind == 0 ? Theme::accent() : Theme::bg3());
+                p.setPen(QPen(Theme::stroke(), 1.0));
+                p.drawRoundedRect(kindA, Theme::px(7), Theme::px(7));
+                p.setBrush(module.kind == 1 ? Theme::accentAlt() : Theme::bg3());
+                p.drawRoundedRect(kindB, Theme::px(7), Theme::px(7));
+                p.setPen(Theme::bg0());
+                p.drawText(kindA, Qt::AlignCenter, "SMOOTH");
+                p.drawText(kindB, Qt::AlignCenter, "TRANCE");
+                pushEditorHit(kindA, "lfo-kind", slot, 0);
+                pushEditorHit(kindB, "lfo-kind", slot, 1);
+
+                if (module.kind == 1) {
+                    QRectF ringRect(card.left() + Theme::pxF(24.0f), card.top() + Theme::pxF(74.0f),
+                                    card.width() - Theme::pxF(48.0f), card.height() * 0.42f);
+                    const QPointF center = ringRect.center();
+                    const float outer = std::min(ringRect.width(), ringRect.height()) * 0.42f;
+                    const float inner = outer * 0.63f;
+                    const int steps = std::max(1, std::min(PadBank::kLfoPatternSteps, module.steps));
+                    for (int step = 0; step < steps; ++step) {
+                        const float a0 = -90.0f + 360.0f * (step / static_cast<float>(steps));
+                        const float a1 = -90.0f + 360.0f * ((step + 1) / static_cast<float>(steps));
+                        const float level = clamp01(module.pattern[static_cast<size_t>(step)]);
+                        QPainterPath seg;
+                        seg.arcMoveTo(QRectF(center.x() - outer, center.y() - outer, outer * 2, outer * 2), a0);
+                        seg.arcTo(QRectF(center.x() - outer, center.y() - outer, outer * 2, outer * 2),
+                                  a0, a1 - a0);
+                        seg.arcTo(QRectF(center.x() - inner, center.y() - inner, inner * 2, inner * 2),
+                                  a1, a0 - a1);
+                        seg.closeSubpath();
+                        p.setBrush(level > 0.5f ? Theme::accent() : Theme::bg3());
+                        p.setPen(QPen(Theme::stroke(), 1.0));
+                        p.drawPath(seg);
+                        const float mid = (a0 + a1) * 0.5f * static_cast<float>(M_PI) / 180.0f;
+                        const float rr = (outer + inner) * 0.5f;
+                        QRectF hitRect(center.x() + std::cos(mid) * rr - Theme::pxF(12.0f),
+                                       center.y() + std::sin(mid) * rr - Theme::pxF(12.0f),
+                                       Theme::pxF(24.0f), Theme::pxF(24.0f));
+                        pushEditorHit(hitRect, "lfo-step", slot, step);
+                    }
+                    const double nowSec =
+                        QDateTime::currentMSecsSinceEpoch() / 1000.0;
+                    const float markerAng =
+                        -90.0f + 360.0f *
+                                     std::fmod(static_cast<float>(nowSec * (0.2 + module.rate * 2.0f)),
+                                               1.0f);
+                    const float markerRad = markerAng * static_cast<float>(M_PI) / 180.0f;
+                    const QPointF marker(center.x() + std::cos(markerRad) * outer,
+                                         center.y() + std::sin(markerRad) * outer);
+                    p.setBrush(Theme::warn());
+                    p.setPen(Qt::NoPen);
+                    p.drawEllipse(marker, Theme::pxF(5.0f), Theme::pxF(5.0f));
+
+                    const float stepsY = ringRect.bottom() + Theme::pxF(8.0f);
+                    drawBox(QRectF(card.left() + Theme::pxF(14.0f), stepsY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                            "STEPS", QString::number(module.steps), "lfo-steps", slot);
+                    drawBox(QRectF(card.left() + Theme::pxF(120.0f), stepsY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                            "DEPTH", QString("%1%").arg(qRound(module.depth * 100.0f)),
+                            "lfo-depth", slot);
+                    drawBox(QRectF(card.left() + Theme::pxF(226.0f), stepsY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                            "SYNC", QString("1/%1").arg(module.sync ? (1 << std::min(5, module.syncIndex)) : 4),
+                            "lfo-sync", slot, module.sync != 0);
+                } else {
+                    QRectF waveRect(card.left() + Theme::pxF(18.0f), card.top() + Theme::pxF(74.0f),
+                                    card.width() - Theme::pxF(36.0f), card.height() * 0.34f);
+                    p.setBrush(Theme::bg3());
+                    p.setPen(QPen(Theme::stroke(), 1.0));
+                    p.drawRoundedRect(waveRect, Theme::px(10), Theme::px(10));
+                    QRectF graph = waveRect.adjusted(Theme::pxF(10.0f), Theme::pxF(10.0f),
+                                                    -Theme::pxF(10.0f), -Theme::pxF(10.0f));
+                    drawWave(graph, Theme::accent(), [&](float t) {
+                        const float sine = std::sin(kTwoPi * t);
+                        const float square = (t < 0.5f) ? 1.0f : -1.0f;
+                        return sine * (1.0f - module.morph) + square * module.morph;
+                    });
+                    const float rowY = waveRect.bottom() + Theme::pxF(12.0f);
+                    drawBox(QRectF(card.left() + Theme::pxF(14.0f), rowY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                            "SHAPE", QString("%1%").arg(qRound(module.morph * 100.0f)),
+                            "lfo-shape", slot);
+                    drawBox(QRectF(card.left() + Theme::pxF(120.0f), rowY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                            "RATE", QString("%1").arg(module.sync ? QString("SYNC") :
+                                                      QString("%1Hz").arg(0.05f + module.rate * 10.0f, 0, 'f', 2)),
+                            "lfo-rate", slot);
+                    drawBox(QRectF(card.left() + Theme::pxF(226.0f), rowY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                            "DEPTH", QString("%1%").arg(qRound(module.depth * 100.0f)),
+                            "lfo-depth", slot);
+                    drawBox(QRectF(card.left() + Theme::pxF(14.0f), rowY + Theme::pxF(58.0f),
+                                   Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                            "SYNC", module.sync ? "ON" : "OFF", "lfo-sync", slot, module.sync != 0);
+                }
+
+                QRectF assignRect(card.left() + Theme::pxF(14.0f), card.bottom() - Theme::pxF(52.0f),
+                                  card.width() - Theme::pxF(28.0f), Theme::pxF(38.0f));
+                drawAssignments(assignRect, module.assign);
+            }
+            if (hasFree && drawn < visibleCount) {
+                m_editorAddRect = QRectF(x, body.top(), cardW, cardH);
+                p.setBrush(Theme::withAlpha(Theme::bg2(), 160));
+                p.setPen(QPen(Theme::stroke(), 1.0, Qt::DashLine));
+                p.drawRoundedRect(m_editorAddRect, Theme::px(12), Theme::px(12));
+                p.setPen(Theme::accent());
+                p.setFont(Theme::condensedFont(28, QFont::Bold));
+                p.drawText(m_editorAddRect, Qt::AlignCenter, "+");
+                p.setFont(Theme::baseFont(10, QFont::DemiBold));
+                p.drawText(m_editorAddRect.adjusted(0, Theme::px(42), 0, 0),
+                           Qt::AlignHCenter | Qt::AlignTop, "ADD LFO");
+            }
+        } else if (m_editorMode == EditorMode::Env) {
+            QVector<int> slots;
+            for (int i = 0; i < PadBank::kEnvModuleCount; ++i) {
+                if (sp.envModules[static_cast<size_t>(i)].enabled) {
+                    slots.push_back(i);
+                }
+            }
+            bool hasFree = slots.size() < PadBank::kEnvModuleCount;
+            m_envScroll = qBound(0, m_envScroll, std::max(0, slots.size() - visibleCount));
+            drawNav(m_editorLeftRect, "<", m_envScroll > 0);
+            drawNav(m_editorRightRect, ">", m_envScroll + visibleCount < slots.size());
+            float x = m_editorLeftRect.right() + gapCard;
+            int drawn = 0;
+            for (int i = m_envScroll; i < slots.size() && drawn < visibleCount; ++i, ++drawn) {
+                const int slot = slots[i];
+                const auto &module = sp.envModules[static_cast<size_t>(slot)];
+                const QRectF card(x, body.top(), cardW, cardH);
+                x += cardW + gapCard;
+                const bool activeCard = (slot == m_activeEnvSlot);
+                p.setBrush(activeCard ? Theme::withAlpha(Theme::accent(), 42) : Theme::bg2());
+                p.setPen(QPen(activeCard ? Theme::accent() : Theme::stroke(), activeCard ? 1.6 : 1.0));
+                p.drawRoundedRect(card, Theme::px(12), Theme::px(12));
+                pushEditorHit(card, "env-select", slot);
+
+                QRectF titleRect(card.left() + Theme::pxF(12.0f), card.top() + Theme::pxF(10.0f),
+                                 card.width() - Theme::pxF(24.0f), Theme::pxF(20.0f));
+                p.setPen(Theme::text());
+                p.setFont(Theme::condensedFont(12, QFont::Bold));
+                p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+                           QString("ADSR %1").arg(slot + 1));
+
+                QRectF bindRect(card.right() - Theme::pxF(74.0f), card.top() + Theme::pxF(8.0f),
+                                Theme::pxF(42.0f), Theme::pxF(20.0f));
+                p.setBrush(Theme::bg3());
+                p.setPen(QPen(Theme::stroke(), 1.0));
+                p.drawRoundedRect(bindRect, Theme::px(6), Theme::px(6));
+                p.setPen(Theme::text());
+                p.setFont(Theme::baseFont(8, QFont::DemiBold));
+                p.drawText(bindRect, Qt::AlignCenter, "BIND");
+                pushEditorHit(bindRect, "env-bind", slot);
+
+                QRectF closeRect(card.right() - Theme::pxF(24.0f), card.top() + Theme::pxF(8.0f),
+                                 Theme::pxF(16.0f), Theme::pxF(20.0f));
+                p.setPen(Theme::textMuted());
+                p.drawText(closeRect, Qt::AlignCenter, "x");
+                pushEditorHit(closeRect, "env-remove", slot);
+
+                QRectF graph(card.left() + Theme::pxF(18.0f), card.top() + Theme::pxF(54.0f),
+                             card.width() - Theme::pxF(36.0f), card.height() * 0.35f);
+                p.setBrush(Theme::bg3());
+                p.setPen(QPen(Theme::stroke(), 1.0));
+                p.drawRoundedRect(graph, Theme::px(10), Theme::px(10));
+                const QRectF pathRect = graph.adjusted(Theme::pxF(12.0f), Theme::pxF(12.0f),
+                                                       -Theme::pxF(12.0f), -Theme::pxF(12.0f));
+                const float a = clamp01(module.attack);
+                const float d = clamp01(module.decay);
+                const float s = clamp01(module.sustain);
+                const float r = clamp01(module.release);
+                const float sum = std::max(0.2f, a + d + r + 0.15f);
+                const float ax = pathRect.left() + pathRect.width() * (a / sum);
+                const float dx = ax + pathRect.width() * (d / sum);
+                const float rx = pathRect.right() - pathRect.width() * (r / sum);
+                QPainterPath envPath;
+                envPath.moveTo(pathRect.left(), pathRect.bottom());
+                envPath.lineTo(ax, pathRect.top());
+                envPath.lineTo(dx, pathRect.top() + (1.0f - s) * pathRect.height());
+                envPath.lineTo(rx, pathRect.top() + (1.0f - s) * pathRect.height());
+                envPath.lineTo(pathRect.right(), pathRect.bottom());
+                p.setPen(QPen(Theme::accent(), Theme::pxF(1.8f)));
+                p.drawPath(envPath);
+
+                const float rowY = graph.bottom() + Theme::pxF(14.0f);
+                drawBox(QRectF(card.left() + Theme::pxF(14.0f), rowY, Theme::pxF(72.0f), Theme::pxF(48.0f)),
+                        "A", QString("%1ms").arg(qRound(module.attack * 2000.0f)), "env-attack", slot);
+                drawBox(QRectF(card.left() + Theme::pxF(92.0f), rowY, Theme::pxF(72.0f), Theme::pxF(48.0f)),
+                        "D", QString("%1ms").arg(qRound(module.decay * 2000.0f)), "env-decay", slot);
+                drawBox(QRectF(card.left() + Theme::pxF(170.0f), rowY, Theme::pxF(72.0f), Theme::pxF(48.0f)),
+                        "S", QString("%1%").arg(qRound(module.sustain * 100.0f)), "env-sustain", slot);
+                drawBox(QRectF(card.left() + Theme::pxF(248.0f), rowY, Theme::pxF(72.0f), Theme::pxF(48.0f)),
+                        "R", QString("%1ms").arg(qRound(module.release * 2000.0f)), "env-release", slot);
+
+                QRectF assignRect(card.left() + Theme::pxF(14.0f), card.bottom() - Theme::pxF(52.0f),
+                                  card.width() - Theme::pxF(28.0f), Theme::pxF(38.0f));
+                drawAssignments(assignRect, module.assign);
+            }
+            if (hasFree && drawn < visibleCount) {
+                m_editorAddRect = QRectF(x, body.top(), cardW, cardH);
+                p.setBrush(Theme::withAlpha(Theme::bg2(), 160));
+                p.setPen(QPen(Theme::stroke(), 1.0, Qt::DashLine));
+                p.drawRoundedRect(m_editorAddRect, Theme::px(12), Theme::px(12));
+                p.setPen(Theme::accent());
+                p.setFont(Theme::condensedFont(28, QFont::Bold));
+                p.drawText(m_editorAddRect, Qt::AlignCenter, "+");
+                p.setFont(Theme::baseFont(10, QFont::DemiBold));
+                p.drawText(m_editorAddRect.adjusted(0, Theme::px(42), 0, 0),
+                           Qt::AlignHCenter | Qt::AlignTop, "ADD ADSR");
+            }
+        } else if (m_editorMode == EditorMode::Filter) {
+            const QStringList presets = filterPresetNames();
+            QVector<int> slots;
+            for (int i = 0; i < PadBank::kFilterModuleCount; ++i) {
+                if (sp.filterModules[static_cast<size_t>(i)].enabled) {
+                    slots.push_back(i);
+                }
+            }
+            bool hasFree = slots.size() < PadBank::kFilterModuleCount;
+            m_filterScroll = qBound(0, m_filterScroll, std::max(0, slots.size() - visibleCount));
+            drawNav(m_editorLeftRect, "<", m_filterScroll > 0);
+            drawNav(m_editorRightRect, ">", m_filterScroll + visibleCount < slots.size());
+            float x = m_editorLeftRect.right() + gapCard;
+            int drawn = 0;
+            for (int i = m_filterScroll; i < slots.size() && drawn < visibleCount; ++i, ++drawn) {
+                const int slot = slots[i];
+                const auto &module = sp.filterModules[static_cast<size_t>(slot)];
+                const QRectF card(x, body.top(), cardW, cardH);
+                x += cardW + gapCard;
+                const bool activeCard = (slot == m_activeFilterSlot);
+                p.setBrush(activeCard ? Theme::withAlpha(Theme::warn(), 38) : Theme::bg2());
+                p.setPen(QPen(activeCard ? Theme::warn() : Theme::stroke(), activeCard ? 1.6 : 1.0));
+                p.drawRoundedRect(card, Theme::px(12), Theme::px(12));
+                pushEditorHit(card, "filter-select", slot);
+
+                QRectF titleRect(card.left() + Theme::pxF(12.0f), card.top() + Theme::pxF(10.0f),
+                                 card.width() - Theme::pxF(24.0f), Theme::pxF(20.0f));
+                p.setPen(Theme::text());
+                p.setFont(Theme::condensedFont(12, QFont::Bold));
+                p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+                           QString("FILTER %1").arg(slot + 1));
+                QRectF closeRect(card.right() - Theme::pxF(24.0f), card.top() + Theme::pxF(8.0f),
+                                 Theme::pxF(16.0f), Theme::pxF(20.0f));
+                p.setPen(Theme::textMuted());
+                p.drawText(closeRect, Qt::AlignCenter, "x");
+                pushEditorHit(closeRect, "filter-remove", slot);
+
+                QRectF presetRect(card.left() + Theme::pxF(14.0f), card.top() + Theme::pxF(42.0f),
+                                  card.width() - Theme::pxF(28.0f), Theme::pxF(44.0f));
+                drawBox(presetRect, "PRESET", presets.value(module.preset, presets.first()),
+                        "filter-preset", slot, activeCard);
+
+                QRectF graph(card.left() + Theme::pxF(18.0f), presetRect.bottom() + Theme::pxF(10.0f),
+                             card.width() - Theme::pxF(36.0f), card.height() * 0.32f);
+                p.setBrush(Theme::bg3());
+                p.setPen(QPen(Theme::stroke(), 1.0));
+                p.drawRoundedRect(graph, Theme::px(10), Theme::px(10));
+                const QRectF g = graph.adjusted(Theme::pxF(10.0f), Theme::pxF(10.0f),
+                                                -Theme::pxF(10.0f), -Theme::pxF(10.0f));
+                QPainterPath response;
+                response.moveTo(g.left(), g.center().y());
+                response.lineTo(g.left() + g.width() * module.lowCut, g.center().y());
+                const float lowX = g.left() + g.width() * module.lowCut;
+                const float highX = g.left() + g.width() * module.highCut;
+                response.lineTo(lowX, g.bottom());
+                response.lineTo(highX, g.top());
+                response.lineTo(g.right(), g.top());
+                p.setPen(QPen(Theme::accent(), Theme::pxF(1.6f)));
+                p.drawPath(response);
+
+                const float rowY = graph.bottom() + Theme::pxF(12.0f);
+                drawBox(QRectF(card.left() + Theme::pxF(14.0f), rowY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                        "LOW", QString("%1%").arg(qRound(module.lowCut * 100.0f)), "filter-low", slot);
+                drawBox(QRectF(card.left() + Theme::pxF(120.0f), rowY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                        "HIGH", QString("%1%").arg(qRound(module.highCut * 100.0f)), "filter-high", slot);
+                drawBox(QRectF(card.left() + Theme::pxF(226.0f), rowY, Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                        "RESO", QString("%1%").arg(qRound(module.resonance * 100.0f)), "filter-reso", slot);
+                drawBox(QRectF(card.left() + Theme::pxF(14.0f), rowY + Theme::pxF(58.0f), Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                        "SLOPE", QString("%1%").arg(qRound(module.slope * 100.0f)), "filter-slope", slot);
+                drawBox(QRectF(card.left() + Theme::pxF(120.0f), rowY + Theme::pxF(58.0f), Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                        "DRIVE", QString("%1%").arg(qRound(module.drive * 100.0f)), "filter-drive", slot);
+                drawBox(QRectF(card.left() + Theme::pxF(226.0f), rowY + Theme::pxF(58.0f), Theme::pxF(96.0f), Theme::pxF(48.0f)),
+                        "MIX", QString("%1%").arg(qRound(module.mix * 100.0f)), "filter-mix", slot);
+            }
+            if (hasFree && drawn < visibleCount) {
+                m_editorAddRect = QRectF(x, body.top(), cardW, cardH);
+                p.setBrush(Theme::withAlpha(Theme::bg2(), 160));
+                p.setPen(QPen(Theme::stroke(), 1.0, Qt::DashLine));
+                p.drawRoundedRect(m_editorAddRect, Theme::px(12), Theme::px(12));
+                p.setPen(Theme::accent());
+                p.setFont(Theme::condensedFont(28, QFont::Bold));
+                p.drawText(m_editorAddRect, Qt::AlignCenter, "+");
+                p.setFont(Theme::baseFont(10, QFont::DemiBold));
+                p.drawText(m_editorAddRect.adjusted(0, Theme::px(42), 0, 0),
+                           Qt::AlignHCenter | Qt::AlignTop, "ADD FILTER");
+            }
+        }
+        p.restore();
     }
 }
 

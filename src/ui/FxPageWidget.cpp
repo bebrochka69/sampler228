@@ -26,6 +26,38 @@ float hash2(int x, int y, int t) {
     const int nn = (n ^ (n >> 13)) * 1274126177;
     return (nn & 0x7fffffff) / static_cast<float>(0x7fffffff);
 }
+
+QStringList effectGroups() {
+    return {"ALL", "DYNAMICS", "DIST", "MOD", "SPACE", "EQ/FILTER", "VISUAL"};
+}
+
+QString effectGroupFor(const QString &effect) {
+    const QString fx = effect.toLower();
+    if (fx == "comp" || fx == "ott" || fx == "limiter" || fx == "clipper" ||
+        fx == "gate" || fx == "gain" || fx == "transient" || fx == "sidechan") {
+        return "DYNAMICS";
+    }
+    if (fx == "dist" || fx == "saturator" || fx == "lofi" || fx == "cassette" ||
+        fx == "tape" || fx == "ringmod" || fx == "robot" || fx == "punch" ||
+        fx == "subharm" || fx == "keyharm" || fx == "freeze" || fx == "noise") {
+        return "DIST";
+    }
+    if (fx == "chorus" || fx == "flanger" || fx == "phaser" || fx == "tremolo" ||
+        fx == "autopan" || fx == "stereo" || fx == "pan" || fx == "chopper") {
+        return "MOD";
+    }
+    if (fx == "delay" || fx == "reverb" || fx == "delay pitch" || fx == "pad" ||
+        fx == "vocoder") {
+        return "SPACE";
+    }
+    if (fx == "eq" || fx == "filter") {
+        return "EQ/FILTER";
+    }
+    if (fx == "spectrum" || fx == "tuner" || fx == "autotune") {
+        return "VISUAL";
+    }
+    return "ALL";
+}
 }  // namespace
 
 FxPageWidget::FxPageWidget(PadBank *pads, QWidget *parent) : QWidget(parent), m_pads(pads) {
@@ -169,9 +201,20 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
 
     if (m_showMenu) {
         const int cols = 4;
-        const int rows = qMax(1, (m_effects.size() + cols - 1) / cols);
-        int row = m_selectedEffect / cols;
-        int col = m_selectedEffect % cols;
+        const QVector<int> &list = m_visibleEffectIndices.isEmpty() ? QVector<int>() : m_visibleEffectIndices;
+        const int count = list.isEmpty() ? m_effects.size() : list.size();
+        const int rows = qMax(1, (count + cols - 1) / cols);
+        int visibleIndex = 0;
+        if (!list.isEmpty()) {
+            visibleIndex = list.indexOf(m_selectedEffect);
+            if (visibleIndex < 0) {
+                visibleIndex = 0;
+            }
+        } else {
+            visibleIndex = m_selectedEffect;
+        }
+        int row = visibleIndex / cols;
+        int col = visibleIndex % cols;
         if (key == Qt::Key_Left) {
             col = (col - 1 + cols) % cols;
         } else if (key == Qt::Key_Right) {
@@ -184,10 +227,11 @@ void FxPageWidget::keyPressEvent(QKeyEvent *event) {
             return;
         }
         int next = row * cols + col;
-        if (next >= m_effects.size()) {
-            next = m_effects.size() - 1;
+        if (next >= count) {
+            next = count - 1;
         }
-        m_selectedEffect = qMax(0, next);
+        next = qMax(0, next);
+        m_selectedEffect = list.isEmpty() ? next : list[next];
         update();
         return;
     }
@@ -385,6 +429,13 @@ void FxPageWidget::mousePressEvent(QMouseEvent *event) {
     }
 
     if (m_showMenu) {
+        for (int i = 0; i < m_groupHits.size(); ++i) {
+            if (m_groupHits[i].contains(pos)) {
+                m_selectedGroup = i;
+                update();
+                return;
+            }
+        }
         for (const FxEffectHit &hit : m_effectHits) {
             if (hit.rect.contains(pos)) {
                 m_selectedEffect = hit.index;
@@ -1425,18 +1476,53 @@ void FxPageWidget::paintEvent(QPaintEvent *event) {
                           menuRect.width() - Theme::px(32), Theme::px(24)),
                    Qt::AlignLeft | Qt::AlignVCenter, "PLUGIN MENU");
 
+        m_groupHits.clear();
+        m_visibleEffectIndices.clear();
+        const QStringList groups = effectGroups();
+        m_selectedGroup = qBound(0, m_selectedGroup, groups.size() - 1);
+        const QRectF groupRect(menuRect.left() + Theme::px(16), menuRect.top() + Theme::px(40),
+                               menuRect.width() - Theme::px(32), Theme::px(34));
+        const float groupGap = Theme::pxF(8.0f);
+        const float groupW = (groupRect.width() - groupGap * (groups.size() - 1)) / groups.size();
+        for (int i = 0; i < groups.size(); ++i) {
+            const QRectF tab(groupRect.left() + i * (groupW + groupGap), groupRect.top(),
+                             groupW, groupRect.height());
+            m_groupHits.push_back(tab);
+            const bool active = (i == m_selectedGroup);
+            p.setBrush(active ? Theme::accentAlt() : Theme::bg1());
+            p.setPen(QPen(active ? Theme::accent() : Theme::stroke(), 1.0));
+            p.drawRoundedRect(tab, Theme::px(8), Theme::px(8));
+            p.setPen(active ? Theme::bg0() : Theme::textMuted());
+            p.setFont(Theme::baseFont(8, QFont::DemiBold));
+            p.drawText(tab, Qt::AlignCenter, groups[i]);
+        }
+
+        const QString currentGroup = groups.value(m_selectedGroup, "ALL");
+        for (int i = 0; i < m_effects.size(); ++i) {
+            if (currentGroup == "ALL" || effectGroupFor(m_effects[i]) == currentGroup) {
+                m_visibleEffectIndices.push_back(i);
+            }
+        }
+        if (m_visibleEffectIndices.isEmpty()) {
+            for (int i = 0; i < m_effects.size(); ++i) {
+                m_visibleEffectIndices.push_back(i);
+            }
+        }
+
         const int cols = 4;
-        const int rows = qMax(1, (m_effects.size() + cols - 1) / cols);
+        const int rows = qMax(1, (m_visibleEffectIndices.size() + cols - 1) / cols);
         const float gridGap = Theme::pxF(12.0f);
-        const QRectF gridRect(menuRect.left() + Theme::px(16), menuRect.top() + Theme::px(48),
-                              menuRect.width() - Theme::px(32), menuRect.height() - Theme::px(64));
+        const QRectF gridRect(menuRect.left() + Theme::px(16), groupRect.bottom() + Theme::px(12),
+                              menuRect.width() - Theme::px(32),
+                              menuRect.bottom() - groupRect.bottom() - Theme::px(28));
         const float cellW = (gridRect.width() - (cols - 1) * gridGap) / cols;
         const float cellH = (gridRect.height() - (rows - 1) * gridGap) / rows;
 
         p.setFont(Theme::baseFont(12, QFont::DemiBold));
-        for (int i = 0; i < m_effects.size(); ++i) {
-            const int r = i / cols;
-            const int c = i % cols;
+        for (int visible = 0; visible < m_visibleEffectIndices.size(); ++visible) {
+            const int i = m_visibleEffectIndices[visible];
+            const int r = visible / cols;
+            const int c = visible % cols;
             const QRectF cell(gridRect.left() + c * (cellW + gridGap),
                               gridRect.top() + r * (cellH + gridGap), cellW, cellH);
             const bool selected = (i == m_selectedEffect);

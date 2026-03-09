@@ -18,6 +18,10 @@ class AudioEngine : public QObject {
     Q_OBJECT
 public:
     static constexpr int kModTargetCount = 17;
+    static constexpr int kLfoModuleCount = 4;
+    static constexpr int kEnvModuleCount = 4;
+    static constexpr int kFilterModuleCount = 4;
+    static constexpr int kLfoPatternSteps = 32;
     enum class SynthKind {
         Dx7,
         Simple,
@@ -36,6 +40,38 @@ public:
     };
 
     struct FmParams {
+        struct LfoModule {
+            bool enabled = false;
+            int kind = 0;
+            int shape = 0;
+            float morph = 0.0f;
+            float rate = 0.2f;
+            float depth = 0.5f;
+            int sync = 1;
+            int syncIndex = 3;
+            int steps = 16;
+            std::array<float, kLfoPatternSteps> pattern{};
+            std::array<float, kModTargetCount> assign{};
+        };
+        struct EnvModule {
+            bool enabled = false;
+            float attack = 0.0f;
+            float decay = 0.25f;
+            float sustain = 1.0f;
+            float release = 0.25f;
+            std::array<float, kModTargetCount> assign{};
+        };
+        struct FilterModule {
+            bool enabled = false;
+            int preset = 0;
+            int type = 0;
+            float lowCut = 0.0f;
+            float highCut = 1.0f;
+            float resonance = 0.0f;
+            float slope = 0.0f;
+            float drive = 0.0f;
+            float mix = 1.0f;
+        };
         float fmAmount = 0.4f;
         float ratio = 1.0f;
         float feedback = 0.0f;
@@ -67,6 +103,9 @@ public:
         std::array<float, 8> macros{};
         std::array<float, kModTargetCount> lfoAssign{};
         std::array<float, kModTargetCount> envAssign{};
+        std::array<LfoModule, kLfoModuleCount> lfoModules{};
+        std::array<EnvModule, kEnvModuleCount> envModules{};
+        std::array<FilterModule, kFilterModuleCount> filterModules{};
     };
     struct EffectSettings {
         int type = 0;
@@ -227,15 +266,25 @@ private:
         int lfoSyncIndex = 0;
         int lfoTarget = 0;
         float lfoPhase = 0.0f;
+        uint32_t lfoNoise = 0x1234567u;
+        float lfoHold = 0.0f;
+        std::array<float, kLfoModuleCount> lfoPhaseModules{};
+        std::array<uint32_t, kLfoModuleCount> lfoNoiseModules{};
+        std::array<float, kLfoModuleCount> lfoHoldModules{};
         float filterIc1L = 0.0f;
         float filterIc2L = 0.0f;
         float filterIc1R = 0.0f;
         float filterIc2R = 0.0f;
+        std::array<float, kFilterModuleCount> filterIc1LModules{};
+        std::array<float, kFilterModuleCount> filterIc2LModules{};
+        std::array<float, kFilterModuleCount> filterIc1RModules{};
+        std::array<float, kFilterModuleCount> filterIc2RModules{};
         float env = 0.0f;
         EnvStage envStage = EnvStage::Attack;
         bool releaseRequested = false;
-        uint32_t lfoNoise = 0x1234567u;
-        float lfoHold = 0.0f;
+        std::array<float, kEnvModuleCount> envValues{};
+        std::array<EnvStage, kEnvModuleCount> envStages{};
+        std::array<bool, kEnvModuleCount> envReleaseRequested{};
     };
 
     void start();
