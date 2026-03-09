@@ -2021,9 +2021,44 @@ static AudioEngine::FmParams buildFmParams(const PadBank::SynthParams &sp) {
     fm.macros = sp.macros;
     fm.lfoAssign = sp.lfoAssign;
     fm.envAssign = sp.envAssign;
-    fm.lfoModules = sp.lfoModules;
-    fm.envModules = sp.envModules;
-    fm.filterModules = sp.filterModules;
+    for (size_t i = 0; i < fm.lfoModules.size(); ++i) {
+        const auto &src = sp.lfoModules[i];
+        auto &dst = fm.lfoModules[i];
+        dst.enabled = src.enabled;
+        dst.kind = src.kind;
+        dst.shape = src.shape;
+        dst.morph = src.morph;
+        dst.rate = src.rate;
+        dst.depth = src.depth;
+        dst.sync = src.sync;
+        dst.syncIndex = src.syncIndex;
+        dst.steps = src.steps;
+        dst.pattern = src.pattern;
+        dst.assign = src.assign;
+    }
+    for (size_t i = 0; i < fm.envModules.size(); ++i) {
+        const auto &src = sp.envModules[i];
+        auto &dst = fm.envModules[i];
+        dst.enabled = src.enabled;
+        dst.attack = src.attack;
+        dst.decay = src.decay;
+        dst.sustain = src.sustain;
+        dst.release = src.release;
+        dst.assign = src.assign;
+    }
+    for (size_t i = 0; i < fm.filterModules.size(); ++i) {
+        const auto &src = sp.filterModules[i];
+        auto &dst = fm.filterModules[i];
+        dst.enabled = src.enabled;
+        dst.preset = src.preset;
+        dst.type = src.type;
+        dst.lowCut = src.lowCut;
+        dst.highCut = src.highCut;
+        dst.resonance = src.resonance;
+        dst.slope = src.slope;
+        dst.drive = src.drive;
+        dst.mix = src.mix;
+    }
     return fm;
 }
 
