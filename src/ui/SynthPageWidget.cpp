@@ -2389,10 +2389,11 @@ void SynthPageWidget::paintEvent(QPaintEvent *event) {
         p.drawText(head, Qt::AlignRight | Qt::AlignVCenter, "ESC close");
 
         QRectF body = overlay.adjusted(Theme::px(14), Theme::px(44), -Theme::px(14), -Theme::px(14));
-        const float navW = Theme::pxF(28.0f);
-        const float gapCard = Theme::pxF(12.0f);
-        const float cardW = std::min(body.width() - navW * 2.0f - gapCard * 2.0f, Theme::pxF(340.0f));
-        const float cardH = body.height();
+        const qreal navW = Theme::pxF(28.0f);
+        const qreal gapCard = Theme::pxF(12.0f);
+        const qreal cardW =
+            std::min<qreal>(body.width() - navW * 2.0 - gapCard * 2.0, Theme::pxF(340.0f));
+        const qreal cardH = body.height();
         const int visibleCount = std::max(1, static_cast<int>((body.width() - navW * 2.0f + gapCard) /
                                                               (cardW + gapCard)));
 
